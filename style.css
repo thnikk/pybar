@@ -1,4 +1,4 @@
-@define-color black rgba(28,31,38,0.9);
+@define-color black rgba(28,31,38,0.5);
 @define-color gray rgba(255,255,255,0.05);
 @define-color light_gray rgba(255,255,255,0.35);
 @define-color white #d8dee9;
@@ -13,6 +13,30 @@ window {
 
 tooltip {
 	font-family: "Iosevka Custom"
+}
+
+popover {
+	background: @black;
+	border: 1px solid @gray;
+	border-radius: 20px;
+	box-shadow: none;
+	padding: 10px;
+	font-family: "Nunito";
+}
+
+.heading {
+	padding: 0px 10px;
+	border-radius: 10px;
+	border: 1px solid @gray;
+	background: @gray;
+	font-size: 24px;
+	font-weight: normal;
+}
+
+calendar {
+	background: transparent;
+	border: none;
+	font-size: 16px;
 }
 
 .bar {

@@ -9,70 +9,32 @@ import calendar
 from datetime import datetime
 import concurrent.futures
 import common as c
+from waybar_module import waybar_module
+from sway_module import sway_module
+from clock_module import clock_module
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('GtkLayerShell', '0.1')
+from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
 
 
-def switch_workspace(module, workspace):
-    """ Click action for workspaces """
-    del module
-    run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
-
-
-def sway(box):
-    """ Sway workspaces """
-    buttons = []
-    for x in range(0, 10):
-        button = c.button(label=str(x), style='workspace')
-        button.connect('clicked', switch_workspace, x)
-        buttons.append(button)
-        box.add(button)
-
-    while True:
-        output = c.load_module(['swaymsg', '-t', 'get_workspaces'])
-        workspaces = [workspace['name'] for workspace in output]
-        focused = [
-            workspace['name'] for workspace in output
-            if workspace['focused']
-        ][0]
-        for x in range(0, 10):
-            if str(x) not in workspaces:
-                buttons[x].hide()
-            else:
-                buttons[x].show()
-        for workspace in buttons:
-            workspace.get_style_context().remove_class('focused')
-        buttons[int(focused)].get_style_context().add_class("focused")
-        time.sleep(0.1)
-
-
-def clock(label):
-    """ d """
-    while True:
-        label.set_label(f" {datetime.now().strftime('%I:%M %m/%d')}")
-        now = datetime.now()
-        cal = calendar.TextCalendar(firstweekday=6)
-        label.props.tooltip_text = cal.formatmonth(
-            now.year, now.month).rstrip()
-        time.sleep(1)
-
-
-def waybar_module(label, command, interval):
-    """ d """
-    while True:
-        output = c.load_module(command)
-        if output['text']:
-            label.set_visible(True)
-        else:
-            label.set_visible(False)
-        label.set_label(output['text'])
-        try:
-            label.get_style_context().add_class(output['class'])
-        except KeyError:
-            pass
-        try:
-            label.props.tooltip_markup = output['tooltip']
-        except KeyError:
-            pass
-        time.sleep(interval)
+def pop():
+    """ Thing """
+    popover = Gtk.Popover()
+    # popover.set_position(Gtk.PositionType.TOP)
+    # popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
+    # popover.set_modal(True)
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    vbox.pack_start(c.label('Calendar', style='heading'), 0, 0, 0)
+    # for x in range(0, 3):
+    #     vbox.add(c.label(f'Thing {x}'))
+    cal = Gtk.Calendar.new()
+    cal.props.no_month_change = True
+    cal.mark_day(datetime.now().day)
+    vbox.add(cal)
+    vbox.show_all()
+    popover.add(vbox)
+    return popover
 
 
 def main():
@@ -80,8 +42,19 @@ def main():
     executor = concurrent.futures.ThreadPoolExecutor()
     pybar = c.Bar(spacing=5)
     pybar.css('style.css')
+
+    workspaces = c.box('h', style='workspaces')
+    pybar.left.pack_start(workspaces, 0, 0, 0)
+    executor.submit(sway_module, workspaces)
+
+    widget_button = Gtk.MenuButton(popover=pop())
+    widget_button.set_direction(Gtk.ArrowType.UP)
+    widget_button.get_style_context().add_class('module')
+    widget_button.get_style_context().add_class('popover-position-top')
+    pybar.right.pack_end(widget_button, 0, 0, 0)
+
     clock_button = c.label('Clock', style='module')
-    executor.submit(clock, clock_button)
+    executor.submit(clock_module, clock_button)
     pybar.right.pack_end(clock_button, 0, 0, 0)
 
     right_config = [
@@ -95,7 +68,7 @@ def main():
             "~/.venv/hoyo-stats/bin/python",
             "~/.local/bin/bar/hoyo-stats.py", "-g", "hsr"], 300],
         [["~/.local/bin/bar/ups.py", "0764", "0501"], 5],
-        [["~/.local/bin/bar/weather.py", "94002"], 300],
+        [["~/.local/bin/bar/weather-new.py", "94002"], 300],
     ]
 
     for command, interval in right_config:
@@ -104,10 +77,6 @@ def main():
         module.set_visible(False)
         module.set_no_show_all(True)
         executor.submit(waybar_module, module, command, interval=interval)
-
-    workspaces = c.box('h', style='workspaces')
-    pybar.left.pack_start(workspaces, 0, 0, 0)
-    executor.submit(sway, workspaces)
 
     executor.submit(pybar.start)
 

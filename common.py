@@ -1,16 +1,35 @@
+#!/usr/bin/python3 -u
+"""
+Description:
+Author:
+"""
 import os
 import json
-from subprocess import check_output, run
+from subprocess import check_output
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
 
 
-def load_module(command):
-    """ Load waybar module """
+def dict_from_cmd(command) -> dict:
     command = [os.path.expanduser(part) for part in command]
     return json.loads(check_output(command))
+
+
+def pop():
+    """ d """
+    popover = Gtk.Popover()
+    popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
+    popover.set_modal(True)
+    popover.set_position(Gtk.PositionType.TOP)
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    vbox.pack_start(Gtk.ModelButton(label="Item 1"), False, True, 10)
+    vbox.pack_start(Gtk.Label(label="Item 2"), False, True, 10)
+    vbox.show_all()
+    popover.add(vbox)
+    popover.set_position(Gtk.PositionType.TOP)
+    return popover
 
 
 def box(orientation, spacing=0, style=None):
@@ -137,6 +156,8 @@ class Bar:
             self.window, GtkLayerShell.Edge.RIGHT, margin)
         GtkLayerShell.set_margin(
             self.window, GtkLayerShell.Edge.BOTTOM, margin)
+        # GtkLayerShell.set_margin(
+        #     self.window, GtkLayerShell.Edge.TOP, 200)
 
         GtkLayerShell.set_namespace(self.window, 'waybar')
 
