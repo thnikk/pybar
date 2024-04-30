@@ -1,4 +1,4 @@
-@define-color black rgba(28,31,38,0.5);
+@define-color black rgba(28,31,38,0.75);
 @define-color gray rgba(255,255,255,0.05);
 @define-color light_gray rgba(255,255,255,0.35);
 @define-color white #d8dee9;
@@ -36,7 +36,22 @@ popover {
 calendar {
 	background: transparent;
 	border: none;
+	font-size: 20px;
+}
+
+.day {
+	min-width: 30px;
 	font-size: 16px;
+}
+
+.dow {
+	color: @light_gray;
+}
+
+.today {
+	background: @gray;
+	border: 1px solid @gray;
+	border-radius: 5px;
 }
 
 .bar {

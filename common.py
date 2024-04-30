@@ -43,6 +43,24 @@ def box(orientation, spacing=0, style=None):
     return obox
 
 
+def add_style(widget, style):
+    """ Add style to widget """
+    if isinstance(style, list):
+        for item in style:
+            widget.get_style_context().add_class(item)
+    else:
+        widget.get_style_context().add_class(style)
+
+
+def del_style(widget, style):
+    """ Add style to widget """
+    if isinstance(style, list):
+        for item in style:
+            widget.get_style_context().remove_class(item)
+    else:
+        widget.get_style_context().remove_class(style)
+
+
 def button(label=None, style=None):
     """ Button """
     __button__ = Gtk.Button.new()
