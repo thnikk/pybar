@@ -20,6 +20,9 @@ from gi.repository import Gtk, GLib, Gdk
 def pop(name):
     """ thing """
     popover = Gtk.Popover()
+    popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
+    popover.set_position(Gtk.PositionType.TOP)
+    popover.set_transitions_enabled(False)
     if name == 'weather':
         widget = weather_widget('~/.cache/weather-widget.json')
     elif name == 'genshin':
@@ -37,7 +40,7 @@ def pop(name):
             widget.add(c.label(f'Item {x}'))
     widget.show_all()
     popover.add(widget)
-    popover.set_pointing_to(Gdk.Rectangle(0, 0, 0, 0))
+    # popover.set_pointing_to(Gdk.Rectangle(0, 0, 0, 0))
     popover.set_position(Gtk.PositionType.TOP)
     return popover
 
@@ -57,6 +60,7 @@ def cache(name, command, interval):
 def module(name):
     """ Waybar module """
     button = c.mbutton(style='module')
+    button.set_direction(Gtk.ArrowType.UP)
     button.set_visible(False)
     button.set_no_show_all(True)
 
