@@ -17,11 +17,14 @@ def switch_workspace(module, workspace):
     run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
 
 
-def module():
+def module(icons):
     module = c.box('h', style='workspaces')
     buttons = []
-    for x in range(0, 10):
-        button = c.button(label=str(x), style='workspace')
+    for x in range(0, 11):
+        try:
+            button = c.button(label=icons[str(x)], style='workspace')
+        except KeyError:
+            button = c.button(label=str(x), style='workspace')
         button.hide()
         button.connect('clicked', switch_workspace, x)
         buttons.append(button)
@@ -33,7 +36,7 @@ def module():
         focused = [
             workspace['name'] for workspace in output
             if workspace['focused']][0]
-        for x in range(0, 10):
+        for x in range(0, 11):
             if str(x) not in workspaces:
                 buttons[x].hide()
             else:

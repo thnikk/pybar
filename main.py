@@ -39,18 +39,22 @@ def main():
         waybar.module(name) for name in config["modules-center"]
     ]
 
+    try:
+        icons = config["workspaces"]
+    except KeyError:
+        icons = {}
     modules_left = [
         waybar.module(name) for name in config["modules-left"]
     ] + [
-        sway.module()
+        sway.module(icons)
     ]
 
     pybar = c.Bar(spacing=5)
     pybar.css('style.css')
     for module in modules_left:
-        pybar.left.pack_start(module, 0, 0, 0)
+        pybar.left.pack_end(module, 0, 0, 0)
     for module in modules_center:
-        pybar.left.pack_start(module, 0, 0, 0)
+        pybar.center.pack_start(module, 0, 0, 0)
     for module in modules_right:
         pybar.right.pack_start(module, 0, 0, 0)
 
