@@ -21,7 +21,16 @@ popover {
 	border-radius: 20px;
 	box-shadow: none;
 	padding: 10px;
-	font-family: "Nunito";
+	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
+}
+
+button {
+	background: none;
+	border: 0;
+	margin: 0;
+	padding: 0;
+	text-shadow: none;
+	box-shadow: none;
 }
 
 .heading {
@@ -70,6 +79,7 @@ calendar {
 	border: 1px solid @gray;
 	border-radius: 5px;
 	color: @white;
+	text-shadow: none;
 }
 
 .workspaces {
@@ -96,6 +106,49 @@ calendar {
 	border: rgba(0, 0, 0, 0.3);
 }
 
-.green { background: @green; color: @black; }
+.green { background: alpha(@green, 0.6); color: @black; border: 1px solid @black; }
+.green-fg { color: @green; }
+.blue-fg { color: @blue; }
 .red { background: @red; color: @black; }
 .orange { background: @orange; color: @black; }
+
+/* widgets */
+.hourly-box, .daily-box, .box {
+	/* padding: 10px; */
+	background: @gray;
+	border: solid 1px @gray;
+	border-radius: 10px;
+}
+
+.hour-box, .day-box, .inner_box, .inner-box {
+	padding: 10px 20px;
+	font-size: 16px;
+}
+
+.icon-small {
+	font-size: 32px;
+}
+
+.today-weather {
+	font-size: 64px;
+	margin: -10px 0px;
+}
+
+.temp-label {
+	font-size: 80px;
+}
+
+.sun {
+	padding-left: 10px;
+}
+
+.events-box {
+	border-radius: 10px;
+	border: 1px solid @gray;
+	background: @gray;
+	/* padding: 0px 5px; */
+}
+
+.event-box {
+	padding: 5px 10px;
+}

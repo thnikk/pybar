@@ -5,7 +5,7 @@ Author:
 """
 import os
 import json
-from subprocess import check_output
+from subprocess import check_output, Popen
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
@@ -15,6 +15,38 @@ from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
 def dict_from_cmd(command) -> dict:
     command = [os.path.expanduser(part) for part in command]
     return json.loads(check_output(command))
+
+
+def scroll(width=0, height=0, style=None):
+    """ Create scrollable window """
+    window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+    window.set_max_content_width(width)
+    window.set_min_content_width(width)
+    window.set_min_content_height(height)
+    window.set_max_content_height(height)
+    window.set_propagate_natural_width(True)
+    window.set_propagate_natural_height(True)
+    if width:
+        hs = Gtk.PolicyType.ALWAYS
+    else:
+        hs = Gtk.PolicyType.NEVER
+    if height:
+        vs = Gtk.PolicyType.ALWAYS
+    else:
+        vs = Gtk.PolicyType.NEVER
+    window.set_policy(
+        hscrollbar_policy=hs,
+        vscrollbar_policy=vs
+    )
+    if style:
+        window.get_style_context().add_class(style)
+    return window
+
+
+def click_link(module, url):
+    """ Click action """
+    del module
+    Popen(['xdg-open', url])
 
 
 def pop():
@@ -69,6 +101,48 @@ def button(label=None, style=None):
     if style:
         __button__.get_style_context().add_class(style)
     return __button__
+
+
+def mbutton(label=None, style=None):
+    """ Button """
+    __button__ = Gtk.MenuButton.new()
+    if label:
+        __button__.set_label(label)
+    if style:
+        __button__.get_style_context().add_class(style)
+    return __button__
+
+
+def v_lines(lines, right=False, style=None) -> Gtk.Box:
+    """ Takes list and returns GTK nested boxes """
+    container = Gtk.Box(
+        orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    if style:
+        container.get_style_context().add_class(style)
+    for line in lines:
+        line_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        text = Gtk.Label()
+        text.set_label(f'{line}')
+        if right:
+            line_box.pack_end(text, False, False, 0)
+        else:
+            line_box.pack_start(text, False, False, 0)
+        container.pack_start(line_box, True, False, 0)
+    return container
+
+
+def h_lines(lines, style=None) -> Gtk.Box:
+    """ Takes list and returns GTK nested boxes """
+    container = Gtk.Box(
+        orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    if style:
+        container.get_style_context().add_class(style)
+    for line in lines:
+        text = Gtk.Label()
+        text.set_label(f'{line}')
+        container.pack_start(text, True, False, 0)
+    return container
 
 
 def sep(orientation, style=None):

@@ -35,9 +35,22 @@ def main():
         clock.module()
     ]
 
+    modules_center = [
+        waybar.module(name) for name in config["modules-center"]
+    ]
+
+    modules_left = [
+        waybar.module(name) for name in config["modules-left"]
+    ] + [
+        sway.module()
+    ]
+
     pybar = c.Bar(spacing=5)
     pybar.css('style.css')
-    pybar.left.add(sway.module())
+    for module in modules_left:
+        pybar.left.pack_start(module, 0, 0, 0)
+    for module in modules_center:
+        pybar.left.pack_start(module, 0, 0, 0)
     for module in modules_right:
         pybar.right.pack_start(module, 0, 0, 0)
 

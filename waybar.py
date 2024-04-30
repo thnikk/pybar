@@ -9,8 +9,37 @@ import os
 import time
 import gi
 import common as c
+from weather_widget import weather_widget
+from hoyo_widget import hoyo_widget
+from updates_widget import updates_widget
+from git_widget import git_widget
 gi.require_version('Gtk', '3.0')
-from gi.repository import GLib
+from gi.repository import Gtk, GLib, Gdk
+
+
+def pop(name):
+    """ thing """
+    popover = Gtk.Popover()
+    if name == 'weather':
+        widget = weather_widget('~/.cache/weather-widget.json')
+    elif name == 'genshin':
+        widget = hoyo_widget('genshin')
+    elif name == 'hsr':
+        widget = hoyo_widget('hsr')
+    elif name == 'updates':
+        widget = updates_widget()
+    elif name == 'git':
+        widget = git_widget('~/Development/Git/waybar-modules')
+    else:
+        widget = c.box('v', style='widget', spacing=20)
+        widget.add(c.label('Example popover', style='heading'))
+        for x in range(0, 3):
+            widget.add(c.label(f'Item {x}'))
+    widget.show_all()
+    popover.add(widget)
+    popover.set_pointing_to(Gdk.Rectangle(0, 0, 0, 0))
+    popover.set_position(Gtk.PositionType.TOP)
+    return popover
 
 
 def cache(name, command, interval):
@@ -27,7 +56,7 @@ def cache(name, command, interval):
 
 def module(name):
     """ Waybar module """
-    button = c.button(style='module')
+    button = c.mbutton(style='module')
     button.set_visible(False)
     button.set_no_show_all(True)
 
@@ -38,15 +67,24 @@ def module(name):
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
-            button.set_visible(True)
-            button.set_label(output['text'])
+            if output['text']:
+                button.set_visible(True)
+                button.set_label(output['text'])
+            else:
+                button.set_visible(False)
             if output['tooltip']:
-                # print(output['tooltip'])
-                button.set_has_tooltip(True)
+                if button.get_tooltip_markup() != output['tooltip']:
+                    button.set_popover(pop(name))
                 button.set_tooltip_markup(output['tooltip'])
+                button.set_has_tooltip(False)
+            try:
+                c.add_style(button, output['class'])
+            except KeyError:
+                pass
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             pass
         return True
     if get_output():
-        GLib.timeout_add(100, get_output)
+        # Timeout of less than 1 second breaks tooltips
+        GLib.timeout_add(1000, get_output)
         return button
