@@ -28,7 +28,8 @@ def cache(name, command, interval):
 def module(name):
     """ Waybar module """
     button = c.button(style='module')
-    button.hide()
+    button.set_visible(False)
+    button.set_no_show_all(True)
 
     def get_output():
         try:
@@ -37,13 +38,15 @@ def module(name):
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
+            button.set_visible(True)
             button.set_label(output['text'])
             if output['tooltip']:
+                # print(output['tooltip'])
+                button.set_has_tooltip(True)
                 button.set_tooltip_markup(output['tooltip'])
-            button.show()
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             pass
         return True
     if get_output():
-        GLib.timeout_add(1000, get_output)
+        GLib.timeout_add(100, get_output)
         return button
