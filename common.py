@@ -251,7 +251,7 @@ class Bar:
         # GtkLayerShell.set_margin(
         #     self.window, GtkLayerShell.Edge.TOP, 200)
 
-        GtkLayerShell.set_namespace(self.window, 'waybar')
+        GtkLayerShell.set_namespace(self.window, 'pybar')
 
         # Reserve part of screen
         GtkLayerShell.auto_exclusive_zone_enable(self.window)
