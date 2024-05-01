@@ -80,10 +80,11 @@ def calendar_widget():
         ) as file:
             events = json.loads(file.read())
     except FileNotFoundError:
-        events = {
-            f"{now.month}/{now.day}":
-                "Set up events in ~/.config/calendar-events.json"
-        }
+        events = {}
+        alert = c.box('v', style='events-box')
+        alert.add(c.label(
+            'Set up events in ~/.config/calendar-events.json',
+            style='event-box', wrap=20))
 
     style_events(last_month, current_month, next_month, events, now)
 
@@ -92,6 +93,11 @@ def calendar_widget():
     widget.add(cal_section)
 
     widget.add(draw_events(now, events))
+
+    try:
+        widget.add(alert)
+    except UnboundLocalError:
+        pass
 
     return widget
 
