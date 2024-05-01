@@ -7,6 +7,7 @@ import os
 import json
 import concurrent.futures
 import common as c
+from bar import Bar
 import clock
 import sway
 import waybar
@@ -49,7 +50,7 @@ def main():
         sway.module(icons)
     ]
 
-    pybar = c.Bar(spacing=5)
+    pybar = Bar(spacing=5)
     pybar.css('style.css')
     for module in modules_left:
         pybar.left.pack_end(module, 0, 0, 0)
