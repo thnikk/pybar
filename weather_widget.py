@@ -15,7 +15,7 @@ def weather_widget(cache):
     widget = c.box('v', style='widget', spacing=20)
 
     today = cache['Today']['info'][0]
-    today_box = c.box('h', style='today-box')
+    today_box = c.box('h', spacing=10)
 
     today_left = c.box('v')
     widget.add(c.label(cache['City'], style='heading'))
@@ -51,10 +51,11 @@ def weather_widget(cache):
 
     hourly_container = c.box('v', spacing=10)
     hourly_container.add(c.label('Hourly forecast', style='title', ha="start"))
-    hourly_box = c.box('h', style='hourly-box')
+    hourly_box = c.box('h', style='box')
     for hour in cache['Hourly']['info']:
-        hour_box = c.box('v', style='hour-box')
-        hour_box.add(c.label(f"{hour['temperature']}°"))
+        hour_box = c.box('v', style='inner-box')
+        hour_box.add(c.label(f"{hour['temperature']}°", style='hour-temp'))
+        hour_box.add(c.label(f"{hour['humidity']}%"))
         icon = c.label(hour['icon'], style='icon-small')
         icon.props.tooltip_text = hour['description']
         hour_box.add(icon)
@@ -68,9 +69,9 @@ def weather_widget(cache):
     daily_container = c.box('v', spacing=10)
     daily_container.add(c.label(
         'Daily forecast', style='title', ha='start'))
-    daily_box = c.box('v', style='daily-box')
+    daily_box = c.box('v', style='box')
     for day in cache['Daily']['info']:
-        day_box = c.box('h', style='day-box')
+        day_box = c.box('h', style='inner-box')
         day_box.add(c.label(day['time']))
         day_box.pack_end(
             c.label(f"{day['high']}° / {day['low']}°"), False, False, 0)

@@ -12,6 +12,7 @@ import common as c
 def hoyo_widget(cache, game):
     """ Genshin widget """
     main_box = c.box('v', style='widget', spacing=20)
+    c.add_style(main_box, 'small-widget')
     label = c.label(cache['Name'], style='heading')
     main_box.add(label)
 

@@ -3,14 +3,13 @@
 Description:
 Author:
 """
-import os
-import json
 import common as c
 
 
 def ups_widget(info):
     """ UPS widget """
     main_box = c.box('v', style='widget', spacing=20)
+    c.add_style(main_box, 'small-widget')
     label = c.label('UPS stats', style='heading')
     main_box.add(label)
 
@@ -22,24 +21,23 @@ def ups_widget(info):
     wide_box.pack_end(detail_box, 0, 0, 0)
     main_box.add(wide_box)
 
-    icons = {"load_watts": "W", "charging": "", "ac_power": "", "battery": ""}
-    # for item, icon in icons.items():
-    #     pass
+    icons = {
+        "load_watts": "W", "charging": "", "ac_power": "", "battery": ""}
 
-    info_box = c.box('v', style='events-box')
+    info_box = c.box('v', style='box')
     info_line = c.box('h')
+    info_items = []
     for name, icon in icons.items():
         if isinstance(info[name], bool):
             if info[name]:
-                info_line.pack_start(c.label(icon, style='event-box'), 1, 0, 0)
+                info_items.append(icon)
         elif isinstance(info[name], int):
-            info_line.pack_start(c.label(
-                f"{icon} {info[name]}", style='event-box'), 1, 0, 0)
+            info_items.append(f"{icon} {info[name]}")
+    for item in info_items:
+        info_line.pack_start(c.label(item, style='inner-box'), 1, 0, 0)
+        if item != info_items[-1]:
+            info_line.add(c.sep('v'))
     info_box.add(info_line)
-    # for key, value in info.items():
-    #     info_box.add(c.label(f"{key}: {value}", style='event-box'))
-    #     if key != list(info)[-1]:
-    #         info_box.add(c.sep('h'))
 
     main_box.add(info_box)
 

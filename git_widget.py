@@ -3,11 +3,6 @@
 Description: Git widget
 Author: thnikk
 """
-import re
-import os
-import sys
-from datetime import datetime, timezone
-from subprocess import run, check_output, CalledProcessError
 import common as c
 
 

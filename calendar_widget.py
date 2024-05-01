@@ -81,7 +81,7 @@ def calendar_widget():
             events = json.loads(file.read())
     except FileNotFoundError:
         events = {}
-        alert = c.box('v', style='events-box')
+        alert = c.box('v', style='box')
         alert.add(c.label(
             'Set up events in ~/.config/calendar-events.json',
             style='event-box', wrap=20))
@@ -162,9 +162,9 @@ def draw_events(now, events):
             event_line.add(c.label(f'{month} month'))
             event_section.add(event_line)
 
-            events_box = c.box('v', style='events-box')
+            events_box = c.box('v', style='box')
             for date, event in month_events.items():
-                event_box = c.box('h', style='event-box', spacing=10)
+                event_box = c.box('h', style='inner-box', spacing=10)
                 event_dot = c.label('', style='event-dot')
                 event_style = event_lookup(event)
                 event_dot.get_style_context().add_class(event_style)

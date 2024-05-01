@@ -7,72 +7,9 @@
 @define-color green #a3be8c;
 @define-color orange #d08770;
 
+/* bar */
 window {
 	background: none;
-}
-
-tooltip {
-	font-family: "Iosevka Custom"
-}
-
-popover {
-	background: @black;
-	border: 1px solid @gray;
-	border-radius: 20px;
-	box-shadow: none;
-	padding: 10px;
-	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
-}
-
-scrollbar {
-	background: none;
-	border: none;
-}
-
-slider { background: none; border: none; }
-separator { background: @gray; padding: 0; margin: 0; }
-
-button {
-	background: none;
-	border: 0;
-	margin: 0;
-	padding: 0;
-	text-shadow: none;
-	box-shadow: none;
-}
-
-.heading {
-	padding: 0px 10px;
-	border-radius: 10px;
-	border: 1px solid @gray;
-	background: @gray;
-	font-size: 24px;
-	font-weight: normal;
-}
-
-calendar {
-	background: transparent;
-	border: none;
-	font-size: 20px;
-}
-
-.day {
-	min-width: 30px;
-	font-size: 16px;
-}
-
-.old {
-	color: @light_gray;
-}
-
-.dow {
-	color: @blue;
-}
-
-.today {
-	background: @gray;
-	border: 1px solid @gray;
-	border-radius: 5px;
 }
 
 .bar {
@@ -94,6 +31,7 @@ calendar {
 	text-shadow: none;
 }
 
+/* workspaces */
 .workspaces {
 	background: @gray;
 	border: 1px solid @gray;
@@ -102,13 +40,9 @@ calendar {
 
 .workspace {
 	padding: 0px 5px;
-	margin: 0;
 	background: transparent;
 	border-radius: 5px;
-	box-shadow: none;
-	text-shadow: none;
 	color: @white;
-	transition: none;
 	border: 1px solid transparent;
 	min-width: 20px;
 }
@@ -119,31 +53,78 @@ calendar {
 	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+/* colorize modules */
 .green { background: alpha(@green, 0.6); color: @black; border: 1px solid @black; }
 .red { background: @red; color: @black; }
 .orange { background: @orange; color: @black; }
 
+/* colorize text */
 .green-fg { color: @green; }
 .blue-fg { color: @blue; }
 .red-fg { color: @red; }
 .orange-fg { color: @orange; }
 
+
+/* Override default rules */
+tooltip {
+	font-family: "Iosevka Custom"
+}
+
+scrollbar {
+	background: none;
+	border: none;
+}
+
+slider { background: none; border: none; }
+
+button {
+	background: none;
+	border: 0;
+	margin: 0;
+	padding: 0;
+	text-shadow: none;
+	box-shadow: none;
+	transition: none;
+}
+
 /* widgets */
-.hourly-box, .daily-box, .box {
-	/* padding: 10px; */
+popover {
+	background: @black;
+	border: 1px solid @gray;
+	border-radius: 20px;
+	box-shadow: none;
+	padding: 10px;
+	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
+}
+
+separator { background: @gray; padding: 0; margin: 0; }
+
+.heading {
+	padding: 0px 10px;
+	border-radius: 10px;
+	border: 1px solid @gray;
+	background: @gray;
+	font-size: 24px;
+	font-weight: normal;
+}
+
+.box {
 	background: @gray;
 	border: solid 1px @gray;
 	border-radius: 10px;
 }
 
-.hour-box, .day-box, .inner-box {
-	padding: 10px 20px;
+.inner-box {
+	padding: 10px;
 	font-size: 16px;
 }
 
 .icon-small {
 	font-size: 32px;
+	padding: 5px;
 }
+
+.hour-temp { font-size: 24px; }
 
 .today-weather {
 	font-size: 64px;
@@ -154,17 +135,17 @@ calendar {
 	font-size: 80px;
 }
 
-.sun {
-	padding-left: 10px;
+.small-widget {
+	min-width: 300px;
 }
 
-.events-box {
-	border-radius: 10px;
-	border: 1px solid @gray;
+/* calendar */
+.day { min-width: 30px; font-size: 16px; }
+.old { color: @light_gray; }
+.dow { color: @blue; }
+.today {
 	background: @gray;
-	/* padding: 0px 5px; */
+	border: 1px solid @gray;
+	border-radius: 5px;
 }
 
-.event-box {
-	padding: 5px 10px;
-}

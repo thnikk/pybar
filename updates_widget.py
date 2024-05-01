@@ -9,6 +9,7 @@ import common as c
 def updates_widget(info):
     """ Update widget """
     main_box = c.box('v', style='widget', spacing=20)
+    c.add_style(main_box, 'small-widget')
     label = c.label('Updates', style='heading')
     main_box.add(label)
 
@@ -27,7 +28,7 @@ def updates_widget(info):
         packages_box = c.box('v')
         scroll_box = c.scroll(0, 348)
         for package in packages:
-            package_box = c.box('h', style='event-box', spacing=20)
+            package_box = c.box('h', style='inner-box', spacing=20)
             package_label = c.button(package[0], style='none')
             try:
                 package_label.connect(
@@ -43,11 +44,11 @@ def updates_widget(info):
                 packages_box.pack_start(c.sep('h'), 1, 1, 0)
 
         if len(packages) > 10:
-            scroll_box.get_style_context().add_class('events-box')
+            scroll_box.get_style_context().add_class('box')
             scroll_box.add(packages_box)
             manager_box.add(scroll_box)
         else:
-            packages_box.get_style_context().add_class('events-box')
+            packages_box.get_style_context().add_class('box')
             manager_box.add(packages_box)
 
         main_box.add(manager_box)
