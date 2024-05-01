@@ -50,7 +50,6 @@ def updates_widget(info):
             packages_box.get_style_context().add_class('events-box')
             manager_box.add(packages_box)
 
-        manager_box.add(packages_box)
         main_box.add(manager_box)
 
     return main_box

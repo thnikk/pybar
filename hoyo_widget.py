@@ -32,26 +32,24 @@ def hoyo_widget(game):
         time_to_text(cache['Until next 40']),
         'until next 40'
     ]:
-        right_box.add(c.label(line, ha='end'))
+        right_box.pack_start(c.label(line, ha='end'), 0, 0, 0)
     top_box.pack_end(right_box, False, False, 0)
     main_box.add(top_box)
 
     # Info section
-    info_section = c.box('v', spacing=10)
     info_box = c.box('v', style='box')
     info = convert_list(cache)
     for line in info:
         info_line = c.box('h')
         for item in line:
             info_line.pack_start(
-                c.label(item, style='inner_box'), True, False, 0)
+                c.label(item, style='inner-box'), True, False, 0)
             if item != line[-1] and item:
-                info_line.add(c.sep('v'))
-            info_box.add(info_line)
+                info_line.pack_start(c.sep('v'), 0, 0, 0)
+        info_box.pack_start(info_line, 0, 0, 0)
         if line != info[-1] and line:
-            info_box.add(c.sep('h'))
-    info_section.add(info_box)
-    main_box.add(info_section)
+            info_box.pack_start(c.sep('h'), 0, 0, 0)
+    main_box.add(info_box)
 
     return main_box
 
