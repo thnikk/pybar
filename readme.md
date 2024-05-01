@@ -9,5 +9,7 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
     - [ ] Subscribe to swaymsg and only update when there's a change
 - [x] Widgets for modules
     - [x] Spawn in the correct position
-    - [ ] Get data for widget directly from module output
+    - [x] Get data for widget directly from module output
 - [ ] Configurable
+- [ ] Handle display disconnection
+- [ ] Support multiple displays

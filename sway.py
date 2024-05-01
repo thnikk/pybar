@@ -3,7 +3,7 @@
 Description:
 Author:
 """
-from subprocess import check_output, run
+from subprocess import check_output, run, CalledProcessError
 import json
 import gi
 import common as c
@@ -31,7 +31,10 @@ def module(icons):
         module.add(button)
 
     def get_workspaces():
-        output = json.loads(check_output(['swaymsg', '-t', 'get_workspaces']))
+        try:
+            output = json.loads(check_output(['swaymsg', '-t', 'get_workspaces']))
+        except CalledProcessError:
+            return True
         workspaces = [workspace['name'] for workspace in output]
         focused = [
             workspace['name'] for workspace in output

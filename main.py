@@ -59,6 +59,10 @@ def main():
     for module in modules_right:
         pybar.right.pack_start(module, 0, 0, 0)
 
+    # default = Gdk.Display.get_default()
+    # for num in range(Gdk.Display.get_n_monitors(default)):
+    #     monitor = Gdk.Display.get_monitor(default, num)
+    #     GtkLayerShell.set_monitor(pybar.window, monitor)
     executor.submit(pybar.start)
 
 

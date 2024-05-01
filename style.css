@@ -136,7 +136,7 @@ calendar {
 	border-radius: 10px;
 }
 
-.hour-box, .day-box, .inner_box, .inner-box {
+.hour-box, .day-box, .inner-box {
 	padding: 10px 20px;
 	font-size: 16px;
 }

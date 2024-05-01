@@ -15,22 +15,22 @@ from updates_widget import updates_widget
 from git_widget import git_widget
 from ups_widget import ups_widget
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib, Gdk
+from gi.repository import Gtk, GLib
 
 
 def get_widget(name, info=None):
     """ Get widget box from appropriate widget """
     match name:
         case 'weather':
-            return weather_widget('~/.cache/weather-widget.json')
+            return weather_widget(info)
         case 'genshin':
-            return hoyo_widget('genshin')
+            return hoyo_widget(info, 'genshin')
         case 'hsr':
-            return hoyo_widget('hsr')
+            return hoyo_widget(info, 'hsr')
         case 'updates':
             return updates_widget(info)
         case 'git':
-            return git_widget('~/Development/Git/waybar-modules')
+            return git_widget(info)
         case 'ups':
             return ups_widget(info)
         case _:
@@ -85,7 +85,7 @@ def module(name):
                 button.set_label(output['text'])
             else:
                 button.set_visible(False)
-            if output['tooltip']:
+            try:
                 if (
                     button.get_tooltip_markup() != output['tooltip']
                     and not button.get_active()
@@ -96,10 +96,15 @@ def module(name):
                         button.set_popover(pop(name))
                 button.set_tooltip_markup(output['tooltip'])
                 button.set_has_tooltip(False)
-            try:
-                c.add_style(button, output['class'])
             except KeyError:
                 pass
+            try:
+                if not output['class']:
+                    raise ValueError
+                c.add_style(button, output['class'])
+            except (KeyError, ValueError):
+                for s in ['red', 'green', 'blue', 'orange', 'yellow']:
+                    button.get_style_context().remove_class(s)
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             pass
         return True

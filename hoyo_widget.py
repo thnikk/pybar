@@ -9,15 +9,9 @@ import json
 import common as c
 
 
-def hoyo_widget(game):
+def hoyo_widget(cache, game):
     """ Genshin widget """
     main_box = c.box('v', style='widget', spacing=20)
-
-    with open(
-        os.path.expanduser('~/.cache/hoyo-stats.json'), 'r', encoding='utf-8'
-    ) as file:
-        cache = json.loads(file.read())[game]
-
     label = c.label(cache['Name'], style='heading')
     main_box.add(label)
 

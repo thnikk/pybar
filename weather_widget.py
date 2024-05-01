@@ -9,15 +9,10 @@ import os
 import common as c
 
 
-def weather_widget(cache_file):
+def weather_widget(cache):
     """ Weather widget """
 
     widget = c.box('v', style='widget', spacing=20)
-
-    with open(
-        os.path.expanduser(cache_file), 'r', encoding='utf-8'
-    ) as file:
-        cache = json.loads(file.read())
 
     today = cache['Today']['info'][0]
     today_box = c.box('h', style='today-box')

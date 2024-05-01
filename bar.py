@@ -8,7 +8,7 @@ import os
 import common as c
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
+from gi.repository import Gtk, Gdk, GtkLayerShell, GLib
 
 
 class Bar:
@@ -65,8 +65,6 @@ class Bar:
             self.window, GtkLayerShell.Edge.RIGHT, margin)
         GtkLayerShell.set_margin(
             self.window, GtkLayerShell.Edge.BOTTOM, margin)
-        # GtkLayerShell.set_margin(
-        #     self.window, GtkLayerShell.Edge.TOP, 200)
 
         GtkLayerShell.set_namespace(self.window, 'pybar')
 
