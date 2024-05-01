@@ -31,7 +31,7 @@ def module():
     label.get_style_context().add_class('module')
 
     def get_time():
-        label.set_label(datetime.now().strftime(' %I:%M:%S'))
+        label.set_label(datetime.now().strftime(' %I:%M %m/%d'))
         return True
 
     if get_time():
