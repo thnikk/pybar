@@ -1,4 +1,13 @@
-:warning: This is very early software and many things don't work. You probably shouldn't use this in its current state, but feel free to look at the code if you need a reference.
+:warning: This is very early software. You probably shouldn't use this in its current state, but feel free to look at the code as a reference. :warning:
 
 # Pybar
 Pybar is a statusbar for Wayland desktops. The main goal of the project is to be compatible with modules written for waybar and to add custom widgets for modules when clicked.
+
+### To-do
+- [x] Accept waybar-formatted json for modules
+- [x] Sway workspaces
+    - [ ] Subscribe to swaymsg and only update when there's a change
+- [x] Widgets for modules
+    - [x] Spawn in the correct position
+    - [ ] Get data for widget directly from module output
+- [ ] Configurable
