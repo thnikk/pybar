@@ -6,6 +6,7 @@ Author:
 import os
 import json
 import concurrent.futures
+import argparse
 import common as c
 from bar import Bar
 import clock
@@ -16,19 +17,37 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GLib
 
 
-def main():
-    """ Main function """
-    executor = concurrent.futures.ThreadPoolExecutor()
-
+def load_config():
+    """ Load config from file """
+    config_path = os.path.expanduser('~/.config/pybar/')
+    if not os.path.exists(config_path):
+        return {"modules-right": [], "modules-center": [], "modules-left": []}
     with open(
         os.path.expanduser('~/.config/pybar/config.json'),
         'r', encoding='utf=8'
     ) as file:
-        config = json.loads(file.read())
+        return json.loads(file.read())
 
-    for name, info in config['modules'].items():
-        executor.submit(
-            waybar.cache, name, info['command'], info['interval'])
+
+def parse_args() -> argparse.ArgumentParser:
+    """ Parse arguments """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', '--output', type=int, default=None)
+    return parser.parse_args()
+
+
+def main():
+    """ Main function """
+    executor = concurrent.futures.ThreadPoolExecutor()
+    args = parse_args()
+    config = load_config()
+
+    try:
+        for name, info in config['modules'].items():
+            executor.submit(
+                waybar.cache, name, info['command'], info['interval'])
+    except KeyError:
+        pass
 
     modules_right = [
         waybar.module(name) for name in config["modules-right"]
@@ -50,7 +69,7 @@ def main():
         sway.module(icons)
     ]
 
-    pybar = Bar(spacing=5)
+    pybar = Bar(args.output, spacing=5)
     pybar.css('style.css')
     for module in modules_left:
         pybar.left.pack_end(module, 0, 0, 0)
@@ -59,10 +78,6 @@ def main():
     for module in modules_right:
         pybar.right.pack_start(module, 0, 0, 0)
 
-    # default = Gdk.Display.get_default()
-    # for num in range(Gdk.Display.get_n_monitors(default)):
-    #     monitor = Gdk.Display.get_monitor(default, num)
-    #     GtkLayerShell.set_monitor(pybar.window, monitor)
     executor.submit(pybar.start)
 
 

@@ -13,7 +13,7 @@ from gi.repository import Gtk, Gdk, GtkLayerShell, GLib
 
 class Bar:
     """ Bar class"""
-    def __init__(self, spacing=0):
+    def __init__(self, output=None, spacing=0):
         self.window = Gtk.Window()
         self.bar = c.box('h', style='bar', spacing=spacing)
         self.left = c.box('h', style='modules-left', spacing=spacing)
@@ -23,6 +23,7 @@ class Bar:
         self.bar.set_center_widget(self.center)
         self.bar.pack_end(self.right, 0, 0, 0)
         self.window.add(self.bar)
+        self.output = output
 
     def css(self, file):
         """ Load CSS from file """
@@ -67,6 +68,12 @@ class Bar:
             self.window, GtkLayerShell.Edge.BOTTOM, margin)
 
         GtkLayerShell.set_namespace(self.window, 'pybar')
+
+        if self.output:
+            default = Gdk.Display.get_default()
+            # for num in range(Gdk.Display.get_n_monitors(default)):
+            monitor = Gdk.Display.get_monitor(default, self.output)
+            GtkLayerShell.set_monitor(self.window, monitor)
 
         # Reserve part of screen
         GtkLayerShell.auto_exclusive_zone_enable(self.window)
