@@ -18,11 +18,19 @@ tooltip {
 popover {
 	background: @black;
 	border: 1px solid @gray;
-	border-radius: 20px;
+	border-radius: 10px;
 	box-shadow: none;
 	padding: 10px;
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
 }
+
+scrollbar {
+	background: none;
+	border: none;
+}
+
+slider { background: none; border: none; }
+separator { background: @gray; }
 
 button {
 	background: none;
@@ -53,8 +61,12 @@ calendar {
 	font-size: 16px;
 }
 
-.dow {
+.old {
 	color: @light_gray;
+}
+
+.dow {
+	color: @blue;
 }
 
 .today {
@@ -107,10 +119,13 @@ calendar {
 }
 
 .green { background: alpha(@green, 0.6); color: @black; border: 1px solid @black; }
-.green-fg { color: @green; }
-.blue-fg { color: @blue; }
 .red { background: @red; color: @black; }
 .orange { background: @orange; color: @black; }
+
+.green-fg { color: @green; }
+.blue-fg { color: @blue; }
+.red-fg { color: @red; }
+.orange-fg { color: @orange; }
 
 /* widgets */
 .hourly-box, .daily-box, .box {

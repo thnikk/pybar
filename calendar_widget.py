@@ -3,7 +3,6 @@
 Description: Calendar widget for clock module
 Author: thnikk
 """
-import argparse
 import json
 from datetime import datetime
 import calendar
@@ -40,14 +39,14 @@ def cal_list(year, month, style=None):
 def event_lookup(event):
     """ Get style for event """
     event_types = {
-        "birthday": "blue",
-        "appointment": "orange",
+        "birthday": "blue-fg",
+        "appointment": "orange-fg",
     }
 
     for event_type, style in event_types.items():
         if event_type in event.lower():
             return style
-    return "green"
+    return "green-fg"
 
 
 def calendar_widget():
@@ -56,14 +55,16 @@ def calendar_widget():
 
     now = datetime.now()
 
+    month_label = c.label(now.strftime('%B'), style='heading')
+    widget.add(month_label)
+
     cal_section = c.box('v')
-    month_label = c.label(now.strftime('%B'), style='month-label')
-    cal_section.add(month_label)
 
     # Create calendar box
     row = c.box('h', spacing=10)
     for dow in ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]:
-        dow_label = c.label(dow, style='dow')
+        dow_label = c.label(dow, style='day')
+        c.add_style(dow_label, 'dow')
         row.add(dow_label)
     cal_box = c.box('v')
     cal_box.add(row)
