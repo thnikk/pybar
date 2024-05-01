@@ -3,12 +3,10 @@
 Description: Updates widget
 Author: thnikk
 """
-import os
-import json
 import common as c
 
 
-def updates_widget():
+def updates_widget(info):
     """ Update widget """
     main_box = c.box('v', style='widget', spacing=20)
     label = c.label('Updates', style='heading')
@@ -20,12 +18,7 @@ def updates_widget():
         "Flatpak": "https://flathub.org/apps/search?q=",
     }
 
-    with open(
-        os.path.expanduser('~/.cache/updates.json'), 'r', encoding='utf-8'
-    ) as file:
-        cache = json.loads(file.read())
-
-    for manager, packages in cache.items():
+    for manager, packages in info.items():
         if not packages:
             continue
         manager_box = c.box('v', spacing=10)
