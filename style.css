@@ -1,4 +1,4 @@
-@define-color black rgba(28,31,38,0.75);
+@define-color black rgba(28,31,38,0.9);
 @define-color gray rgba(255,255,255,0.05);
 @define-color light_gray rgba(255,255,255,0.35);
 @define-color white rgba(255, 255, 255, 0.7);
@@ -18,7 +18,7 @@ tooltip {
 popover {
 	background: @black;
 	border: 1px solid @gray;
-	border-radius: 10px;
+	border-radius: 20px;
 	box-shadow: none;
 	padding: 10px;
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
@@ -30,7 +30,7 @@ scrollbar {
 }
 
 slider { background: none; border: none; }
-separator { background: @gray; }
+separator { background: @gray; padding: 0; margin: 0; }
 
 button {
 	background: none;
@@ -103,19 +103,20 @@ calendar {
 .workspace {
 	padding: 0px 5px;
 	margin: 0;
-	border: none;
 	background: transparent;
 	border-radius: 5px;
 	box-shadow: none;
 	text-shadow: none;
 	color: @white;
 	transition: none;
+	border: 1px solid transparent;
+	min-width: 20px;
 }
 
 .focused {
 	background: @white;
 	color: @black;
-	border: rgba(0, 0, 0, 0.3);
+	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 .green { background: alpha(@green, 0.6); color: @black; border: 1px solid @black; }
