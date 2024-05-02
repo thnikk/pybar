@@ -7,14 +7,8 @@ import os
 import json
 import concurrent.futures
 import argparse
-import common as c
 from bar import Bar
-import clock
-import sway
-import waybar
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GLib
+import modules
 
 
 def load_config():
@@ -45,38 +39,43 @@ def main():
     try:
         for name, info in config['modules'].items():
             executor.submit(
-                waybar.cache, name, info['command'], info['interval'])
+                modules.cache, name, info['command'], info['interval'])
     except KeyError:
         pass
 
-    modules_right = [
-        waybar.module(name) for name in config["modules-right"]
-    ] + [
-        clock.module()
-    ]
+    # try:
+    #     icons = config["workspaces"]
+    # except KeyError:
+    #     icons = {}
 
-    modules_center = [
-        waybar.module(name) for name in config["modules-center"]
-    ]
-
-    try:
-        icons = config["workspaces"]
-    except KeyError:
-        icons = {}
-    modules_left = [
-        waybar.module(name) for name in config["modules-left"]
-    ] + [
-        sway.module(icons)
-    ]
+    # modules_left = [
+    #     modules.module(name) for name in config["modules-left"]
+    # ]
+    #
+    # modules_center = [
+    #     modules.module(name) for name in config["modules-center"]
+    # ]
+    #
+    # modules_right = [
+    #     modules.module(name) for name in config["modules-right"]
+    # ]
 
     pybar = Bar(args.output, spacing=5)
     pybar.css('style.css')
-    for module in modules_left:
-        pybar.left.pack_end(module, 0, 0, 0)
-    for module in modules_center:
-        pybar.center.pack_start(module, 0, 0, 0)
-    for module in modules_right:
-        pybar.right.pack_start(module, 0, 0, 0)
+
+    for section_name, section in {
+        "modules-left": pybar.left, "modules-center": pybar.center,
+        "modules-right": pybar.right
+    }.items():
+        for name in config[section_name]:
+            section.add(modules.module(name))
+    #
+    # for module in modules_left:
+    #     pybar.left.pack_start(module, 0, 0, 0)
+    # for module in modules_center:
+    #     pybar.center.pack_start(module, 0, 0, 0)
+    # for module in modules_right:
+    #     pybar.right.pack_start(module, 0, 0, 0)
 
     executor.submit(pybar.start)
 

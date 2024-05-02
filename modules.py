@@ -3,18 +3,20 @@
 Description:
 Author:
 """
-from subprocess import check_output, CalledProcessError
+from subprocess import run, check_output, CalledProcessError
+from datetime import datetime
 import json
 import os
 import time
 import gi
 import common as c
 import widgets
+from calendar_widget import calendar_widget
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib  # noqa
 
 
-def get_widget(name, info):
+def get_widget(name, info=None):
     """ Get widget box from appropriate widget """
     match name:
         case 'weather':
@@ -29,11 +31,13 @@ def get_widget(name, info):
             return widgets.git_widget(info)
         case 'ups':
             return widgets.ups_widget(info)
+        case 'calendar':
+            return calendar_widget()
         case _:
             return widgets.generic_widget(name, info)
 
 
-def pop(name, info):
+def pop(name, info=None):
     """ Make popover widget """
     popover = Gtk.Popover()
     popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
@@ -64,8 +68,13 @@ def cache(name, command, interval):
         time.sleep(interval)
 
 
-def module(name):
+def module(name, icons=None):
     """ Waybar module """
+    if name == 'clock':
+        return clock()
+    elif name == 'workspaces':
+        return workspaces(icons)
+
     button = c.mbutton(style='module')
     button.set_direction(Gtk.ArrowType.UP)
     button.set_visible(False)
@@ -89,7 +98,7 @@ def module(name):
                     and not button.get_active()
                 ):
                     try:
-                        button.set_popover(pop(name, output['widget']))
+                        button.set_popover(pop(name, info=output['widget']))
                     except KeyError:
                         # button.set_popover(pop(name))
                         pass
@@ -115,3 +124,61 @@ def module(name):
         # Timeout of less than 1 second breaks tooltips
         GLib.timeout_add(1000, get_output)
         return button
+
+
+def switch_workspace(module, workspace):
+    """ Click action """
+    del module
+    run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
+
+
+def workspaces(icons):
+    module = c.box('h', style='workspaces')
+    buttons = []
+    for x in range(0, 11):
+        try:
+            button = c.button(label=icons[str(x)], style='workspace')
+        except (KeyError, TypeError):
+            button = c.button(label=str(x), style='workspace')
+        button.hide()
+        button.connect('clicked', switch_workspace, x)
+        buttons.append(button)
+        module.add(button)
+
+    def get_workspaces():
+        try:
+            output = json.loads(
+                check_output(['swaymsg', '-t', 'get_workspaces']))
+        except CalledProcessError:
+            return True
+        workspaces = [workspace['name'] for workspace in output]
+        focused = [
+            workspace['name'] for workspace in output
+            if workspace['focused']][0]
+        for x in range(0, 11):
+            if str(x) not in workspaces:
+                buttons[x].hide()
+            else:
+                buttons[x].show()
+        for workspace in buttons:
+            c.del_style(workspace, 'focused')
+        c.add_style(buttons[int(focused)], 'focused')
+        return True
+    if get_workspaces():
+        GLib.timeout_add(50, get_workspaces)
+        return module
+
+
+def clock():
+    """ Clock module """
+    label = Gtk.MenuButton(popover=pop('calendar'))
+    label.set_direction(Gtk.ArrowType.UP)
+    label.get_style_context().add_class('module')
+
+    def get_time():
+        label.set_label(datetime.now().strftime(' %I:%M %m/%d'))
+        return True
+
+    if get_time():
+        GLib.timeout_add(1000, get_time)
+        return label
