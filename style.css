@@ -54,9 +54,9 @@ window {
 }
 
 /* colorize modules */
-.green { background: alpha(@green, 0.6); color: @black; border: 1px solid @black; }
-.red { background: @red; color: @black; }
-.orange { background: @orange; color: @black; }
+.green { background: alpha(@green, 0.6); color: @black; border: 1px solid @gray; }
+.red { background: alpha(@red, 0.6); color: @black; border: 1px solid @gray; }
+.orange { background: alpha(@orange, 0.6); color: @black; border: 1px solid @gray; }
 
 /* colorize text */
 .green-fg { color: @green; }
@@ -116,6 +116,11 @@ separator { background: @gray; padding: 0; margin: 0; }
 
 .inner-box {
 	padding: 10px;
+	font-size: 16px;
+}
+
+.inner-box-wide {
+	padding: 10px 20px;
 	font-size: 16px;
 }
 

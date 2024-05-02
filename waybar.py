@@ -9,42 +9,31 @@ import os
 import time
 import gi
 import common as c
-from weather_widget import weather_widget
-from hoyo_widget import hoyo_widget
-from updates_widget import updates_widget
-from git_widget import git_widget
-from ups_widget import ups_widget
-from privacy_widget import privacy_widget
+import widgets
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
 
-def get_widget(name, info=None):
+def get_widget(name, info):
     """ Get widget box from appropriate widget """
     match name:
         case 'weather':
-            return weather_widget(info)
+            return widgets.weather_widget(info)
         case 'genshin':
-            return hoyo_widget(info, 'genshin')
+            return widgets.hoyo_widget(info, 'genshin')
         case 'hsr':
-            return hoyo_widget(info, 'hsr')
+            return widgets.hoyo_widget(info, 'hsr')
         case 'updates':
-            return updates_widget(info)
+            return widgets.updates_widget(info)
         case 'git':
-            return git_widget(info)
+            return widgets.git_widget(info)
         case 'ups':
-            return ups_widget(info)
-        case 'privacy':
-            return privacy_widget(info)
+            return widgets.ups_widget(info)
         case _:
-            widget = c.box('v', style='widget', spacing=20)
-            widget.add(c.label('Example popover', style='heading'))
-            for x in range(0, 3):
-                widget.add(c.label(f'Item {x}'))
-            return widget
+            return widgets.generic_widget(name, info)
 
 
-def pop(name, info=None):
+def pop(name, info):
     """ Make popover widget """
     popover = Gtk.Popover()
     popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
@@ -100,11 +89,16 @@ def module(name):
                     and not button.get_active()
                 ):
                     try:
-                        button.set_popover(pop(name, info=output['widget']))
+                        button.set_popover(pop(name, output['widget']))
                     except KeyError:
-                        button.set_popover(pop(name))
+                        # button.set_popover(pop(name))
+                        pass
                 button.set_tooltip_markup(output['tooltip'])
-                button.set_has_tooltip(False)
+                try:
+                    output['widget']
+                    button.set_has_tooltip(False)
+                except KeyError:
+                    pass
             except KeyError:
                 pass
             try:
