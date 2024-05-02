@@ -3,7 +3,7 @@
 Description:
 Author:
 """
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 import json
 import os
 import time
@@ -60,12 +60,18 @@ def pop(name, info=None):
 def cache(name, command, interval):
     """ Save command output to cache file """
     while True:
+        cache_dir = os.path.expanduser('~/.cache/pybar')
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
         command = [os.path.expanduser(arg) for arg in command]
         with open(
-            os.path.expanduser(f'~/.cache/pybar/{name}.json'),
+            os.path.expanduser(f'{cache_dir}/{name}.json'),
             'w', encoding='utf-8'
         ) as file:
-            file.write(check_output(command).decode())
+            try:
+                file.write(check_output(command).decode())
+            except CalledProcessError:
+                pass
         time.sleep(interval)
 
 
