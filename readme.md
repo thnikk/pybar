@@ -1,6 +1,8 @@
-:warning: This is very early software. You probably shouldn't use this in its current state, but feel free to look at the code as a reference. :warning:
-
 # Pybar
+
+![Screenshot](screenshot.png)
+> A waybar-like statusbar with widgets
+
 Pybar is a statusbar for Wayland desktops. The main goal of the project is to be compatible with modules written for waybar and to add custom widgets for modules when clicked.
 
 ### To-do
@@ -12,4 +14,4 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
     - [x] Get data for widget directly from module output
 - [ ] Configurable
 - [ ] Handle display disconnection
-- [ ] Support multiple displays
+- [x] Support multiple displays
