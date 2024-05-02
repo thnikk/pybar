@@ -14,6 +14,7 @@ from hoyo_widget import hoyo_widget
 from updates_widget import updates_widget
 from git_widget import git_widget
 from ups_widget import ups_widget
+from privacy_widget import privacy_widget
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
@@ -33,6 +34,8 @@ def get_widget(name, info=None):
             return git_widget(info)
         case 'ups':
             return ups_widget(info)
+        case 'privacy':
+            return privacy_widget(info)
         case _:
             widget = c.box('v', style='widget', spacing=20)
             widget.add(c.label('Example popover', style='heading'))
