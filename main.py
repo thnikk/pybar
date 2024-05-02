@@ -26,7 +26,9 @@ def load_config():
 def parse_args() -> argparse.ArgumentParser:
     """ Parse arguments """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', type=int, default=None)
+    parser.add_argument('-o', '--output', type=str, default=None,
+                        help='Comma-separated list of outputs for the bar '
+                        'to appear on.')
     return parser.parse_args()
 
 
@@ -43,17 +45,24 @@ def main():
     except KeyError:
         pass
 
-    pybar = Bar(args.output, spacing=5)
-    pybar.css('style.css')
+    if args.output:
+        outputs = args.output.split(',')
+    else:
+        outputs = [None]
 
-    for section_name, section in {
-        "modules-left": pybar.left, "modules-center": pybar.center,
-        "modules-right": pybar.right
-    }.items():
-        for name in config[section_name]:
-            section.add(modules.module(name))
+    for output in outputs:
+        pybar = Bar(output, spacing=5)
+        css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
+        pybar.css(css_path)
 
-    executor.submit(pybar.start)
+        for section_name, section in {
+            "modules-left": pybar.left, "modules-center": pybar.center,
+            "modules-right": pybar.right
+        }.items():
+            for name in config[section_name]:
+                section.add(modules.module(name))
+
+        executor.submit(pybar.start)
 
 
 if __name__ == "__main__":

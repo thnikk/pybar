@@ -5,10 +5,12 @@ Author:
 """
 import gi
 import os
+from subprocess import check_output, CalledProcessError
+import json
 import common as c
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, GLib
+from gi.repository import Gtk, Gdk, GtkLayerShell  # noqa
 
 
 class Bar:
@@ -69,11 +71,20 @@ class Bar:
 
         GtkLayerShell.set_namespace(self.window, 'pybar')
 
-        if self.output:
-            default = Gdk.Display.get_default()
-            # for num in range(Gdk.Display.get_n_monitors(default)):
-            monitor = Gdk.Display.get_monitor(default, self.output)
-            GtkLayerShell.set_monitor(self.window, monitor)
+        try:
+            names = [
+                output['name'] for output in
+                json.loads(check_output(['swaymsg', '-t', 'get_outputs']))
+            ]
+            if self.output not in names:
+                raise ValueError
+            if self.output is not None:
+                default = Gdk.Display.get_default()
+                monitor = Gdk.Display.get_monitor(
+                    default, names.index(self.output))
+                GtkLayerShell.set_monitor(self.window, monitor)
+        except (CalledProcessError, ValueError):
+            pass
 
         # Reserve part of screen
         GtkLayerShell.auto_exclusive_zone_enable(self.window)
