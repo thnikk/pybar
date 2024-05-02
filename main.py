@@ -43,23 +43,6 @@ def main():
     except KeyError:
         pass
 
-    # try:
-    #     icons = config["workspaces"]
-    # except KeyError:
-    #     icons = {}
-
-    # modules_left = [
-    #     modules.module(name) for name in config["modules-left"]
-    # ]
-    #
-    # modules_center = [
-    #     modules.module(name) for name in config["modules-center"]
-    # ]
-    #
-    # modules_right = [
-    #     modules.module(name) for name in config["modules-right"]
-    # ]
-
     pybar = Bar(args.output, spacing=5)
     pybar.css('style.css')
 
@@ -69,13 +52,6 @@ def main():
     }.items():
         for name in config[section_name]:
             section.add(modules.module(name))
-    #
-    # for module in modules_left:
-    #     pybar.left.pack_start(module, 0, 0, 0)
-    # for module in modules_center:
-    #     pybar.center.pack_start(module, 0, 0, 0)
-    # for module in modules_right:
-    #     pybar.right.pack_start(module, 0, 0, 0)
 
     executor.submit(pybar.start)
 
