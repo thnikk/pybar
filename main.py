@@ -3,25 +3,12 @@
 Description:
 Author:
 """
-import os
-import json
 import concurrent.futures
 import argparse
 import sway
+import config as Config
 from bar import Bar
 import modules
-
-
-def load_config():
-    """ Load config from file """
-    config_path = os.path.expanduser('~/.config/pybar/')
-    if not os.path.exists(config_path):
-        return {"modules-right": [], "modules-center": [], "modules-left": []}
-    with open(
-        os.path.expanduser('~/.config/pybar/config.json'),
-        'r', encoding='utf=8'
-    ) as file:
-        return json.loads(file.read())
 
 
 def parse_args() -> argparse.ArgumentParser:
@@ -37,7 +24,7 @@ def main():
     """ Main function """
     executor = concurrent.futures.ThreadPoolExecutor()
     args = parse_args()
-    config = load_config()
+    config = Config.load()
 
     try:
         for name, info in config['modules'].items():
