@@ -13,6 +13,7 @@ import common as c
 import widgets
 from pulse import Pulse
 from calendar_widget import calendar_widget
+from volume_widget import volume_widget
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib  # noqa
 
@@ -34,6 +35,8 @@ def get_widget(name, info=None):
             return widgets.ups_widget(info)
         case 'calendar':
             return calendar_widget()
+        case 'volume':
+            return volume_widget()
         case _:
             return widgets.generic_widget(name, info)
 
@@ -154,15 +157,13 @@ def workspaces(icons):
         module.add(button)
 
     def get_workspaces():
-        try:
-            output = json.loads(
-                check_output(['swaymsg', '-t', 'get_workspaces']))
-        except CalledProcessError:
-            return True
-        workspaces = [workspace['name'] for workspace in output]
-        focused = [
-            workspace['name'] for workspace in output
-            if workspace['focused']][0]
+        with open(
+            os.path.expanduser('~/.cache/pybar/sway.json'),
+            'r', encoding='utf-8'
+        ) as file:
+            cache = json.loads(file.read())
+        workspaces = cache['workspaces']
+        focused = cache['focused']
         for x in range(0, 11):
             if str(x) not in workspaces:
                 buttons[x].hide()
@@ -194,7 +195,8 @@ def clock():
 
 def volume():
     """ """
-    label = Gtk.MenuButton()
+    label = Gtk.MenuButton(popover=pop('volume'))
+    label.set_direction(Gtk.ArrowType.UP)
     label.get_style_context().add_class('module')
 
     def get_volume():
@@ -203,5 +205,5 @@ def volume():
         return True
 
     if get_volume():
-        GLib.timeout_add(250, get_volume)
+        GLib.timeout_add(1000, get_volume)
         return label

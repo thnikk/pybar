@@ -7,6 +7,7 @@ import os
 import json
 import concurrent.futures
 import argparse
+import sway
 from bar import Bar
 import modules
 
@@ -45,6 +46,8 @@ def main():
     except KeyError:
         pass
 
+    executor.submit(sway.cache)
+
     if args.output:
         outputs = args.output.split(',')
     else:
@@ -54,6 +57,7 @@ def main():
         pybar = Bar(output, spacing=5)
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
         pybar.css(css_path)
+        pybar.css('~/.config/pybar/style.css')
 
         for section_name, section in {
             "modules-left": pybar.left, "modules-center": pybar.center,
