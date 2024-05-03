@@ -15,7 +15,7 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
 - [ ] Configurable
     - [x] User CSS in ~/.config/pybar/style.css
     - [x] JSON config in ~/.config/pybar/config.json
-        - [ ] Automatically make base config on first run
+        - [x] Automatically make base config on first run
         - [ ] Different bars for each display
 - [ ] Handle display disconnection
 - [x] Support multiple displays

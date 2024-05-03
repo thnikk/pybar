@@ -14,9 +14,9 @@ def load():
         os.makedirs(config_path)
         default_config = {
             "workspaces": {},
-            "modules-left": ["test"],
+            "modules-left": ["workspaces"],
             "modules-center": [],
-            "modules-right": [],
+            "modules-right": ["clock"],
             "modules": {
                 "test": {
                     "command": ["test"],
@@ -25,7 +25,7 @@ def load():
             }
         }
         with open(f"{config_path}/config.json", 'w', encoding='utf-8') as file:
-            file.write(json.dumps(default_config))
+            file.write(json.dumps(default_config, indent=4))
         return default_config
     with open(
         os.path.expanduser('~/.config/pybar/config.json'),
