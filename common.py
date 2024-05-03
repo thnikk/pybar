@@ -12,6 +12,15 @@ gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
 
 
+def level(value, min=0, max=100, style=None):
+    """ Create level bar """
+    bar = Gtk.LevelBar().new_for_interval(min, max)
+    bar.set_value(value)
+    if style:
+        bar.get_style_context().add_class(style)
+    return bar
+
+
 def dict_from_cmd(command) -> dict:
     command = [os.path.expanduser(part) for part in command]
     return json.loads(check_output(command))

@@ -93,16 +93,17 @@ class Pulse():
 
 def main():
     """ Main function """
-    args = parse_args()
+    # args = parse_args()
     p = Pulse()
-    if args.switch:
-        if args.whitelist:
-            whitelist = args.whitelist.split(',')
-        else:
-            whitelist = None
-        p.inc_default_sink(whitelist)
-    if args.volume:
-        p.change_sink_volume(p.get_default_sink(), args.volume)
+    # if args.switch:
+    #     if args.whitelist:
+    #         whitelist = args.whitelist.split(',')
+    #     else:
+    #         whitelist = None
+    #     p.inc_default_sink(whitelist)
+    # if args.volume:
+    #     p.change_sink_volume(p.get_default_sink(), args.volume)
+    print(json.dumps(p.get_sinks('sinks'), indent=4))
 
 
 if __name__ == "__main__":
