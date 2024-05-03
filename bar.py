@@ -10,7 +10,7 @@ import json
 import common as c
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell  # noqa
+from gi.repository import Gtk, Gdk, GtkLayerShell, GLib  # noqa
 
 
 class Bar:
@@ -29,12 +29,16 @@ class Bar:
 
     def css(self, file):
         """ Load CSS from file """
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_path(os.path.expanduser(file))
-        screen = Gdk.Screen.get_default()
-        style_context = Gtk.StyleContext()
-        style_context.add_provider_for_screen(
-            screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+        try:
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_path(os.path.expanduser(file))
+            screen = Gdk.Screen.get_default()
+            style_context = Gtk.StyleContext()
+            style_context.add_provider_for_screen(
+                screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+        except GLib.GError as e:
+            print(e)
+            pass
 
     def modules(self, modules):
         """ Add modules to bar """
