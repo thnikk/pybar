@@ -88,11 +88,15 @@ def calendar_widget():
 
     style_events(last_month, current_month, next_month, events, now)
 
-    cal_box.add(draw_calendar(last_month, current_month, next_month))
+    combined_calendar = combine_calendar(last_month, current_month, next_month)
+
+    cal_box.add(draw_calendar(combined_calendar))
     cal_section.add(cal_box)
     widget.add(cal_section)
 
-    widget.add(draw_events(now, events))
+    events_section = draw_events(now, events, combined_calendar)
+    if events_section:
+        widget.add(events_section)
 
     try:
         widget.add(alert)
@@ -119,8 +123,8 @@ def style_events(last_month, current_month, next_month, events, now):
                     styles.append(event_style)
 
 
-def draw_calendar(last_month, current_month, next_month):
-    """ Draw calendar"""
+def combine_calendar(last_month, current_month, next_month):
+    """ Combine calendar months """
     combined_month = []
     if len(last_month[-1]) < 7:
         combined_month += last_month[:-1]
@@ -132,6 +136,11 @@ def draw_calendar(last_month, current_month, next_month):
         mixed_month = [combined_month[-1] + next_month[0]]
         del combined_month[-1]
         combined_month += mixed_month + next_month[1:]
+    return combined_month
+
+
+def draw_calendar(combined_month):
+    """ Draw calendar"""
     lines = c.box('v')
     for week in combined_month:
         line = c.box('h', spacing=10)
@@ -146,15 +155,24 @@ def draw_calendar(last_month, current_month, next_month):
     return lines
 
 
-def draw_events(now, events):
+def draw_events(now, events, combined_calendar):
     """ Draw events """
     events_section = c.box('v', spacing=20)
-    for offset, month in enumerate(['Last', 'This', 'Next']):
+    for offset, month in enumerate(['This', 'Next']):
         month_events = {
             date: event for date, event in events.items()
-            if date.split('/', maxsplit=1)[0] == str(
-                diff_month(now.year, now.month, offset-1)[1])
+            if (
+                date.split('/', maxsplit=1)[0] == str(
+                    diff_month(now.year, now.month, offset)[1])
+                and (
+                    offset and not
+                    int(date.split('/')[1]) > combined_calendar[-1][-1][0]
+                )
+            )
         }
+
+        if not month_events:
+            return None
 
         if month_events:
             event_section = c.box('v', spacing=10)
@@ -164,6 +182,11 @@ def draw_events(now, events):
 
             events_box = c.box('v', style='box')
             for date, event in month_events.items():
+                if (
+                    int(date.split('/')[0]) != now.month and
+                    int(date.split('/')[1]) < now.day
+                ):
+                    continue
                 event_box = c.box('h', style='inner-box', spacing=10)
                 event_dot = c.label('', style='event-dot')
                 event_style = event_lookup(event)
@@ -180,3 +203,11 @@ def draw_events(now, events):
             event_section.add(events_box)
             events_section.add(event_section)
     return events_section
+
+
+def main():
+    calendar_widget()
+
+
+if __name__ == "__main__":
+    main()
