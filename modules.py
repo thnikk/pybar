@@ -11,6 +11,7 @@ import time
 import gi
 import common as c
 import widgets
+from pulse import Pulse
 from calendar_widget import calendar_widget
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib  # noqa
@@ -70,10 +71,17 @@ def cache(name, command, interval):
 
 def module(name, icons=None):
     """ Waybar module """
+    # builtin = {
+    #     "clock": clock,
+    #     "workspaces": workspaces,
+    #     "volume": volume
+    # }
     if name == 'clock':
         return clock()
     elif name == 'workspaces':
         return workspaces(icons)
+    elif name == 'volume':
+        return volume()
 
     button = c.mbutton(style='module')
     button.set_direction(Gtk.ArrowType.UP)
@@ -181,4 +189,19 @@ def clock():
 
     if get_time():
         GLib.timeout_add(1000, get_time)
+        return label
+
+
+def volume():
+    """ """
+    label = Gtk.MenuButton()
+    label.get_style_context().add_class('module')
+
+    def get_volume():
+        p = Pulse()
+        label.set_label(f' {p.get_sink_volume(p.get_default_sink())}%')
+        return True
+
+    if get_volume():
+        GLib.timeout_add(250, get_volume)
         return label
