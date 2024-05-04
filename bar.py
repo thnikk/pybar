@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -u
 """
-Description:
-Author:
+Description: Main GTK bar class that spawns the bar
+Author: thnikk
 """
 import gi
 import os
@@ -37,7 +37,11 @@ class Bar:
             style_context.add_provider_for_screen(
                 screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
         except GLib.GError as e:
-            print(e)
+            filename = f"/{'/'.join(e.message.split('/')[1:]).split(':')[0]}"
+            if '.config/pybar' not in filename:
+                c.print_debug(
+                    f"Failed to load CSS from {filename}",
+                    name='pybar', color="red")
             pass
 
     def modules(self, modules):

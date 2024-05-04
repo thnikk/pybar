@@ -1,15 +1,41 @@
 #!/usr/bin/python3 -u
 """
-Description:
-Author:
+Description: Helper functions
+Author: thnikk
 """
 import os
 import json
+import inspect
+from datetime import datetime
+import sys
 from subprocess import check_output, Popen
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
+
+
+def print_debug(msg, name=None, color=38) -> None:
+    """ Print debug message """
+    colors = {
+        "gray": 30, "red": 31, "green": 32, "yellow": 33, "blue": 34,
+        "purple": 36, "cyan": 36
+    }
+    if isinstance(color, str):
+        try:
+            color = colors[color]
+        except KeyError:
+            color = 31
+    if not name:
+        # Get filename of program calling this function
+        frame = inspect.stack()[1]
+        name = frame[0].f_code.co_filename.split('/')[-1].split('.')[0]
+    # Color the name using escape sequences
+    colored_name = f"\033[{color}m{name}\033[0m"
+    # Get the time in the same format as waybar
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    # Print the debug message
+    print(f'[{timestamp}] [{colored_name}] {msg}', file=sys.stderr)
 
 
 def level(value, min=0, max=100, style=None):
@@ -22,6 +48,7 @@ def level(value, min=0, max=100, style=None):
 
 
 def dict_from_cmd(command) -> dict:
+    """ Get json output of command """
     command = [os.path.expanduser(part) for part in command]
     return json.loads(check_output(command))
 
@@ -59,7 +86,7 @@ def click_link(module, url):
 
 
 def pop():
-    """ d """
+    """ Create popover widget """
     popover = Gtk.Popover()
     popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
     popover.set_modal(True)
