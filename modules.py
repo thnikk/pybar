@@ -97,7 +97,10 @@ def module(name, icons=None):
                 os.path.expanduser(f'~/.cache/pybar/{name}.json'),
                 'r', encoding='utf-8'
             ) as file:
-                output = json.loads(file.read())
+                try:
+                    output = json.loads(file.read())
+                except json.decoder.JSONDecodeError:
+                    return True
             if output['text']:
                 button.set_visible(True)
                 button.set_label(output['text'])
@@ -137,9 +140,8 @@ def module(name, icons=None):
         return button
 
 
-def switch_workspace(module, workspace):
+def switch_workspace(_, workspace):
     """ Click action """
-    del module
     run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
 
 
@@ -150,7 +152,10 @@ def workspaces(icons):
         try:
             button = c.button(label=icons[str(x)], style='workspace')
         except (KeyError, TypeError):
-            button = c.button(label=str(x), style='workspace')
+            try:
+                button = c.button(label=icons['default'], style='workspace')
+            except KeyError:
+                button = c.button(label=str(x), style='workspace')
         button.hide()
         button.connect('clicked', switch_workspace, x)
         buttons.append(button)
@@ -161,7 +166,10 @@ def workspaces(icons):
             os.path.expanduser('~/.cache/pybar/sway.json'),
             'r', encoding='utf-8'
         ) as file:
-            cache = json.loads(file.read())
+            try:
+                cache = json.loads(file.read())
+            except json.decoder.JSONDecodeError:
+                return True
         workspaces = cache['workspaces']
         focused = cache['focused']
         for x in range(0, 11):

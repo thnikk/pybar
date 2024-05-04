@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -u
 """
-Description:
-Author:
+Description: Loads the config and spawns the bar
+Author: thnikk
 """
 import concurrent.futures
 import argparse
@@ -51,7 +51,7 @@ def main():
             "modules-right": pybar.right
         }.items():
             for name in config[section_name]:
-                section.add(modules.module(name))
+                section.add(modules.module(name, config))
 
         executor.submit(pybar.start)
 
