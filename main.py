@@ -19,10 +19,18 @@ def main():
     executor = concurrent.futures.ThreadPoolExecutor()
     config = Config.load()
 
+    unique = set(
+        config['modules-left'] +
+        config['modules-center'] +
+        config['modules-right']
+    )
+
     try:
-        for name, info in config['modules'].items():
+        for name in unique:
             executor.submit(
-                modules.cache, name, info['command'], info['interval'])
+                modules.cache, name,
+                config['modules'][name]['command'],
+                config['modules'][name]['interval'])
     except KeyError:
         pass
 
