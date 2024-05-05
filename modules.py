@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -u
 """
-Description:
-Author:
+Description: Load module and popover widgets
+Author: thnikk
 """
 from subprocess import run, check_output, CalledProcessError
 from datetime import datetime
@@ -68,21 +68,17 @@ def cache(name, command, interval):
             try:
                 file.write(check_output(command).decode())
             except CalledProcessError:
+                c.print_debug('Failed to load module.', color='red', name=name)
                 pass
         time.sleep(interval)
 
 
-def module(name, icons=None):
+def module(name, config):
     """ Waybar module """
-    # builtin = {
-    #     "clock": clock,
-    #     "workspaces": workspaces,
-    #     "volume": volume
-    # }
     if name == 'clock':
         return clock()
     elif name == 'workspaces':
-        return workspaces(icons)
+        return workspaces(config['workspaces'])
     elif name == 'volume':
         return volume()
 
@@ -101,11 +97,15 @@ def module(name, icons=None):
                     output = json.loads(file.read())
                 except json.decoder.JSONDecodeError:
                     return True
+            if button.get_label() == output['text']:
+                return True
             if output['text']:
                 button.set_visible(True)
                 button.set_label(output['text'])
             else:
-                button.set_visible(False)
+                if button.get_visible():
+                    button.set_visible(False)
+                return True
             try:
                 if (
                     button.get_tooltip_markup() != output['tooltip']
@@ -193,7 +193,10 @@ def clock():
     label.get_style_context().add_class('module')
 
     def get_time():
-        label.set_label(datetime.now().strftime(' %I:%M %m/%d'))
+        new = datetime.now().strftime(' %I:%M %m/%d')
+        if new == label.get_label():
+            return True
+        label.set_label(new)
         return True
 
     if get_time():
@@ -209,7 +212,12 @@ def volume():
 
     def get_volume():
         p = Pulse()
-        label.set_label(f' {p.get_sink_volume(p.get_default_sink())}%')
+        try:
+            new = f' {p.get_sink_volume(p.get_default_sink())}%'
+            if new != label.get_label():
+                label.set_label(new)
+        except TypeError:
+            pass
         return True
 
     if get_volume():
