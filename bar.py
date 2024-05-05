@@ -5,18 +5,71 @@ Author: thnikk
 """
 import gi
 import os
-from subprocess import check_output, CalledProcessError
-import json
 import common as c
+import modules
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, GLib  # noqa
 
 
+class Display:
+    """ Display class """
+    def __init__(self, config):
+        self.display = Gdk.Display.get_default()
+        self.config = config
+        self.bars = []
+
+    def removed(self, display, monitor, user_data):
+        """ Redraw when a monitor is removed """
+        c.print_debug(f"{monitor.get_model()} disconnected.", color='red')
+        self.draw_all()
+
+    def added(self, display, monitor, user_data):
+        """ Redraw when a monitor is added """
+        c.print_debug(f"{monitor.get_model()} connected.", color='red')
+        self.draw_all()
+
+    def hook(self):
+        """ Connect to signal handlers """
+        for n in range(Gdk.Display.get_n_monitors(self.display)):
+            monitor = Gdk.Display.get_monitor(self.display, n)
+            self.display.connect("monitor-added", self.added, monitor)
+            self.display.connect("monitor-removed", self.removed, monitor)
+
+    def draw_bar(self, monitor):
+        """ Draw a bar on a monitor """
+        self.bar = Bar(monitor)
+        self.bar.css('style.css')
+        self.bar.left.add(c.label('test', style='module'))
+        self.bar.start()
+
+    def draw_all(self):
+        """ Draw all bars """
+
+        # Iterate through list and destroy all bars
+        for bar in self.bars:
+            bar.window.destroy()
+            del bar
+
+        # Iterate through monitors and spawn a bar on each
+        for monitor in [
+            Gdk.Display.get_monitor(self.display, n)
+            for n in range(Gdk.Display.get_n_monitors(self.display))
+        ]:
+            if not monitor:
+                continue
+            bar = Bar(self.config, monitor, spacing=5)
+            bar.populate()
+            bar.css('style.css')
+            bar.start()
+            self.bars.append(bar)
+
+
 class Bar:
     """ Bar class"""
-    def __init__(self, output=None, spacing=0):
+    def __init__(self, config, monitor, spacing=0):
         self.window = Gtk.Window()
+        self.config = config
         self.bar = c.box('h', style='bar', spacing=spacing)
         self.left = c.box('h', style='modules-left', spacing=spacing)
         self.center = c.box('h', style='modules-center', spacing=spacing)
@@ -25,7 +78,17 @@ class Bar:
         self.bar.set_center_widget(self.center)
         self.bar.pack_end(self.right, 0, 0, 0)
         self.window.add(self.bar)
-        self.output = output
+        self.monitor = monitor
+
+    def populate(self):
+        """ Populate bar with modules """
+        for section_name, section in {
+            "modules-left": self.left,
+            "modules-center": self.center,
+            "modules-right": self.right,
+        }.items():
+            for name in self.config[section_name]:
+                section.add(modules.module(name, self.config))
 
     def css(self, file):
         """ Load CSS from file """
@@ -78,25 +141,9 @@ class Bar:
             self.window, GtkLayerShell.Edge.BOTTOM, margin)
 
         GtkLayerShell.set_namespace(self.window, 'pybar')
-
-        try:
-            names = [
-                output['name'] for output in
-                json.loads(check_output(['swaymsg', '-t', 'get_outputs']))
-            ]
-            if self.output not in names:
-                raise ValueError
-            if self.output is not None:
-                default = Gdk.Display.get_default()
-                monitor = Gdk.Display.get_monitor(
-                    default, names.index(self.output))
-                GtkLayerShell.set_monitor(self.window, monitor)
-        except (CalledProcessError, ValueError):
-            pass
+        GtkLayerShell.set_monitor(self.window, self.monitor)
 
         # Reserve part of screen
         GtkLayerShell.auto_exclusive_zone_enable(self.window)
 
         self.window.show_all()
-        self.window.connect('destroy', Gtk.main_quit)
-        Gtk.main()

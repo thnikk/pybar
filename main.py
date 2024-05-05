@@ -4,26 +4,19 @@ Description: Loads the config and spawns the bar
 Author: thnikk
 """
 import concurrent.futures
-import argparse
 import sway
 import config as Config
-from bar import Bar
+from bar import Display
 import modules
-
-
-def parse_args() -> argparse.ArgumentParser:
-    """ Parse arguments """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', type=str, default=None,
-                        help='Comma-separated list of outputs for the bar '
-                        'to appear on.')
-    return parser.parse_args()
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('GtkLayerShell', '0.1')
+from gi.repository import Gtk, Gdk, GtkLayerShell, GLib  # noqa
 
 
 def main():
     """ Main function """
     executor = concurrent.futures.ThreadPoolExecutor()
-    args = parse_args()
     config = Config.load()
 
     try:
@@ -35,25 +28,10 @@ def main():
 
     executor.submit(sway.cache)
 
-    if args.output:
-        outputs = args.output.split(',')
-    else:
-        outputs = [None]
-
-    for output in outputs:
-        pybar = Bar(output, spacing=5)
-        css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
-        pybar.css(css_path)
-        pybar.css('~/.config/pybar/style.css')
-
-        for section_name, section in {
-            "modules-left": pybar.left, "modules-center": pybar.center,
-            "modules-right": pybar.right
-        }.items():
-            for name in config[section_name]:
-                section.add(modules.module(name, config))
-
-        executor.submit(pybar.start)
+    display = Display(config)
+    display.hook()
+    display.draw_all()
+    Gtk.main()
 
 
 if __name__ == "__main__":

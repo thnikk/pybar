@@ -12,7 +12,7 @@ from subprocess import check_output, Popen
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango
+from gi.repository import Gtk, Gdk, GtkLayerShell, Pango  # noqa
 
 
 def print_debug(msg, name=None, color=38) -> None:
