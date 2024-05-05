@@ -55,7 +55,7 @@ window {
 
 /* colorize modules */
 .green { background: alpha(@green, 0.6); color: @black; border: 1px solid @gray; }
-.red { background: alpha(@red, 0.6); color: @black; border: 1px solid @gray; }
+.red { background: alpha(@red, 0.6); color: @white; border: 1px solid @gray; }
 .orange { background: alpha(@orange, 0.6); color: @black; border: 1px solid @gray; }
 
 /* colorize text */
