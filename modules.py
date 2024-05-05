@@ -162,14 +162,17 @@ def workspaces(icons):
         module.add(button)
 
     def get_workspaces():
-        with open(
-            os.path.expanduser('~/.cache/pybar/sway.json'),
-            'r', encoding='utf-8'
-        ) as file:
-            try:
-                cache = json.loads(file.read())
-            except json.decoder.JSONDecodeError:
-                return True
+        try:
+            with open(
+                os.path.expanduser('~/.cache/pybar/sway.json'),
+                'r', encoding='utf-8'
+            ) as file:
+                try:
+                    cache = json.loads(file.read())
+                except json.decoder.JSONDecodeError:
+                    return True
+        except FileNotFoundError:
+            return True
         workspaces = cache['workspaces']
         focused = cache['focused']
         for x in range(0, 11):
