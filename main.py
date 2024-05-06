@@ -5,6 +5,7 @@ Author: thnikk
 """
 import concurrent.futures
 import sway
+import pulse
 import config as Config
 from bar import Display
 import common as c
@@ -35,7 +36,10 @@ def main():
         except KeyError:
             pass
 
-    executor.submit(sway.cache)
+    if 'workspaces' in unique:
+        executor.submit(sway.cache)
+    if 'volume' in unique:
+        executor.submit(pulse.update)
 
     display = Display(config)
     display.hook()

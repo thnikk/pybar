@@ -11,7 +11,6 @@ import time
 import gi
 import common as c
 import widgets
-from pulse import Pulse
 from calendar_widget import calendar_widget
 from volume_widget import volume_widget
 gi.require_version('Gtk', '3.0')
@@ -36,7 +35,7 @@ def get_widget(name, info=None):
         case 'calendar':
             return calendar_widget()
         case 'volume':
-            return volume_widget()
+            return volume_widget(info)
         case _:
             return widgets.generic_widget(name, info)
 
@@ -215,22 +214,29 @@ def clock():
 
 def volume():
     """ Volume module """
-    label = Gtk.MenuButton(popover=pop('volume'))
+    label = Gtk.MenuButton()
     label.set_direction(Gtk.ArrowType.UP)
     label.get_style_context().add_class('module')
+    c.add_style(label, 'module-fixed')
 
     def get_volume():
-        p = Pulse()
+        # return True
+        with open(
+            os.path.expanduser('~/.cache/pybar/pulse.json'),
+            'r', encoding='utf-8'
+        ) as file:
+            cache = json.loads(file.read())
         try:
-            new = f' {p.get_sink_volume(p.get_default_sink())}%'
+            default_sink = cache['default-sink']
+            new = f' {cache['sinks'][default_sink]['volume']}%'
             if new != label.get_label():
                 label.set_label(new)
         except TypeError:
             pass
         if not label.get_active():
-            label.set_popover(pop('volume'))
+            label.set_popover(pop('volume', cache))
         return True
 
     if get_volume():
-        GLib.timeout_add(250, get_volume)
+        GLib.timeout_add(1000, get_volume)
         return label
