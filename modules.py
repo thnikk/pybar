@@ -88,51 +88,57 @@ def module(name, config):
     button.set_no_show_all(True)
 
     def get_output():
+        """ Create module using cache """
+        # Load cache
         try:
             with open(
                 os.path.expanduser(f'~/.cache/pybar/{name}.json'),
                 'r', encoding='utf-8'
             ) as file:
+                output = json.loads(file.read())
+        except (FileNotFoundError, json.decoder.JSONDecodeError):
+            return True
+        if button.get_label() == output['text']:
+            return True
+
+        # Set label
+        if output['text']:
+            button.set_visible(True)
+            button.set_label(output['text'])
+        else:
+            if button.get_visible():
+                button.set_visible(False)
+                button.set_label('')
+            return True
+
+        # Set tooltip or popover
+        try:
+            if (
+                button.get_tooltip_markup() != output['tooltip']
+                and not button.get_active()
+            ):
                 try:
-                    output = json.loads(file.read())
-                except json.decoder.JSONDecodeError:
-                    return True
-            if button.get_label() == output['text']:
-                return True
-            if output['text']:
-                button.set_visible(True)
-                button.set_label(output['text'])
-            else:
-                if button.get_visible():
-                    button.set_visible(False)
-                return True
-            try:
-                if (
-                    button.get_tooltip_markup() != output['tooltip']
-                    and not button.get_active()
-                ):
-                    try:
-                        button.set_popover(pop(name, info=output['widget']))
-                    except KeyError:
-                        # button.set_popover(pop(name))
-                        pass
-                button.set_tooltip_markup(output['tooltip'])
-                try:
-                    output['widget']
-                    button.set_has_tooltip(False)
+                    button.set_popover(pop(name, info=output['widget']))
                 except KeyError:
+                    # button.set_popover(pop(name))
                     pass
+            button.set_tooltip_markup(output['tooltip'])
+            try:
+                output['widget']
+                button.set_has_tooltip(False)
             except KeyError:
                 pass
-            try:
-                if not output['class']:
-                    raise ValueError
-                c.add_style(button, output['class'])
-            except (KeyError, ValueError):
-                for s in ['red', 'green', 'blue', 'orange', 'yellow']:
-                    button.get_style_context().remove_class(s)
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
+        except KeyError:
             pass
+
+        # Set class
+        try:
+            if not output['class']:
+                raise ValueError
+            c.add_style(button, output['class'])
+        except (KeyError, ValueError):
+            for s in ['red', 'green', 'blue', 'orange', 'yellow']:
+                button.get_style_context().remove_class(s)
         return True
     if get_output():
         # Timeout of less than 1 second breaks tooltips
@@ -146,6 +152,7 @@ def switch_workspace(_, workspace):
 
 
 def workspaces(icons):
+    """ Workspaces module """
     module = c.box('h', style='workspaces')
     buttons = []
     for x in range(0, 11):
