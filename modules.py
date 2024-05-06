@@ -120,9 +120,8 @@ def module(name, config):
                 try:
                     button.set_popover(pop(name, info=output['widget']))
                 except KeyError:
-                    # button.set_popover(pop(name))
                     pass
-            button.set_tooltip_markup(output['tooltip'])
+                button.set_tooltip_markup(output['tooltip'])
             try:
                 output['widget']
                 button.set_has_tooltip(False)
@@ -215,7 +214,7 @@ def clock():
 
 
 def volume():
-    """ """
+    """ Volume module """
     label = Gtk.MenuButton(popover=pop('volume'))
     label.set_direction(Gtk.ArrowType.UP)
     label.get_style_context().add_class('module')
@@ -231,5 +230,5 @@ def volume():
         return True
 
     if get_volume():
-        GLib.timeout_add(1000, get_volume)
+        GLib.timeout_add(250, get_volume)
         return label

@@ -8,7 +8,7 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
 ### To-do
 - [x] Accept waybar-formatted json for modules
 - [x] Sway workspaces
-    - [ ] Subscribe to swaymsg and only update when there's a change
+    - [x] Subscribe to swaymsg and only update when there's a change
 - [x] Widgets for modules
     - [x] Spawn in the correct position
     - [x] Get data for widget directly from module output
@@ -17,5 +17,6 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
     - [x] JSON config in ~/.config/pybar/config.json
         - [x] Automatically make base config on first run
         - [ ] Different bars for each display
-- [ ] Handle display disconnection
+- [x] Handle display disconnection
+    - Partial janky support
 - [x] Support multiple displays
