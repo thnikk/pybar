@@ -7,6 +7,7 @@ import concurrent.futures
 import sway
 import config as Config
 from bar import Display
+import common as c
 import modules
 import gi
 gi.require_version('Gtk', '3.0')
@@ -25,14 +26,14 @@ def main():
         config['modules-right']
     )
 
-    try:
-        for name in unique:
+    for name in unique:
+        try:
             executor.submit(
                 modules.cache, name,
                 config['modules'][name]['command'],
                 config['modules'][name]['interval'])
-    except KeyError:
-        pass
+        except KeyError:
+            pass
 
     executor.submit(sway.cache)
 
