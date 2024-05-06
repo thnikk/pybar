@@ -220,7 +220,6 @@ def volume():
     c.add_style(label, 'module-fixed')
 
     def get_volume():
-        # return True
         with open(
             os.path.expanduser('~/.cache/pybar/pulse.json'),
             'r', encoding='utf-8'

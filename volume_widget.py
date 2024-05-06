@@ -12,17 +12,21 @@ from gi.repository import GLib  # noqa
 
 def sink_volume(widget, sink):
     """ Action for changing value of scale """
-    c.print_debug(f"{sink} {widget.get_value()}", name='volume-widget')
     run(["pactl", "set-sink-volume", sink, f"{str(widget.get_value())}%"],
         check=False, capture_output=False)
 
 
 def sink_input_volume(widget, sink):
     """ Action for changing value of scale """
-    c.print_debug(f"{sink} {widget.get_value()}", name='volume-widget')
     run([
         "pactl", "set-sink-input-volume", sink,
         f"{str(widget.get_value())}%"],
+        check=False, capture_output=False)
+
+
+def set_default_sink(widget, sink):
+    """ Set the default sink """
+    run(["pactl", "set-default-sink", sink],
         check=False, capture_output=False)
 
 
@@ -37,13 +41,14 @@ def volume_widget(cache):
     sinks_box = c.box('v', style='box')
     for id, info in cache['sinks'].items():
         sink_box = c.box('v', spacing=10, style='inner-box')
-        sink_box.add(c.label(info['name']))
+        sink_label = c.button(info['name'])
+        sink_label.connect('clicked', set_default_sink, id)
+        if id == cache['default-sink']:
+            c.add_style(sink_label, 'active')
+        sink_box.add(sink_label)
         level = c.slider(info['volume'])
-        level.connect(
-            'value-changed', sink_volume, id)
-        level_box = c.box('v')
-        level_box.pack_start(level, 1, 0, 0)
-        sink_box.pack_start(level_box, 1, 1, 0)
+        level.connect('value-changed', sink_volume, id)
+        sink_box.pack_start(level, 1, 1, 0)
         sinks_box.add(sink_box)
     section_box.add(sinks_box)
     main_box.add(section_box)
@@ -55,8 +60,7 @@ def volume_widget(cache):
         sink_box = c.box('v', spacing=10, style='inner-box')
         sink_box.add(c.label(sink_input['name']))
         level = c.slider(sink_input['volume'])
-        level.connect(
-            'value-changed', sink_input_volume, sink_input['id'])
+        level.connect('value-changed', sink_input_volume, sink_input['id'])
         sink_box.pack_start(level, 1, 1, 0)
         sinks_box.add(sink_box)
         if sink_input != cache['sink-inputs'][-1]:
