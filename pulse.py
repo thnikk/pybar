@@ -90,6 +90,16 @@ class Pulse():
         volume = max(min(volume, 150), 0)
         check_output(['pactl', 'set-sink-volume', sink, f'{volume}%'])
 
+    def set_sink_volume(self, sink, value):
+        """ Set sink volume """
+        value = round(value)
+        check_output(['pactl', 'set-sink-volume', sink, f'{value}%'])
+
+    def set_sink_input_volume(self, sink, value):
+        """ Set sink volume """
+        value = round(value)
+        check_output(['pactl', 'set-sink-input-volume', sink, f'{value}%'])
+
 
 def main():
     """ Main function """
@@ -103,7 +113,7 @@ def main():
     #     p.inc_default_sink(whitelist)
     # if args.volume:
     #     p.change_sink_volume(p.get_default_sink(), args.volume)
-    print(json.dumps(p.get_sinks('sinks'), indent=4))
+    print(json.dumps(p.get_sinks('sink-inputs'), indent=4))
 
 
 if __name__ == "__main__":

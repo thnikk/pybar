@@ -227,6 +227,8 @@ def volume():
                 label.set_label(new)
         except TypeError:
             pass
+        if not label.get_active():
+            label.set_popover(pop('volume'))
         return True
 
     if get_volume():

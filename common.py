@@ -38,6 +38,19 @@ def print_debug(msg, name=None, color=38) -> None:
     print(f'[{timestamp}] [{colored_name}] {msg}', file=sys.stderr)
 
 
+def slider(value, min=0, max=100, style=None):
+    """ Create a slider """
+    widget = Gtk.Scale().new_with_range(
+        orientation=Gtk.Orientation.HORIZONTAL,
+        min=min, max=max, step=1
+    )
+    widget.set_value(value)
+    widget.set_draw_value(False)
+    if style:
+        widget.get_style_context().add_class(style)
+    return widget
+
+
 def level(value, min=0, max=100, style=None):
     """ Create level bar """
     bar = Gtk.LevelBar().new_for_interval(min, max)

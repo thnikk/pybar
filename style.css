@@ -54,9 +54,9 @@ window {
 }
 
 /* colorize modules */
-.green { background: alpha(@green, 0.6); color: @black; border: 1px solid @gray; }
-.red { background: alpha(@red, 0.6); color: @white; border: 1px solid @gray; }
-.orange { background: alpha(@orange, 0.6); color: @black; border: 1px solid @gray; }
+.green { background: alpha(@green, 0.2); color: @white; border: 1px solid @gray; }
+.red { background: alpha(@red, 0.2); color: @white; border: 1px solid @gray; }
+.orange { background: alpha(@orange, 0.2); color: @white; border: 1px solid @gray; }
 
 /* colorize text */
 .green-fg { color: @green; }
@@ -75,24 +75,32 @@ scrollbar {
 	border: none;
 }
 
-slider { background: none; border: none; }
+scrollbar slider { background: none; border: none; }
 
-levelbar trough {
-	border: 1px solid @gray;
-	padding: 2px;
-	border-radius: 10px;
-	color: black;
-	background: @gray;
+scale contents trough { background: @black; border: 1px solid @gray; }
+scale contents trough highlight { background: @blue; }
+
+scale contents trough slider {
+	background: #1c1f26;
+	/* border-radius: 0px; */
 }
 
-levelbar block {
-	background: none;
-	color: @blue;
-	border-radius: 10px;
-	border: none;
-}
-
-levelbar block.high, levelbar block:not(.empty) { border: 1px solid @gray; background-color: @blue; }
+/* levelbar trough { */
+/* 	border: 1px solid @gray; */
+/* 	padding: 2px; */
+/* 	border-radius: 10px; */
+/* 	color: black; */
+/* 	background: @gray; */
+/* } */
+/**/
+/* levelbar block { */
+/* 	background: none; */
+/* 	color: @blue; */
+/* 	border-radius: 10px; */
+/* 	border: none; */
+/* } */
+/**/
+/* levelbar block.high, levelbar block:not(.empty) { border: 1px solid @gray; background-color: @blue; } */
 /* levelbar block.low, levelbar block.high, levelbar block.full, levelbar block.empty { background: @blue; border: 1px solid @gray; } */
 
 button {
