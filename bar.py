@@ -21,12 +21,12 @@ class Display:
 
     def removed(self, display, monitor, user_data):
         """ Redraw when a monitor is removed """
-        c.print_debug(f"{monitor.get_model()} disconnected.", color='red')
+        c.print_debug(f"{monitor.get_model()} disconnected.", color='green')
         self.draw_all()
 
     def added(self, display, monitor, user_data):
         """ Redraw when a monitor is added """
-        c.print_debug(f"{monitor.get_model()} connected.", color='red')
+        c.print_debug(f"{monitor.get_model()} connected.", color='green')
         self.draw_all()
 
     def hook(self):
@@ -35,13 +35,6 @@ class Display:
             monitor = Gdk.Display.get_monitor(self.display, n)
             self.display.connect("monitor-added", self.added, monitor)
             self.display.connect("monitor-removed", self.removed, monitor)
-
-    def draw_bar(self, monitor):
-        """ Draw a bar on a monitor """
-        self.bar = Bar(monitor)
-        self.bar.css('style.css')
-        self.bar.left.add(c.label('test', style='module'))
-        self.bar.start()
 
     def draw_all(self):
         """ Draw all bars """
@@ -60,7 +53,10 @@ class Display:
                 continue
             bar = Bar(self.config, monitor, spacing=5)
             bar.populate()
-            bar.css('style.css')
+            css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
+            bar.css(css_path)
+            # bar.css('style.css')
+            bar.css('~/.config/pybar/style.css')
             bar.start()
             self.bars.append(bar)
 
