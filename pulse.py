@@ -13,13 +13,23 @@ def cache():
     with pulsectl.Pulse() as pulse:
         output = {
             "default-sink": pulse.server_info().default_sink_name,
+            "default-source": pulse.server_info().default_source_name,
             "sinks": {
                 sink.proplist['node.name']: {
                     "name": sink.proplist['device.product.name'],
                     "volume": round(sink.volume.value_flat * 100)
                 }
                 for sink in pulse.sink_list()
-                },
+            },
+            "sources": {
+                source.proplist['node.name']: {
+                    "name": source.proplist['alsa.card_name'],
+                    "volume": round(source.volume.value_flat * 100),
+                }
+                for source in pulse.source_list()
+                if 'alsa.card_name' in source.proplist
+                and source.proplist['device.class'] != 'monitor'
+            },
             "sink-inputs": [
                 {
                     "id": sink_input.proplist['object.serial'],
@@ -53,3 +63,12 @@ def update():
     while True:
         cache()
         listen()
+
+
+def main():
+    """ Debug """
+    cache()
+
+
+if __name__ == "__main__":
+    main()

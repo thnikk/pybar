@@ -16,6 +16,12 @@ def sink_volume(widget, sink):
         check=False, capture_output=False)
 
 
+def source_volume(widget, source):
+    """ Action for changing value of scale """
+    run(["pactl", "set-source-volume", source, f"{str(widget.get_value())}%"],
+        check=False, capture_output=False)
+
+
 def sink_input_volume(widget, sink):
     """ Action for changing value of scale """
     run([
@@ -27,6 +33,12 @@ def sink_input_volume(widget, sink):
 def set_default_sink(widget, sink):
     """ Set the default sink """
     run(["pactl", "set-default-sink", sink],
+        check=False, capture_output=False)
+
+
+def set_default_source(widget, source):
+    """ Set the default sink """
+    run(["pactl", "set-default-source", source],
         check=False, capture_output=False)
 
 
@@ -51,6 +63,23 @@ def volume_widget(cache):
         sink_box.pack_start(level, 1, 1, 0)
         sinks_box.add(sink_box)
     section_box.add(sinks_box)
+    main_box.add(section_box)
+
+    section_box = c.box('v', spacing=10)
+    section_box.add(c.label('Inputs', style='title', ha='start'))
+    sources_box = c.box('v', style='box')
+    for id, info in cache['sources'].items():
+        source_box = c.box('v', spacing=10, style='inner-box')
+        source_label = c.button(info['name'])
+        source_label.connect('clicked', set_default_source, id)
+        if id == cache['default-source']:
+            c.add_style(source_label, 'active')
+        source_box.add(source_label)
+        level = c.slider(info['volume'])
+        level.connect('value-changed', source_volume, id)
+        source_box.pack_start(level, 1, 1, 0)
+        sources_box.add(source_box)
+    section_box.add(sources_box)
     main_box.add(section_box)
 
     section_box = c.box('v', spacing=10)
