@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import os
 import time
+from glob import glob
 import gi
 import common as c
 import widgets
@@ -38,6 +39,10 @@ def get_widget(name, info=None):
             return calendar_widget()
         case 'volume':
             return volume_widget(info)
+        case 'backlight':
+            return widgets.backlight(info)
+        case 'battery':
+            return widgets.battery(info)
         case _:
             return widgets.generic_widget(name, info)
 
@@ -82,6 +87,10 @@ def module(name, config):
         return workspaces(config['workspaces'])
     elif name == 'volume':
         return volume()
+    elif name == 'backlight':
+        return backlight()
+    elif name == 'battery':
+        return battery()
 
     button = c.mbutton(style='module')
     button.set_direction(Gtk.ArrowType.UP)
@@ -214,6 +223,64 @@ def clock():
         return label
 
 
+def battery():
+    """ Battery module """
+    label = Gtk.MenuButton()
+    label.set_direction(Gtk.ArrowType.UP)
+    label.get_style_context().add_class('module')
+    c.add_style(label, 'module-fixed')
+
+    def get_percent():
+        info = {}
+        full = 0
+        now = 0
+        for path in glob('/sys/class/power_supply/BAT*'):
+            battery_info = {}
+            for file in ["energy_now", "energy_full"]:
+                with open(f"{path}/{file}", 'r', encoding='utf-8') as f:
+                    value = int(f.read())
+                    battery_info[file] = value
+                    if file == 'energy_now':
+                        now += value
+                    elif file == 'energy_full':
+                        full += value
+            info[path.split('/')[-1]] = battery_info
+        if not label.get_active():
+            label.set_popover(pop('battery', info))
+        percentage = str(round((now/full)*100))
+        label.set_label(f' {percentage}%')
+        return True
+    if get_percent():
+        GLib.timeout_add(60000, get_percent)
+        return label
+
+
+def backlight():
+    """ Backlight module """
+    label = Gtk.MenuButton()
+    label.set_direction(Gtk.ArrowType.UP)
+    label.get_style_context().add_class('module')
+    c.add_style(label, 'module-fixed')
+
+    def get_brightness():
+        base_path = "/sys/class/backlight/intel_backlight"
+        if not os.path.exists(base_path):
+            return False
+        info = {}
+        for item in ["brightness", "max_brightness"]:
+            with open(f'{base_path}/{item}', 'r', encoding='utf-8') as file:
+                info[item] = int(file.read())
+        if not label.get_active():
+            label.set_popover(pop('backlight', info))
+        percentage = round((info['brightness']/info['max_brightness'])*100)
+        label.set_label(f' {percentage}%')
+        return True
+
+    if get_brightness():
+        GLib.timeout_add(1000, get_brightness)
+        return label
+
+
 def volume():
     """ Volume module """
     label = Gtk.MenuButton()
@@ -222,14 +289,14 @@ def volume():
     c.add_style(label, 'module-fixed')
 
     def get_volume():
-        with open(
-            os.path.expanduser('~/.cache/pybar/pulse.json'),
-            'r', encoding='utf-8'
-        ) as file:
-            try:
+        try:
+            with open(
+                os.path.expanduser('~/.cache/pybar/pulse.json'),
+                'r', encoding='utf-8'
+            ) as file:
                 cache = json.loads(file.read())
-            except json.decoder.JSONDecodeError:
-                return True
+        except (FileNotFoundError,json.decoder.JSONDecodeError):
+            return True
         try:
             default_sink = cache['default-sink']
             new = f' {cache['sinks'][default_sink]['volume']}%'

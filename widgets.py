@@ -304,6 +304,50 @@ def xdrip(cache):
     return main_box
 
 
+def set_backlight(widget):
+    """ Action for backlight slider """
+    with open(
+        '/sys/class/backlight/intel_backlight/brightness',
+        'w', encoding='utf-8'
+    ) as file:
+        file.write(str(round(widget.get_value())))
+
+
+def backlight(cache):
+    """ Backlight widget """
+    main_box = c.box('h', style='small-widget')
+    main_box.add(c.label('', style='inner-box'))
+    level = c.slider(cache['brightness'], 10, cache['max_brightness'])
+    level.connect('value-changed', set_backlight)
+    main_box.pack_start(level, 1, 1, 0)
+    return main_box
+
+
+def battery(cache):
+    """ Battery widget """
+    main_box = c.box('v', spacing=20, style='small-widget')
+    main_box.add(c.label('Battery', style='heading'))
+
+    outer_box = c.box('v', spacing=10)
+    outer_box.add(c.label('Devices', style='title', ha='start'))
+    battery_box = c.box('v', style='box')
+    for device, info in cache.items():
+        device_box = c.box('h', style='inner-box')
+        percentage = str(round((
+            info['energy_now'] / info['energy_full']
+        )*100))
+        device_box.pack_start(c.label(device), 0, 0, 0)
+        device_box.pack_end(c.label(f'{percentage}%'), 0, 0, 0)
+        battery_box.add(device_box)
+        if device != list(cache)[-1]:
+            battery_box.add(c.sep('h'))
+    outer_box.add(battery_box)
+
+    main_box.add(outer_box)
+
+    return main_box
+
+
 def time_to_text(time_string) -> str:
     """ Convert time to text string """
     hours = int(time_string.split(':')[0])
