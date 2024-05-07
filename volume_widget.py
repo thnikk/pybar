@@ -65,7 +65,8 @@ def volume_widget(cache):
         if id != list(cache['sinks'])[-1]:
             sinks_box.add(c.sep('v'))
     section_box.add(sinks_box)
-    main_box.add(section_box)
+    if cache['sinks']:
+        main_box.add(section_box)
 
     section_box = c.box('v', spacing=10)
     section_box.add(c.label('Inputs', style='title', ha='start'))
@@ -84,7 +85,8 @@ def volume_widget(cache):
         if id != list(cache['sources'])[-1]:
             sinks_box.add(c.sep('v'))
     section_box.add(sources_box)
-    main_box.add(section_box)
+    if cache['sources']:
+        main_box.add(section_box)
 
     section_box = c.box('v', spacing=10)
     section_box.add(c.label('Programs', style='title', ha='start'))
@@ -99,6 +101,7 @@ def volume_widget(cache):
         if sink_input != cache['sink-inputs'][-1]:
             sinks_box.add(c.sep('v'))
     section_box.add(sinks_box)
-    main_box.add(section_box)
+    if cache['sink-inputs']:
+        main_box.add(section_box)
 
     return main_box
