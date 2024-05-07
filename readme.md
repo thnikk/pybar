@@ -20,3 +20,4 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
 - [x] Handle display disconnection
     - Partial janky support
 - [x] Support multiple displays
+- [ ] Use variable to store cache instead of files

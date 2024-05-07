@@ -62,6 +62,8 @@ def volume_widget(cache):
         level.connect('value-changed', sink_volume, id)
         sink_box.pack_start(level, 1, 1, 0)
         sinks_box.add(sink_box)
+        if id != list(cache['sinks'])[-1]:
+            sinks_box.add(c.sep('v'))
     section_box.add(sinks_box)
     main_box.add(section_box)
 
@@ -79,6 +81,8 @@ def volume_widget(cache):
         level.connect('value-changed', source_volume, id)
         source_box.pack_start(level, 1, 1, 0)
         sources_box.add(source_box)
+        if id != list(cache['sources'])[-1]:
+            sinks_box.add(c.sep('v'))
     section_box.add(sources_box)
     main_box.add(section_box)
 

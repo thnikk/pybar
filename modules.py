@@ -224,7 +224,10 @@ def volume():
             os.path.expanduser('~/.cache/pybar/pulse.json'),
             'r', encoding='utf-8'
         ) as file:
-            cache = json.loads(file.read())
+            try:
+                cache = json.loads(file.read())
+            except json.decoder.JSONDecodeError:
+                return True
         try:
             default_sink = cache['default-sink']
             new = f' {cache['sinks'][default_sink]['volume']}%'
