@@ -32,6 +32,8 @@ def get_widget(name, info=None):
             return widgets.git_widget(info)
         case 'ups':
             return widgets.ups_widget(info)
+        case 'xdrip':
+            return widgets.xdrip(info)
         case 'calendar':
             return calendar_widget()
         case 'volume':

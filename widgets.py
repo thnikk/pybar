@@ -8,7 +8,7 @@ import common as c
 
 def generic_widget(name, cache):
     """ Generic widget """
-    main_box = c.box('v', style='widget', spacing=20)
+    main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
     label = c.label(name.capitalize(), style='heading')
     main_box.add(label)
@@ -29,7 +29,7 @@ def generic_widget(name, cache):
 
 def weather_widget(cache):
     """ Weather widget """
-    widget = c.box('v', style='widget', spacing=20)
+    widget = c.box('v', spacing=20)
 
     today = cache['Today']['info'][0]
     today_box = c.box('h', spacing=10)
@@ -106,7 +106,7 @@ def weather_widget(cache):
 
 def updates_widget(info):
     """ Update widget """
-    main_box = c.box('v', style='widget', spacing=20)
+    main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
     label = c.label('Updates', style='heading')
     main_box.add(label)
@@ -158,7 +158,7 @@ def git_widget(cache):
     """ Git widget """
     commits = cache["commits"]
 
-    main_box = c.box('v', style='widget', spacing=20)
+    main_box = c.box('v', spacing=20)
     main_box.get_style_context().add_class('wide')
     main_box.add(c.label(cache["name"], style='heading'))
 
@@ -201,7 +201,7 @@ def git_widget(cache):
 
 def ups_widget(cache):
     """ UPS widget """
-    main_box = c.box('v', style='widget', spacing=20)
+    main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
     label = c.label('UPS stats', style='heading')
     main_box.add(label)
@@ -239,7 +239,7 @@ def ups_widget(cache):
 
 def hoyo_widget(cache, game):
     """ Genshin widget """
-    main_box = c.box('v', style='widget', spacing=20)
+    main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
     label = c.label(cache['Name'], style='heading')
     main_box.add(label)
@@ -273,6 +273,33 @@ def hoyo_widget(cache, game):
         if line != info[-1] and line:
             info_box.pack_start(c.sep('h'), 0, 0, 0)
     main_box.add(info_box)
+
+    return main_box
+
+
+def xdrip(cache):
+    """ XDrip widget """
+    main_box = c.box('v', spacing=20)
+    main_box.add(c.label('XDrip+', style="heading"))
+
+    wide_box = c.box('h', spacing=20)
+    sgv_box = c.box('h', spacing=5)
+    sgv_box.add(c.label(
+        f"{cache['sgv']}", style='large-text'))
+    sgv_box.add(c.label(cache['direction'], va='start', style='arrow'))
+    wide_box.add(sgv_box)
+    detail_box = c.box('v')
+    detail_box.add(c.label(f"{cache['since_last']} minutes ago"))
+    wide_box.pack_end(detail_box, 0, 0, 0)
+    main_box.add(wide_box)
+
+    bottom_box = c.box('h', style='box')
+    items = [f" {cache['delta']}", f" {cache['date']}"]
+    for item in items:
+        bottom_box.pack_start(c.label(item, style='inner-box'), 1, 0, 0)
+        if item != items[-1]:
+            bottom_box.add(c.sep('v'))
+    main_box.add(bottom_box)
 
     return main_box
 

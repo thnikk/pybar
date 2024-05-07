@@ -61,6 +61,7 @@ window {
 .green { background: alpha(@green, 0.2); color: @white; border: 1px solid @gray; }
 .red { background: alpha(@red, 0.2); color: @white; border: 1px solid @gray; }
 .orange { background: alpha(@orange, 0.2); color: @white; border: 1px solid @gray; }
+.gray { color: @light_gray; }
 
 /* colorize text */
 .green-fg { color: @green; }
@@ -125,6 +126,7 @@ popover {
 	box-shadow: none;
 	padding: 10px;
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
+	min-width: 300px;
 }
 
 separator { background: @gray; padding: 0; margin: 0; }
@@ -171,6 +173,9 @@ separator { background: @gray; padding: 0; margin: 0; }
 	font-size: 64px;
 	margin: -10px 0px;
 }
+
+.large-text { font-size: 64px; margin: -15px 0px; }
+.arrow { font-size: 24px; }
 
 .temp-label {
 	font-size: 80px;
