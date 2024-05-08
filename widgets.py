@@ -4,6 +4,7 @@ Description: Widgets
 Author: thnikk
 """
 import common as c
+from subprocess import run, CalledProcessError
 
 
 def generic_widget(name, cache):
@@ -344,6 +345,69 @@ def battery(cache):
     outer_box.add(battery_box)
 
     main_box.add(outer_box)
+
+    return main_box
+
+
+def network(cache):
+    """ Network widget """
+    main_box = c.box('v', spacing=20, style='small-widget')
+    main_box.add(c.label('Network', style='heading'))
+
+    names = {
+        'GENERAL.DEVICE': 'Device', "GENERAL.CONNECTION": "SSID",
+        'IP4.ADDRESS[1]': 'IP'
+    }
+
+    for device in cache['Network']:
+        if not '(connected)' in device['GENERAL.STATE']:
+            continue
+        network_box = c.box('v', spacing=10)
+        network_box.add(c.label(
+            device['GENERAL.TYPE'], style='title', ha='start'))
+        device_box = c.box('v', style='box')
+        for long, short in names.items():
+            if short == 'SSID' and device['GENERAL.TYPE'] != 'wifi':
+                continue
+            line = c.box('h', style='inner-box')
+            line.pack_start(c.label(short), 0, 0, 0)
+            line.pack_end(c.label(device[long]), 0, 0, 0)
+            device_box.add(line)
+            if long != list(names)[-1]:
+                device_box.add(c.sep('h'))
+        network_box.add(device_box)
+
+        main_box.add(network_box)
+
+    return main_box
+
+
+def power_action(button, command):
+    """ Action for power menu buttons """
+    run(command, check=False, capture_output=False)
+
+
+def power():
+    main_box = c.box('v', spacing=30)
+    # main_box.add(c.label('Power menu', style='heading'))
+
+    buttons = {
+        "Lock  ": ["swaylock"],
+        "Log out  ": ["swaymsg", "exit"],
+        "Suspend  ": ["systemctl", "suspend"],
+        "Reboot  ": ["systemctl", "reboot"],
+        "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
+        "Shut down  ": ["systemctl", "poweroff"],
+    }
+
+    power_box = c.box('v', style='box')
+    for icon, command in buttons.items():
+        button = c.button(label=icon, ha='end', style='power-item')
+        button.connect('clicked', power_action, command)
+        power_box.add(button)
+        if icon != list(buttons)[-1]:
+            power_box.add(c.sep('h'))
+    main_box.add(power_box)
 
     return main_box
 

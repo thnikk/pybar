@@ -15,6 +15,12 @@ gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, Pango  # noqa
 
 
+align = {
+    "fill": Gtk.Align.FILL, "start": Gtk.Align.START,
+    "end": Gtk.Align.END, "center": Gtk.Align.CENTER
+}
+
+
 def print_debug(msg, name=None, color=38) -> None:
     """ Print debug message """
     colors = {
@@ -142,13 +148,17 @@ def del_style(widget, style):
         widget.get_style_context().remove_class(style)
 
 
-def button(label=None, style=None):
+def button(label=None, style=None, ha=None):
     """ Button """
     __button__ = Gtk.Button.new()
     if label:
         __button__.set_label(label)
     if style:
         __button__.get_style_context().add_class(style)
+    try:
+        __button__.props.halign = align[ha]
+    except KeyError:
+        pass
     return __button__
 
 
@@ -215,18 +225,13 @@ def label(
     if style:
         text.get_style_context().add_class(style)
 
-    options = {
-        "fill": Gtk.Align.FILL, "start": Gtk.Align.START,
-        "end": Gtk.Align.END, "center": Gtk.Align.CENTER
-    }
-
     try:
-        text.props.valign = options[va]
+        text.props.valign = align[va]
     except KeyError:
         pass
 
     try:
-        text.props.halign = options[ha]
+        text.props.halign = align[ha]
     except KeyError:
         pass
     if isinstance(he, bool):

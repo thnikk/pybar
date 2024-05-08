@@ -22,6 +22,8 @@ window {
 	color: @white;
 }
 
+button { color: inherit; }
+
 .module {
 	padding: 2px 5px;
 	background: @gray;
@@ -121,6 +123,7 @@ button {
 /* widgets */
 popover {
 	background: @black;
+	color: @white;
 	border: 1px solid @gray;
 	border-radius: 20px;
 	box-shadow: none;
@@ -176,6 +179,8 @@ separator { background: @gray; padding: 0; margin: 0; }
 
 .large-text { font-size: 64px; margin: -15px 0px; }
 .arrow { font-size: 24px; }
+
+.power-item { font-size: 20px; padding: 10px; }
 
 .temp-label {
 	font-size: 80px;

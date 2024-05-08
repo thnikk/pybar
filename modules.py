@@ -43,6 +43,10 @@ def get_widget(name, info=None):
             return widgets.backlight(info)
         case 'battery':
             return widgets.battery(info)
+        case 'network':
+            return widgets.network(info)
+        case 'power':
+            return widgets.power()
         case _:
             return widgets.generic_widget(name, info)
 
@@ -91,6 +95,8 @@ def module(name, config):
         return backlight()
     elif name == 'battery':
         return battery()
+    elif name == 'power':
+        return power()
 
     button = c.mbutton(style='module')
     button.set_direction(Gtk.ArrowType.UP)
@@ -295,15 +301,11 @@ def volume():
                 'r', encoding='utf-8'
             ) as file:
                 cache = json.loads(file.read())
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
+        except (FileNotFoundError,json.decoder.JSONDecodeError):
             return True
         try:
             default_sink = cache['default-sink']
-            if 'arctis' in default_sink.lower():
-                icon = ""
-            else:
-                icon = ""
-            new = f'{icon} {cache['sinks'][default_sink]['volume']}%'
+            new = f' {cache['sinks'][default_sink]['volume']}%'
             if new != label.get_label():
                 label.set_label(new)
         except TypeError:
@@ -315,3 +317,13 @@ def volume():
     if get_volume():
         GLib.timeout_add(1000, get_volume)
         return label
+
+
+def power():
+    """ Power widget """
+    label = Gtk.MenuButton('')
+    label.set_direction(Gtk.ArrowType.UP)
+    label.set_popover(pop('power'))
+    label.get_style_context().add_class('module')
+
+    return label
