@@ -12,10 +12,11 @@ from glob import glob
 import gi
 import common as c
 import widgets
+import pulsectl
 from calendar_widget import calendar_widget
 from volume_widget import volume_widget
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib  # noqa
+from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 def get_widget(name, info=None):
@@ -287,35 +288,54 @@ def backlight():
         return label
 
 
+def action(button, event):
+    """ Scroll action """
+    with pulsectl.Pulse('volume-increaser') as pulse:
+        default = pulse.sink_default_get()
+        c.print_debug(default.volume.value_flat)
+        if event.direction == Gdk.ScrollDirection.UP:
+            if default.volume.value_flat < 1:
+                pulse.volume_change_all_chans(default, 0.01)
+            else:
+                pulse.volume_set_all_chans(default, 1)
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            pulse.volume_change_all_chans(default, -0.01)
+    get_volume(button)
+
+
+def get_volume(label):
+    """ Get volume data from cache """
+    try:
+        with open(
+            os.path.expanduser('~/.cache/pybar/pulse.json'),
+            'r', encoding='utf-8'
+        ) as file:
+            cache = json.loads(file.read())
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
+        return True
+    try:
+        default_sink = cache['default-sink']
+        new = f' {cache['sinks'][default_sink]['volume']}%'
+        if new != label.get_label():
+            label.set_label(new)
+    except TypeError:
+        pass
+    if not label.get_active():
+        label.set_popover(pop('volume', cache))
+    return True
+
+
 def volume():
     """ Volume module """
     label = Gtk.MenuButton()
     label.set_direction(Gtk.ArrowType.UP)
     label.get_style_context().add_class('module')
     c.add_style(label, 'module-fixed')
+    label.add_events(Gdk.EventMask.SCROLL_MASK)
+    label.connect('scroll-event', action)
 
-    def get_volume():
-        try:
-            with open(
-                os.path.expanduser('~/.cache/pybar/pulse.json'),
-                'r', encoding='utf-8'
-            ) as file:
-                cache = json.loads(file.read())
-        except (FileNotFoundError,json.decoder.JSONDecodeError):
-            return True
-        try:
-            default_sink = cache['default-sink']
-            new = f' {cache['sinks'][default_sink]['volume']}%'
-            if new != label.get_label():
-                label.set_label(new)
-        except TypeError:
-            pass
-        if not label.get_active():
-            label.set_popover(pop('volume', cache))
-        return True
-
-    if get_volume():
-        GLib.timeout_add(1000, get_volume)
+    if get_volume(label):
+        GLib.timeout_add(1000, get_volume, label)
         return label
 
 
