@@ -295,11 +295,15 @@ def volume():
                 'r', encoding='utf-8'
             ) as file:
                 cache = json.loads(file.read())
-        except (FileNotFoundError,json.decoder.JSONDecodeError):
+        except (FileNotFoundError, json.decoder.JSONDecodeError):
             return True
         try:
             default_sink = cache['default-sink']
-            new = f' {cache['sinks'][default_sink]['volume']}%'
+            if 'arctis' in default_sink.lower():
+                icon = ""
+            else:
+                icon = ""
+            new = f'{icon} {cache['sinks'][default_sink]['volume']}%'
             if new != label.get_label():
                 label.set_label(new)
         except TypeError:
