@@ -159,7 +159,7 @@ def git_widget(cache):
     commits = cache["commits"]
 
     main_box = c.box('v', spacing=20)
-    main_box.get_style_context().add_class('wide')
+    main_box.get_style_context().add_class('widget-medium')
     main_box.add(c.label(cache["name"], style='heading'))
 
     commits_box = c.box('v', spacing=10)
@@ -170,7 +170,7 @@ def git_widget(cache):
         commit_box = c.box('v', style='box')
 
         title_box = c.box('h', style='inner-box', spacing=20)
-        title = c.label(info['msg'], length=100, ha='start')
+        title = c.label(info['msg'], length=30, ha='start')
         title.props.tooltip_text = info['msg']
         title_box.add(title)
         title_box.pack_end(c.label(info['date'], style='green-fg'), 0, 0, 0)
