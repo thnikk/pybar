@@ -360,7 +360,7 @@ def network(cache):
     }
 
     for device in cache['Network']:
-        if not '(connected)' in device['GENERAL.STATE']:
+        if '(connected)' not in device['GENERAL.STATE']:
             continue
         network_box = c.box('v', spacing=10)
         network_box.add(c.label(
@@ -416,17 +416,21 @@ def sales(cache):
     main_box = c.box('v', spacing=20)
     main_box.add(c.label('Sales', style='heading'))
 
+    total = 0
     for order in cache["orders"]:
         order_box = c.box('v', style='box')
         for item in order:
             line = c.box('h', style='inner-box', spacing=20)
             line.add(c.label(f"{item['item']}"))
             line.add(c.label(f"x{item['quantity']}"))
-            price = c.label(f"${item['price']:.2f}")
+            line_total = item['price'] * item['quantity']
+            price = c.label(f"${line_total:.2f}")
+            total += line_total
             c.add_style(price, 'green-fg')
             line.pack_end(price, 0, 0, 0)
             order_box.add(line)
         main_box.add(order_box)
+    main_box.add(c.label(f'${total:.2f}', ha='end', style='green-fg'))
 
     return main_box
 
