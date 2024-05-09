@@ -317,17 +317,15 @@ def get_volume(label):
             cache = json.loads(file.read())
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         return True
-    try:
-        default_sink = cache['default-sink']
-        volume = cache['sinks'][default_sink]['volume']
+
+    with pulsectl.Pulse() as pulse:
+        volume = round(pulse.sink_default_get().volume.value_flat * 100)
         icons = ["  ", " ", ""]
         icon_index = int(volume // (100 / len(icons)))
         icon = icons[icon_index]
         new = f'{icon} {volume}%'
         if new != label.get_label():
             label.set_label(new)
-    except TypeError:
-        pass
     if not label.get_active():
         label.set_popover(pop('volume', cache))
     return True
