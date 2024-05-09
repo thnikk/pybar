@@ -4,7 +4,7 @@ Description: Widgets
 Author: thnikk
 """
 import common as c
-from subprocess import run, CalledProcessError
+from subprocess import run
 
 
 def generic_widget(name, cache):
@@ -430,7 +430,11 @@ def sales(cache):
             line.pack_end(price, 0, 0, 0)
             order_box.add(line)
         main_box.add(order_box)
-    main_box.add(c.label(f'${total:.2f}', ha='end', style='green-fg'))
+    total_box = c.box('h', style='inner-box')
+    total_box.add(c.label('Total', style='title'))
+    total_box.pack_end(
+        c.label(f'${total:.2f}', ha='end', style='green-fg'), 0, 0, 0)
+    main_box.add(total_box)
 
     return main_box
 
