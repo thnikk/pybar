@@ -31,7 +31,7 @@ class Module(Gtk.MenuButton):
         self.icon = Gtk.Label()
         self.text = Gtk.Label()
         self.box.add(self.icon)
-        self.box.add(self.text)
+        self.box.pack_end(self.text, 0, 0, 0)
         self.add(self.box)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
 
