@@ -412,6 +412,25 @@ def power():
     return main_box
 
 
+def sales(cache):
+    main_box = c.box('v', spacing=20)
+    main_box.add(c.label('Sales', style='heading'))
+
+    for order in cache["orders"]:
+        order_box = c.box('v', style='box')
+        for item in order:
+            line = c.box('h', style='inner-box', spacing=20)
+            line.add(c.label(f"{item['item']}"))
+            line.add(c.label(f"x{item['quantity']}"))
+            price = c.label(f"${item['price']:.2f}")
+            c.add_style(price, 'green-fg')
+            line.pack_end(price, 0, 0, 0)
+            order_box.add(line)
+        main_box.add(order_box)
+
+    return main_box
+
+
 def time_to_text(time_string) -> str:
     """ Convert time to text string """
     hours = int(time_string.split(':')[0])

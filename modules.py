@@ -48,6 +48,8 @@ def get_widget(name, info=None):
             return widgets.network(info)
         case 'power':
             return widgets.power()
+        case 'sales':
+            return widgets.sales(info)
         case _:
             return widgets.generic_widget(name, info)
 
@@ -292,7 +294,6 @@ def action(button, event):
     """ Scroll action """
     with pulsectl.Pulse('volume-increaser') as pulse:
         default = pulse.sink_default_get()
-        c.print_debug(default.volume.value_flat)
         if event.direction == Gdk.ScrollDirection.UP:
             if default.volume.value_flat < 1:
                 pulse.volume_change_all_chans(default, 0.01)
@@ -315,7 +316,11 @@ def get_volume(label):
         return True
     try:
         default_sink = cache['default-sink']
-        new = f' {cache['sinks'][default_sink]['volume']}%'
+        volume = cache['sinks'][default_sink]['volume']
+        icons = ["  ", " ", ""]
+        icon_index = int(volume // (100 / len(icons)))
+        icon = icons[icon_index]
+        new = f'{icon} {volume}%'
         if new != label.get_label():
             label.set_label(new)
     except TypeError:
