@@ -15,11 +15,15 @@ def load():
         default_config = {
             "workspaces": {},
             "modules-left": ["workspaces"],
-            "modules-center": [],
-            "modules-right": ["clock"],
+            "modules-center": ["updates"],
+            "modules-right": ["volume", "network", "clock", "power"],
             "modules": {
-                "test": {
-                    "command": ["test"],
+                "updates": {
+                    "command": ["~/.local/bin/bar/updates.py"],
+                    "interval": 300
+                },
+                "network": {
+                    "command": ["~/.local/bin/bar/network.py"],
                     "interval": 60
                 }
             }
