@@ -15,6 +15,7 @@ import widgets
 import pulsectl
 from calendar_widget import calendar_widget
 from volume_widget import volume_widget
+# from modules_new import volume as volume_new
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -88,20 +89,22 @@ def cache(name, command, interval):
 
 def module(name, config):
     """ Waybar module """
-    if name == 'clock':
-        return clock()
-    elif name == 'workspaces':
-        return workspaces(config['workspaces'])
-    elif name == 'volume':
-        return volume()
-    elif name == 'backlight':
-        return backlight()
-    elif name == 'battery':
-        return battery()
-    elif name == 'power':
-        return power()
-    elif name == 'test':
-        return test()
+    builtin = {
+        'clock': clock,
+        'workspaces': workspaces,
+        'volume': volume,
+        'backlight': backlight,
+        'battery': battery,
+        'power': power,
+        'test': test
+    }
+
+    if name in list(builtin):
+        try:
+            config = config['modules'][name]
+        except KeyError:
+            config = None
+        return builtin[name](config)
 
     button = Gtk.MenuButton()
     c.add_style(button, 'module')
@@ -172,17 +175,18 @@ def switch_workspace(_, workspace):
     run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
 
 
-def workspaces(icons):
+def workspaces(config=None):
     """ Workspaces module """
     module = c.box('h', style='workspaces')
     buttons = []
     for x in range(0, 11):
         try:
-            button = c.button(label=icons[str(x)], style='workspace')
+            button = c.button(label=config['icons'][str(x)], style='workspace')
         except (KeyError, TypeError):
             try:
-                button = c.button(label=icons['default'], style='workspace')
-            except KeyError:
+                button = c.button(
+                    label=config['icons']['default'], style='workspace')
+            except (KeyError, TypeError):
                 button = c.button(label=str(x), style='workspace')
         button.hide()
         button.connect('clicked', switch_workspace, x)
@@ -217,14 +221,18 @@ def workspaces(icons):
         return module
 
 
-def clock():
+def clock(config=None):
     """ Clock module """
     label = Gtk.MenuButton(popover=pop('calendar'))
     label.set_direction(Gtk.ArrowType.UP)
     label.get_style_context().add_class('module')
 
     def get_time():
-        new = datetime.now().strftime(' %I:%M %m/%d')
+        try:
+            datestring = config['format']
+        except (TypeError, KeyError):
+            datestring = '%I:%M %m/%d'
+        new = datetime.now().strftime(f' {datestring}')
         if new == label.get_label():
             return True
         label.set_label(new)
@@ -235,7 +243,7 @@ def clock():
         return label
 
 
-def battery():
+def battery(config=None):
     """ Battery module """
     label = Gtk.MenuButton()
     label.set_direction(Gtk.ArrowType.UP)
@@ -267,7 +275,7 @@ def battery():
         return label
 
 
-def backlight():
+def backlight(config=None):
     """ Backlight module """
     label = Gtk.MenuButton()
     label.set_direction(Gtk.ArrowType.UP)
@@ -331,7 +339,7 @@ def get_volume(label):
     return True
 
 
-def volume():
+def volume(config=None):
     """ Volume module """
     label = Gtk.MenuButton()
     label.set_direction(Gtk.ArrowType.UP)
@@ -353,7 +361,7 @@ def scroll_action(module, event):
     c.print_debug(event.direction)
 
 
-def test():
+def test(config=None):
     module = c.Module()
     module.icon.set_label('')
     module.text.set_label('0')
@@ -376,7 +384,7 @@ def test():
         return module
 
 
-def power():
+def power(config=None):
     """ Power module """
     module = c.Module()
     module.icon.set_label('')

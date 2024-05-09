@@ -21,10 +21,10 @@ Pybar is a statusbar for Wayland desktops. The main goal of the project is to be
 
 ### Goals
 There are still some things missing, including:
-- All built-in modules should be included in this repo (they currently expect the waybar-modules repo in ~/.local/bin/bar)
-- Store module output in memory instead of files. This should improve performance.
-- Allow for more configuration of built-in widgets.
-- Allow differently configured bars for different monitors.
+- [ ] All built-in modules should be included in this repo (they currently expect the waybar-modules repo in ~/.local/bin/bar)
+- [ ] Store module output in memory instead of files. This should improve performance.
+- [x] Allow for more configuration of built-in widgets.
+- [ ] Allow differently configured bars for different monitors.
 
 ### Installation
 As pybar is still under very active development, I haven't looked into packaging yet. For now, you can:
