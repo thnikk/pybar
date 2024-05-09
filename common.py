@@ -27,7 +27,7 @@ class Module(Gtk.MenuButton):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
-        self.box = box('h', spacing=5)
+        self.box = box('h')
         self.icon = Gtk.Label()
         self.text = Gtk.Label()
         self.box.add(self.icon)
@@ -42,7 +42,7 @@ class Widget(Gtk.Popover):
         super().__init__()
         self.set_constrain_to(Gtk.PopoverConstraint.NONE)
         self.set_position(Gtk.PositionType.TOP)
-        self.set_transitions_enabled(True)
+        self.set_transitions_enabled(False)
         self.box = box('v', spacing=20)
 
     def heading(self, string):

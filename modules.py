@@ -379,10 +379,35 @@ def test():
 
 
 def power():
-    """ Power widget """
-    label = Gtk.MenuButton('')
-    label.set_direction(Gtk.ArrowType.UP)
-    label.set_popover(pop('power'))
-    label.get_style_context().add_class('module')
+    """ Power module """
+    module = c.Module()
+    module.icon.set_label('')
 
-    return label
+    def power_action(button, command, widget):
+        """ Action for power menu buttons """
+        widget.popdown()
+        run(command, check=False, capture_output=False)
+
+    buttons = {
+        "Lock  ": ["swaylock"],
+        "Log out  ": ["swaymsg", "exit"],
+        "Suspend  ": ["systemctl", "suspend"],
+        "Reboot  ": ["systemctl", "reboot"],
+        "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
+        "Shut down  ": ["systemctl", "poweroff"],
+    }
+
+    widget = c.Widget()
+    power_box = c.box('v', style='box')
+    for icon, command in buttons.items():
+        button = c.button(label=icon, ha='end', style='power-item')
+        button.connect('clicked', power_action, command, widget)
+        power_box.add(button)
+        if icon != list(buttons)[-1]:
+            power_box.add(c.sep('h'))
+
+    widget.box.add(power_box)
+    widget.draw()
+    module.set_popover(widget)
+
+    return module
