@@ -103,7 +103,8 @@ def module(name, config):
     elif name == 'test':
         return test()
 
-    button = c.mbutton(style='module')
+    button = Gtk.MenuButton()
+    c.add_style(button, 'module')
     button.set_direction(Gtk.ArrowType.UP)
     button.set_visible(False)
     button.set_no_show_all(True)
@@ -346,38 +347,6 @@ def volume():
         return label
 
 
-class Module(Gtk.MenuButton):
-    """ Template module """
-    def __init__(self):
-        super().__init__()
-        self.set_direction(Gtk.ArrowType.UP)
-        self.get_style_context().add_class('module')
-        self.box = c.box('h', spacing=5)
-        self.icon = Gtk.Label()
-        self.text = Gtk.Label()
-        self.box.add(self.icon)
-        self.box.add(self.text)
-        self.add(self.box)
-        self.add_events(Gdk.EventMask.SCROLL_MASK)
-
-
-class Widget(Gtk.Popover):
-    """ Template widget"""
-    def __init__(self):
-        super().__init__()
-        self.set_constrain_to(Gtk.PopoverConstraint.NONE)
-        self.set_position(Gtk.PositionType.TOP)
-        self.set_transitions_enabled(True)
-        self.box = c.box('v', spacing=20)
-
-    def heading(self, string):
-        self.box.add(c.label(string, style='heading'))
-
-    def draw(self):
-        self.box.show_all()
-        self.add(self.box)
-
-
 def click_action(module, event):
     c.print_debug(event.button)
 
@@ -387,11 +356,11 @@ def scroll_action(module, event):
 
 
 def test():
-    module = Module()
+    module = c.Module()
     module.icon.set_label('')
     module.text.set_label('0')
 
-    widget = Widget()
+    widget = c.Widget()
     widget.heading('Test')
     widget.draw()
     module.set_popover(widget)

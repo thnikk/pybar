@@ -8,7 +8,7 @@ import json
 import inspect
 from datetime import datetime
 import sys
-from subprocess import check_output, Popen
+from subprocess import check_output
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
@@ -19,6 +19,38 @@ align = {
     "fill": Gtk.Align.FILL, "start": Gtk.Align.START,
     "end": Gtk.Align.END, "center": Gtk.Align.CENTER
 }
+
+
+class Module(Gtk.MenuButton):
+    """ Template module """
+    def __init__(self):
+        super().__init__()
+        self.set_direction(Gtk.ArrowType.UP)
+        self.get_style_context().add_class('module')
+        self.box = box('h', spacing=5)
+        self.icon = Gtk.Label()
+        self.text = Gtk.Label()
+        self.box.add(self.icon)
+        self.box.add(self.text)
+        self.add(self.box)
+        self.add_events(Gdk.EventMask.SCROLL_MASK)
+
+
+class Widget(Gtk.Popover):
+    """ Template widget"""
+    def __init__(self):
+        super().__init__()
+        self.set_constrain_to(Gtk.PopoverConstraint.NONE)
+        self.set_position(Gtk.PositionType.TOP)
+        self.set_transitions_enabled(True)
+        self.box = box('v', spacing=20)
+
+    def heading(self, string):
+        self.box.add(label(string, style='heading'))
+
+    def draw(self):
+        self.box.show_all()
+        self.add(self.box)
 
 
 def print_debug(msg, name=None, color=38) -> None:
@@ -57,15 +89,6 @@ def slider(value, min=0, max=100, style=None):
     return widget
 
 
-def level(value, min=0, max=100, style=None):
-    """ Create level bar """
-    bar = Gtk.LevelBar().new_for_interval(min, max)
-    bar.set_value(value)
-    if style:
-        bar.get_style_context().add_class(style)
-    return bar
-
-
 def dict_from_cmd(command) -> dict:
     """ Get json output of command """
     command = [os.path.expanduser(part) for part in command]
@@ -98,27 +121,6 @@ def scroll(width=0, height=0, style=None):
     return window
 
 
-def click_link(module, url):
-    """ Click action """
-    del module
-    Popen(['xdg-open', url])
-
-
-def pop():
-    """ Create popover widget """
-    popover = Gtk.Popover()
-    popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
-    popover.set_modal(True)
-    popover.set_position(Gtk.PositionType.TOP)
-    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-    vbox.pack_start(Gtk.ModelButton(label="Item 1"), False, True, 10)
-    vbox.pack_start(Gtk.Label(label="Item 2"), False, True, 10)
-    vbox.show_all()
-    popover.add(vbox)
-    popover.set_position(Gtk.PositionType.TOP)
-    return popover
-
-
 def box(orientation, spacing=0, style=None):
     """ Create box """
     if orientation == 'v':
@@ -140,7 +142,7 @@ def add_style(widget, style):
 
 
 def del_style(widget, style):
-    """ Add style to widget """
+    """ Remove style from widget """
     if isinstance(style, list):
         for item in style:
             widget.get_style_context().remove_class(item)
@@ -150,58 +152,16 @@ def del_style(widget, style):
 
 def button(label=None, style=None, ha=None):
     """ Button """
-    __button__ = Gtk.Button.new()
+    widget = Gtk.Button.new()
     if label:
-        __button__.set_label(label)
+        widget.set_label(label)
     if style:
-        __button__.get_style_context().add_class(style)
+        widget.get_style_context().add_class(style)
     try:
-        __button__.props.halign = align[ha]
+        widget.props.halign = align[ha]
     except KeyError:
         pass
-    return __button__
-
-
-def mbutton(label=None, style=None):
-    """ Button """
-    __button__ = Gtk.MenuButton.new()
-    if label:
-        __button__.set_label(label)
-    if style:
-        __button__.get_style_context().add_class(style)
-    return __button__
-
-
-def v_lines(lines, right=False, style=None) -> Gtk.Box:
-    """ Takes list and returns GTK nested boxes """
-    container = Gtk.Box(
-        orientation=Gtk.Orientation.VERTICAL, spacing=0)
-    if style:
-        container.get_style_context().add_class(style)
-    for line in lines:
-        line_box = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        text = Gtk.Label()
-        text.set_label(f'{line}')
-        if right:
-            line_box.pack_end(text, False, False, 0)
-        else:
-            line_box.pack_start(text, False, False, 0)
-        container.pack_start(line_box, True, False, 0)
-    return container
-
-
-def h_lines(lines, style=None) -> Gtk.Box:
-    """ Takes list and returns GTK nested boxes """
-    container = Gtk.Box(
-        orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-    if style:
-        container.get_style_context().add_class(style)
-    for line in lines:
-        text = Gtk.Label()
-        text.set_label(f'{line}')
-        container.pack_start(text, True, False, 0)
-    return container
+    return widget
 
 
 def sep(orientation, style=None):

@@ -4,7 +4,7 @@ Description: Widgets
 Author: thnikk
 """
 import common as c
-from subprocess import run
+from subprocess import run, Popen
 
 
 def generic_widget(name, cache):
@@ -41,18 +41,21 @@ def weather_widget(cache):
         f"{today['temperature']}° {today['icon']}", 'today-weather')
     today_left.add(temp)
 
-    extra = c.h_lines([
+    extra = c.box('h')
+    for item in [
         f" {today['humidity']}%",
         f" {today['wind']}mph",
-    ], style='extra')
+    ]:
+        extra.pack_start(c.label(item), 1, 0, 0)
     today_left.add(extra)
 
     today_right = c.box('v')
-    today_right.pack_start(c.v_lines([
+    for item in [
         today['description'],
         f"Feels like {today['feels_like']}°",
         f"{today['quality']} air quality"
-    ], right=True), True, False, 0)
+    ]:
+        today_right.add(c.label(item, ha='end'))
 
     today_box.pack_start(today_left, False, False, 0)
 
@@ -118,6 +121,10 @@ def updates_widget(info):
         "Flatpak": "https://flathub.org/apps/search?q=",
     }
 
+    def click_link(_, url):
+        """ Click action """
+        Popen(['xdg-open', url])
+
     for manager, packages in info.items():
         if not packages:
             continue
@@ -131,7 +138,7 @@ def updates_widget(info):
             package_label = c.button(package[0], style='none')
             try:
                 package_label.connect(
-                    'clicked', c.click_link,
+                    'clicked', click_link,
                     f'{urls[manager]}{package[0]}')
             except KeyError:
                 pass
