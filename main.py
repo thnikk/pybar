@@ -8,12 +8,10 @@ import sway
 import pulse
 import config as Config
 from bar import Display
-import common as c
-import modules
+import module
 import gi
 gi.require_version('Gtk', '3.0')
-gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, GLib  # noqa
+from gi.repository import Gtk  # noqa
 
 
 def main():
@@ -29,10 +27,11 @@ def main():
 
     for name in unique:
         try:
+            module_config = config['modules'][name]
             executor.submit(
-                modules.cache, name,
-                config['modules'][name]['command'],
-                config['modules'][name]['interval'])
+                module.cache, name,
+                module_config['command'],
+                module_config['interval'])
         except KeyError:
             pass
 

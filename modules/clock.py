@@ -1,13 +1,16 @@
 #!/usr/bin/python3 -u
 """
-Description: Calendar widget for clock module
+Description: Clock widget
 Author: thnikk
 """
-import json
+import common as c
 from datetime import datetime
 import calendar
 import os
-import common as c
+import json
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 def diff_month(year, month, diff):
@@ -47,63 +50,6 @@ def event_lookup(event):
         if event_type in event.lower():
             return style
     return "green-fg"
-
-
-def calendar_widget():
-    """ Draw calendar """
-    widget = c.box('v', style='widget', spacing=20)
-
-    now = datetime.now()
-
-    month_label = c.label(now.strftime('%B'), style='heading')
-    widget.add(month_label)
-
-    cal_section = c.box('v')
-
-    # Create calendar box
-    row = c.box('h', spacing=10)
-    for dow in ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]:
-        dow_label = c.label(dow, style='day')
-        c.add_style(dow_label, 'dow')
-        row.add(dow_label)
-    cal_box = c.box('v')
-    cal_box.add(row)
-
-    last_month = cal_list(*diff_month(now.year, now.month, -1), 'old')[-2:]
-    current_month = cal_list(now.year, now.month)
-    next_month = cal_list(*diff_month(now.year, now.month, 1), 'old')[:2]
-
-    try:
-        with open(
-            os.path.expanduser('~/.config/calendar-events.json'),
-            'r', encoding='utf-8'
-        ) as file:
-            events = json.loads(file.read())
-    except FileNotFoundError:
-        events = {}
-        alert = c.box('v', style='box')
-        alert.add(c.label(
-            'Set up events in ~/.config/calendar-events.json',
-            style='event-box', wrap=20))
-
-    style_events(last_month, current_month, next_month, events, now)
-
-    combined_calendar = combine_calendar(last_month, current_month, next_month)
-
-    cal_box.add(draw_calendar(combined_calendar))
-    cal_section.add(cal_box)
-    widget.add(cal_section)
-
-    events_section = draw_events(now, events, combined_calendar)
-    if events_section:
-        widget.add(events_section)
-
-    try:
-        widget.add(alert)
-    except UnboundLocalError:
-        pass
-
-    return widget
 
 
 def style_events(last_month, current_month, next_month, events, now):
@@ -205,9 +151,84 @@ def draw_events(now, events, combined_calendar):
     return events_section
 
 
-def main():
-    calendar_widget()
+def widget():
+    """ Draw calendar """
+    widget = c.box('v', style='widget', spacing=20)
+
+    now = datetime.now()
+
+    month_label = c.label(now.strftime('%B'), style='heading')
+    widget.add(month_label)
+
+    cal_section = c.box('v')
+
+    # Create calendar box
+    row = c.box('h', spacing=10)
+    for dow in ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]:
+        dow_label = c.label(dow, style='day')
+        c.add_style(dow_label, 'dow')
+        row.add(dow_label)
+    cal_box = c.box('v')
+    cal_box.add(row)
+
+    last_month = cal_list(*diff_month(now.year, now.month, -1), 'old')[-2:]
+    current_month = cal_list(now.year, now.month)
+    next_month = cal_list(*diff_month(now.year, now.month, 1), 'old')[:2]
+
+    try:
+        with open(
+            os.path.expanduser('~/.config/calendar-events.json'),
+            'r', encoding='utf-8'
+        ) as file:
+            events = json.loads(file.read())
+    except FileNotFoundError:
+        events = {}
+        alert = c.box('v', style='box')
+        alert.add(c.label(
+            'Set up events in ~/.config/calendar-events.json',
+            style='event-box', wrap=20))
+
+    style_events(last_month, current_month, next_month, events, now)
+
+    combined_calendar = combine_calendar(last_month, current_month, next_month)
+
+    cal_box.add(draw_calendar(combined_calendar))
+    cal_section.add(cal_box)
+    widget.add(cal_section)
+
+    events_section = draw_events(now, events, combined_calendar)
+    if events_section:
+        widget.add(events_section)
+
+    try:
+        widget.add(alert)
+    except UnboundLocalError:
+        pass
+
+    return widget
 
 
-if __name__ == "__main__":
-    main()
+def module(config=None):
+    """ Clock module """
+    module = c.Module()
+    module.icon.set_label('')
+
+    module.set_widget(widget())
+
+    def get_time():
+        try:
+            datestring = config['format']
+        except (TypeError, KeyError):
+            datestring = '%I:%M %m/%d'
+        new = datetime.now().strftime(f'{datestring}')
+        last = module.text.get_label()
+        if new != last:
+            module.text.set_label(new)
+            # Redraw calendar on new day
+            if new[-2:] != last[-2:]:
+                module.set_widget(widget())
+        return True
+
+    if get_time():
+        GLib.timeout_add(1000, get_time)
+        return module

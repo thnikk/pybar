@@ -6,7 +6,7 @@ Author: thnikk
 import gi
 import os
 import common as c
-import modules
+import module
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 from gi.repository import Gtk, Gdk, GtkLayerShell, GLib  # noqa
@@ -84,7 +84,7 @@ class Bar:
             "modules-right": self.right,
         }.items():
             for name in self.config[section_name]:
-                section.add(modules.module(name, self.config))
+                section.add(module.module(name, self.config))
 
     def css(self, file):
         """ Load CSS from file """
@@ -112,8 +112,8 @@ class Bar:
             section = Gtk.Box(
                 orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
             section.get_style_context().add_class(position)
-            for module in modules[index]:
-                section.pack_start(module(), False, False, 0)
+            for item in modules[index]:
+                section.pack_start(item(), False, False, 0)
             main.pack_start(section, position == "center", False, 0)
 
         self.window.add(main)

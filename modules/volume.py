@@ -1,13 +1,16 @@
 #!/usr/bin/python3 -u
 """
-Description: Volume widget
+Description: Volume module
 Author: thnikk
 """
 import common as c
 from subprocess import run
+import pulsectl
+import os
+import json
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GLib  # noqa
+from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 def sink_volume(widget, sink):
@@ -42,7 +45,7 @@ def set_default_source(widget, source):
         check=False, capture_output=False)
 
 
-def volume_widget(cache):
+def widget(cache):
     """ Volume widget """
     main_box = c.box('v', style='widget', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -105,3 +108,54 @@ def volume_widget(cache):
         main_box.add(section_box)
 
     return main_box
+
+
+def action(button, event):
+    """ Scroll action """
+    with pulsectl.Pulse('volume-increaser') as pulse:
+        default = pulse.sink_default_get()
+        if event.direction == Gdk.ScrollDirection.UP:
+            if default.volume.value_flat < 1:
+                pulse.volume_change_all_chans(default, 0.01)
+            else:
+                pulse.volume_set_all_chans(default, 1)
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            pulse.volume_change_all_chans(default, -0.01)
+    get_volume(button)
+
+
+def get_volume(module):
+    """ Get volume data from cache """
+    try:
+        with open(
+            os.path.expanduser('~/.cache/pybar/pulse.json'),
+            'r', encoding='utf-8'
+        ) as file:
+            cache = json.loads(file.read())
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
+        return True
+
+    with pulsectl.Pulse() as pulse:
+        volume = round(pulse.sink_default_get().volume.value_flat * 100)
+        icons = ["", "", ""]
+        icon_index = int(volume // (100 / len(icons)))
+        icon = icons[icon_index]
+        if icon != module.icon.get_label():
+            module.icon.set_label(icon)
+        new = f'{volume}%'
+        if new != module.text.get_label():
+            module.text.set_label(new)
+    if not module.get_active():
+        module.set_widget(widget(cache))
+    return True
+
+
+def module(config=None):
+    """ Volume module """
+    module = c.Module()
+    c.add_style(module, 'module-fixed')
+    module.connect('scroll-event', action)
+
+    if get_volume(module):
+        GLib.timeout_add(1000, get_volume, module)
+        return module

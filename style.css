@@ -129,7 +129,6 @@ popover {
 	box-shadow: none;
 	padding: 10px;
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
-	min-width: 300px;
 }
 
 separator { background: @gray; padding: 0; margin: 0; }
