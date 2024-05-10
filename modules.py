@@ -256,7 +256,6 @@ def clock(config=None):
 def battery(config=None):
     """ Battery module """
     module = c.Module()
-    c.add_style(module, 'module-fixed')
     module.icon.set_text('')
     icons = ['', '', '', '', '']
 
@@ -293,6 +292,29 @@ def backlight(config=None):
     c.add_style(module, 'module-fixed')
     module.icon.set_label('')
 
+    def scroll_action(button, event):
+        """ Scroll action """
+        info = get_brightness()
+        if event.direction == Gdk.ScrollDirection.UP:
+            if info['brightness'] < info['max_brightness']:
+                info['brightness'] = round(
+                    info['brightness'] + (info['max_brightness'] * 0.01))
+            else:
+                info['brighntess'] = info['max_brightness']
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            if info['brightness'] > (info['max_brightness'] * 0.01):
+                info['brightness'] = round(
+                    info['brightness'] - (info['max_brightness'] * 0.01))
+            else:
+                info['brighntess'] = round(info['max_brightness'] * 0.01)
+        with open(
+            "/sys/class/backlight/intel_backlight/brightness", 'w',
+            encoding='utf-8'
+        ) as file:
+            file.write(f"{round(info['brightness'])}")
+        update_module(info)
+    module.connect('scroll-event', scroll_action)
+
     def get_brightness():
         base_path = "/sys/class/backlight/intel_backlight"
         if not os.path.exists(base_path):
@@ -301,14 +323,19 @@ def backlight(config=None):
         for item in ["brightness", "max_brightness"]:
             with open(f'{base_path}/{item}', 'r', encoding='utf-8') as file:
                 info[item] = int(file.read())
+        return info
+
+    def update_module(info=None):
+        if not info:
+            info = get_brightness()
         if not module.get_active():
             module.set_widget(widgets.backlight(info))
         percentage = round((info['brightness']/info['max_brightness'])*100)
         module.text.set_label(f'{percentage}%')
         return True
 
-    if get_brightness():
-        GLib.timeout_add(1000, get_brightness)
+    if update_module(get_brightness()):
+        GLib.timeout_add(1000, update_module)
         return module
 
 
