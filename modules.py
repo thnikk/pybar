@@ -223,24 +223,34 @@ def workspaces(config=None):
 
 def clock(config=None):
     """ Clock module """
-    label = Gtk.MenuButton(popover=pop('calendar'))
-    label.set_direction(Gtk.ArrowType.UP)
-    label.get_style_context().add_class('module')
+    module = c.Module()
+    module.icon.set_label('')
+
+    def set_widget(module):
+        widget = c.Widget()
+        widget.box.add(calendar_widget())
+        widget.draw()
+        module.set_popover(widget)
+
+    set_widget(module)
 
     def get_time():
         try:
             datestring = config['format']
         except (TypeError, KeyError):
             datestring = '%I:%M %m/%d'
-        new = datetime.now().strftime(f' {datestring}')
-        if new == label.get_label():
-            return True
-        label.set_label(new)
+        new = datetime.now().strftime(f'{datestring}')
+        last = module.text.get_label()
+        if new != last:
+            module.text.set_label(new)
+            # Redraw calendar on new day
+            if new[-2:] != last[-2:]:
+                set_widget(module)
         return True
 
     if get_time():
         GLib.timeout_add(1000, get_time)
-        return label
+        return module
 
 
 def battery(config=None):
@@ -386,7 +396,7 @@ def test(config=None):
 
 def power(config=None):
     """ Power module """
-    module = c.Module()
+    module = c.Module(1, 0)
     module.icon.set_label('')
 
     def power_action(button, command, widget):
