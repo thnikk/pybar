@@ -37,6 +37,13 @@ class Module(Gtk.MenuButton):
         self.add(self.box)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
 
+    def set_widget(self, box):
+        """ Set widget """
+        widget = Widget()
+        widget.box.add(box)
+        widget.draw()
+        self.set_popover(widget)
+
 
 class Widget(Gtk.Popover):
     """ Template widget"""

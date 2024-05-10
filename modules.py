@@ -255,10 +255,10 @@ def clock(config=None):
 
 def battery(config=None):
     """ Battery module """
-    label = Gtk.MenuButton()
-    label.set_direction(Gtk.ArrowType.UP)
-    label.get_style_context().add_class('module')
-    c.add_style(label, 'module-fixed')
+    module = c.Module()
+    c.add_style(module, 'module-fixed')
+    module.icon.set_text('')
+    icons = ['', '', '', '', '']
 
     def get_percent():
         info = {}
@@ -275,22 +275,23 @@ def battery(config=None):
                     elif file == 'energy_full':
                         full += value
             info[path.split('/')[-1]] = battery_info
-        if not label.get_active():
-            label.set_popover(pop('battery', info))
-        percentage = str(round((now/full)*100))
-        label.set_label(f' {percentage}%')
+        if not module.get_active():
+            module.set_widget(widgets.battery(info))
+        percentage = round((now/full)*100)
+        icon_index = int(percentage // (100 / len(icons)))
+        module.icon.set_label(icons[icon_index])
+        module.text.set_label(f'{percentage}%')
         return True
     if get_percent():
         GLib.timeout_add(60000, get_percent)
-        return label
+        return module
 
 
 def backlight(config=None):
     """ Backlight module """
-    label = Gtk.MenuButton()
-    label.set_direction(Gtk.ArrowType.UP)
-    label.get_style_context().add_class('module')
-    c.add_style(label, 'module-fixed')
+    module = c.Module()
+    c.add_style(module, 'module-fixed')
+    module.icon.set_label('')
 
     def get_brightness():
         base_path = "/sys/class/backlight/intel_backlight"
@@ -300,15 +301,15 @@ def backlight(config=None):
         for item in ["brightness", "max_brightness"]:
             with open(f'{base_path}/{item}', 'r', encoding='utf-8') as file:
                 info[item] = int(file.read())
-        if not label.get_active():
-            label.set_popover(pop('backlight', info))
+        if not module.get_active():
+            module.set_widget(widgets.backlight(info))
         percentage = round((info['brightness']/info['max_brightness'])*100)
-        label.set_label(f' {percentage}%')
+        module.text.set_label(f'{percentage}%')
         return True
 
     if get_brightness():
         GLib.timeout_add(1000, get_brightness)
-        return label
+        return module
 
 
 def action(button, event):
