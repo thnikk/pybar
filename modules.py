@@ -55,19 +55,6 @@ def get_widget(name, info=None):
             return widgets.generic_widget(name, info)
 
 
-def pop(name, info=None):
-    """ Make popover widget """
-    popover = Gtk.Popover()
-    popover.set_constrain_to(Gtk.PopoverConstraint.NONE)
-    popover.set_position(Gtk.PositionType.TOP)
-    popover.set_transitions_enabled(False)
-    widget = get_widget(name, info)
-    widget.show_all()
-    popover.add(widget)
-    popover.set_position(Gtk.PositionType.TOP)
-    return popover
-
-
 def cache(name, command, interval):
     """ Save command output to cache file """
     while True:
@@ -106,11 +93,9 @@ def module(name, config):
             config = None
         return builtin[name](config)
 
-    button = Gtk.MenuButton()
-    c.add_style(button, 'module')
-    button.set_direction(Gtk.ArrowType.UP)
-    button.set_visible(False)
-    button.set_no_show_all(True)
+    module = c.Module(0, 1)
+    module.set_visible(False)
+    module.set_no_show_all(True)
 
     def get_output():
         """ Create module using cache """
@@ -123,33 +108,33 @@ def module(name, config):
                 output = json.loads(file.read())
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             return True
-        if button.get_label() == output['text']:
+        if module.text.get_label() == output['text']:
             return True
 
         # Set label
         if output['text']:
-            button.set_visible(True)
-            button.set_label(output['text'])
+            module.set_visible(True)
+            module.set_label(output['text'])
         else:
-            if button.get_visible():
-                button.set_visible(False)
-                button.set_label('')
+            if module.get_visible():
+                module.set_visible(False)
+                module.set_label('')
             return True
 
         # Set tooltip or popover
         try:
             if (
-                button.get_tooltip_markup() != output['tooltip']
-                and not button.get_active()
+                module.get_tooltip_markup() != output['tooltip']
+                and not module.get_active()
             ):
                 try:
-                    button.set_popover(pop(name, info=output['widget']))
+                    module.set_widget(get_widget(name, info=output['widget']))
                 except KeyError:
                     pass
-                button.set_tooltip_markup(output['tooltip'])
+                module.set_tooltip_markup(output['tooltip'])
             try:
                 output['widget']
-                button.set_has_tooltip(False)
+                module.set_has_tooltip(False)
             except KeyError:
                 pass
         except KeyError:
@@ -159,15 +144,15 @@ def module(name, config):
         try:
             if not output['class']:
                 raise ValueError
-            c.add_style(button, output['class'])
+            c.add_style(module, output['class'])
         except (KeyError, ValueError):
             for s in ['red', 'green', 'blue', 'orange', 'yellow']:
-                button.get_style_context().remove_class(s)
+                module.get_style_context().remove_class(s)
         return True
     if get_output():
         # Timeout of less than 1 second breaks tooltips
         GLib.timeout_add(1000, get_output)
-        return button
+        return module
 
 
 def switch_workspace(_, workspace):
@@ -353,7 +338,7 @@ def action(button, event):
     get_volume(button)
 
 
-def get_volume(label):
+def get_volume(module):
     """ Get volume data from cache """
     try:
         with open(
@@ -366,37 +351,28 @@ def get_volume(label):
 
     with pulsectl.Pulse() as pulse:
         volume = round(pulse.sink_default_get().volume.value_flat * 100)
-        icons = ["  ", " ", ""]
+        icons = ["", "", ""]
         icon_index = int(volume // (100 / len(icons)))
         icon = icons[icon_index]
-        new = f'{icon} {volume}%'
-        if new != label.get_label():
-            label.set_label(new)
-    if not label.get_active():
-        label.set_popover(pop('volume', cache))
+        if icon != module.icon.get_label():
+            module.icon.set_label(icon)
+        new = f'{volume}%'
+        if new != module.text.get_label():
+            module.text.set_label(new)
+    if not module.get_active():
+        module.set_widget(volume_widget(cache))
     return True
 
 
 def volume(config=None):
     """ Volume module """
-    label = Gtk.MenuButton()
-    label.set_direction(Gtk.ArrowType.UP)
-    label.get_style_context().add_class('module')
-    c.add_style(label, 'module-fixed')
-    label.add_events(Gdk.EventMask.SCROLL_MASK)
-    label.connect('scroll-event', action)
+    module = c.Module()
+    c.add_style(module, 'module-fixed')
+    module.connect('scroll-event', action)
 
-    if get_volume(label):
-        GLib.timeout_add(1000, get_volume, label)
-        return label
-
-
-def click_action(module, event):
-    c.print_debug(event.button)
-
-
-def scroll_action(module, event):
-    c.print_debug(event.direction)
+    if get_volume(module):
+        GLib.timeout_add(1000, get_volume, module)
+        return module
 
 
 def test(config=None):
@@ -409,8 +385,14 @@ def test(config=None):
     widget.draw()
     module.set_popover(widget)
 
-    # module.connect('button-press-event', click_action)
-    # module.connect('scroll-event', scroll_action)
+    def click_action(module, event):
+        c.print_debug(event.button)
+
+    def scroll_action(module, event):
+        c.print_debug(event.direction)
+
+    module.connect('button-press-event', click_action)
+    module.connect('scroll-event', scroll_action)
 
     def update():
         num = int(module.text.get_label()) + 1
