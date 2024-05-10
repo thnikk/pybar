@@ -9,6 +9,7 @@ import pulse
 import config as Config
 from bar import Display
 import module
+import cache
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk  # noqa
@@ -28,10 +29,13 @@ def main():
     for name in unique:
         try:
             module_config = config['modules'][name]
-            executor.submit(
-                module.cache, name,
-                module_config['command'],
-                module_config['interval'])
+            if 'command' in list(module_config):
+                executor.submit(
+                    module.cache, name,
+                    module_config['command'],
+                    module_config['interval'])
+            else:
+                executor.submit(cache.cache, name, module_config)
         except KeyError:
             pass
 
