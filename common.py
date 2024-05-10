@@ -23,15 +23,17 @@ align = {
 
 class Module(Gtk.MenuButton):
     """ Template module """
-    def __init__(self):
+    def __init__(self, icon=True, text=True):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
-        self.box = box('h')
-        self.icon = Gtk.Label()
-        self.text = Gtk.Label()
-        self.box.add(self.icon)
-        self.box.pack_end(self.text, 0, 0, 0)
+        self.box = box('h', spacing=5)
+        if icon:
+            self.icon = Gtk.Label()
+            self.box.add(self.icon)
+        if text:
+            self.text = Gtk.Label()
+            self.box.pack_end(self.text, 0, 0, 0)
         self.add(self.box)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
 
