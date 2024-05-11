@@ -107,8 +107,8 @@ def module(name, config):
                 output = json.loads(file.read())
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             return True
-        if module.text.get_label() == output['text']:
-            return True
+        # if module.text.get_label() == output['text']:
+        #     return True
 
         # Set label
         if output['text']:

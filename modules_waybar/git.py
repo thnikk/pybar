@@ -6,10 +6,12 @@ Author: thnikk
 import os
 from subprocess import run, check_output, CalledProcessError
 import argparse
+import json
 import re
 from datetime import datetime, timezone
 import sys
-from common import print_debug
+from modules_waybar.common import print_debug
+import modules_waybar.tooltip as tt
 
 
 class Git:
@@ -113,13 +115,24 @@ def module(config):
     """ Module """
     if 'icon' not in list(config):
         config['icon'] = ''
-    git = Git(os.path.expanduser(config['path']))
+    git = Git(os.path.expanduser(config["path"]))
     git.fetch()
     commits = git.commits()
+
+    tooltip = []
+    for commit, info in commits.items():
+        tooltip.append(
+            f"{tt.span(commit, 'blue')} {info['msg']} "
+            f"({tt.span(info['date'], 'green')})"
+        )
+        for file in info['files']:
+            tooltip.append(f'  {file}')
+        tooltip.append('')
 
     if commits:
         return {
             "text": f"{config['icon']} {len(commits)}",
+            "tooltip": "\n".join(tooltip).strip(),
             "widget": {"name": git.name, "commits": commits}
         }
     else:
@@ -129,7 +142,10 @@ def module(config):
 def main():
     """ Main function """
     args = parse_args()
-    print(module({"path": args.path, "icon": args.icon}))
+    print(
+        json.dumps(
+          module({"path": args.path, "icon": args.icon})
+        ))
 
 
 if __name__ == "__main__":

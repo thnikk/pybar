@@ -9,7 +9,6 @@ import json
 import common as c
 from modules_waybar import git
 from modules_waybar import network
-from modules_waybar import sales
 from modules_waybar import updates
 from modules_waybar import xdrip
 from modules_waybar import weather
@@ -17,24 +16,39 @@ from modules_waybar import vm
 from modules_waybar import ups
 from modules_waybar import privacy
 
+functions = {
+    "git": git.module,
+    "network": network.module,
+    "updates": updates.module,
+    "xdrip": xdrip.module,
+    "weather": weather.module,
+    "vm": vm.module,
+    "ups": ups.module,
+    "privacy": privacy.module,
+}
+
+try:
+    from modules_waybar import sales
+    functions['sales'] = sales.module
+except ModuleNotFoundError as e:
+    c.print_debug(e)
+try:
+    from modules_waybar import hoyo
+    functions['genshin'] = hoyo.module
+    functions['hsr'] = hoyo.module
+except ModuleNotFoundError as e:
+    c.print_debug(e)
+
 
 def cache(name, config):
     """ Save command output to cache file """
-    functions = {
-        "git": git.module,
-        "network": network.module,
-        "sales": sales.module,
-        "updates": updates.module,
-        "xdrip": xdrip.module,
-        "weather": weather.module,
-        "vm": vm.module,
-        "ups": ups.module,
-        "privacy": privacy.module,
-    }
 
     # Skip if name isn't in functions
     if name not in list(functions):
         return
+
+    c.print_debug(
+        f'Starting thread for {name}', 'cache-builtin', color='green')
 
     while True:
         cache_dir = os.path.expanduser('~/.cache/pybar')

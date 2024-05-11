@@ -7,9 +7,9 @@ import os
 import time
 import configparser
 import argparse
+from modules_waybar.common import print_debug
+import modules_waybar.tooltip as tt
 import genshin
-from common import print_debug
-import tooltip as tt
 
 cache_file = os.path.expanduser("~/.cache/hoyo-stats.json")
 config_file = os.path.expanduser("~/.config/hoyo-stats.ini")
@@ -197,14 +197,16 @@ def hsr_module(cache):
     return output
 
 
-def module(game):
+def module(config):
     """ Module """
+    if 'game' not in list(config['game']):
+        config['game'] = genshin
     config = get_config()
-    cache = asyncio.run(generate_cache(config, game))
+    cache = asyncio.run(generate_cache(config, config['game']))
 
-    if game == "genshin":
+    if config['game'] == "genshin":
         output = genshin_module(cache['genshin'])
-    elif game == "hsr":
+    elif config['game'] == "hsr":
         output = hsr_module(cache['hsr'])
     else:
         output = {"text": "Invalid game specified"}

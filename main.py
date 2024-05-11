@@ -8,6 +8,7 @@ import sway
 import pulse
 import config as Config
 from bar import Display
+import common as c
 import module
 import cache
 import gi
@@ -30,13 +31,16 @@ def main():
         try:
             module_config = config['modules'][name]
             if 'command' in list(module_config):
+                c.print_debug(
+                    f'Starting thread for {name}', 'cache-waybar',
+                    color='green')
                 executor.submit(
                     module.cache, name,
                     module_config['command'],
                     module_config['interval'])
             else:
                 executor.submit(cache.cache, name, module_config)
-        except KeyError:
+        except (KeyError, TypeError):
             pass
 
     if 'workspaces' in unique:

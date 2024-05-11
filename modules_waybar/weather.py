@@ -413,7 +413,7 @@ def module(config):
     hour_now = int(now.strftime('%H'))
     night = (
         om.weather.daily.sunrise > hour_now
-        or hour_now > om.weather.daily.sunset) and config['night_icon']
+        or hour_now > om.weather.daily.sunset) and config['night_icons']
 
     return {
             "text": f"{om.weather.hourly.icon(hour_now, night)} "
