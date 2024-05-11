@@ -1,8 +1,11 @@
-<center>
+<p align="center">
     <img width="600" src="assets/pybar-light.png#gh-light-mode-only" alt="Pybar">
     <img width="600" src="assets/pybar-dark.png#gh-dark-mode-only" alt="Pybar">
+</p>
+
+<p align="center">
     A statusbar for Wayland desktops with clickable widgets.
-</center>
+</p>
 
 ![Screenshot](assets/screenshot.png)
 
