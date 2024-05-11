@@ -33,7 +33,7 @@ def cache():
             "sink-inputs": [
                 {
                     "id": sink_input.proplist['object.serial'],
-                    "name": sink_input.proplist['application.process.binary'],
+                    "name": sink_input.proplist['application.name'],
                     "volume": round(sink_input.volume.value_flat * 100)
                 }
                 for sink_input in pulse.sink_input_list()

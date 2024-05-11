@@ -33,19 +33,20 @@ def sink_input_volume(widget, sink):
         check=False, capture_output=False)
 
 
-def set_default_sink(widget, sink):
+def set_default_sink(button, sink, widget):
     """ Set the default sink """
     run(["pactl", "set-default-sink", sink],
         check=False, capture_output=False)
+    widget.popdown()
 
 
-def set_default_source(widget, source):
+def set_default_source(button, source):
     """ Set the default sink """
     run(["pactl", "set-default-source", source],
         check=False, capture_output=False)
 
 
-def widget(cache):
+def widget_box(module, cache, widget):
     """ Volume widget """
     main_box = c.box('v', style='widget', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -57,7 +58,7 @@ def widget(cache):
     for id, info in cache['sinks'].items():
         sink_box = c.box('v', spacing=10, style='inner-box')
         sink_label = c.button(info['name'])
-        sink_label.connect('clicked', set_default_sink, id)
+        sink_label.connect('clicked', set_default_sink, id, widget)
         if id == cache['default-sink']:
             c.add_style(sink_label, 'active')
         sink_box.add(sink_label)
@@ -110,7 +111,7 @@ def widget(cache):
     return main_box
 
 
-def action(button, event):
+def action(module, event):
     """ Scroll action """
     with pulsectl.Pulse('volume-increaser') as pulse:
         default = pulse.sink_default_get()
@@ -121,7 +122,9 @@ def action(button, event):
                 pulse.volume_set_all_chans(default, 1)
         elif event.direction == Gdk.ScrollDirection.DOWN:
             pulse.volume_change_all_chans(default, -0.01)
-    get_volume(button)
+        # volume = round(pulse.sink_default_get().volume.value_flat * 100)
+        # module.text.set_label(f'{volume}%')
+    get_volume(module)
 
 
 def get_volume(module):
@@ -131,22 +134,31 @@ def get_volume(module):
             os.path.expanduser('~/.cache/pybar/pulse.json'),
             'r', encoding='utf-8'
         ) as file:
-            cache = json.loads(file.read())
+            cache_raw = file.read()
+            cache = json.loads(cache_raw)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         return True
 
-    with pulsectl.Pulse() as pulse:
-        volume = round(pulse.sink_default_get().volume.value_flat * 100)
-        icons = ["", "", ""]
-        icon_index = int(volume // (100 / len(icons)))
+    volume = cache['sinks'][cache['default-sink']]['volume']
+    icons = ["", "", ""]
+    icon_index = int(volume // (100 / len(icons)))
+    try:
         icon = icons[icon_index]
-        if icon != module.icon.get_label():
-            module.icon.set_label(icon)
-        new = f'{volume}%'
-        if new != module.text.get_label():
-            module.text.set_label(new)
+    except IndexError:
+        icon = icons[-1]
+    if icon != module.icon.get_label():
+        module.icon.set_label(icon)
+    new = f'{volume}%'
+    if new != module.text.get_label():
+        module.text.set_label(new)
     if not module.get_active():
-        module.set_widget(widget(cache))
+        if module.get_tooltip_text() != cache_raw:
+            module.set_tooltip_text(cache_raw)
+            module.set_has_tooltip(False)
+            widget = c.Widget()
+            widget.box.add(widget_box(module, cache, widget))
+            widget.draw()
+            module.set_popover(widget)
     return True
 
 
@@ -157,5 +169,5 @@ def module(config=None):
     module.connect('scroll-event', action)
 
     if get_volume(module):
-        GLib.timeout_add(1000, get_volume, module)
+        GLib.timeout_add(250, get_volume, module)
         return module
