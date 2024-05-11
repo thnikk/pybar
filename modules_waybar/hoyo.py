@@ -54,7 +54,7 @@ def old(old_time, min_diff):
     """ Check age of datetime objects """
     diff = (datetime.now() - old_time).total_seconds()
     if diff > 60*min_diff:
-        print_debug('Cache is old, fetching new data.')
+        # print_debug('Cache is old, fetching new data.')
         return True
     return False
 
@@ -75,8 +75,8 @@ async def generate_cache(config, game):
                 cache = json.load(json_file)
                 break
         except json.decoder.JSONDecodeError:
-            print_debug(
-                "Couldn't decode json cache, waiting and trying again.")
+            # print_debug(
+            #     "Couldn't decode json cache, waiting and trying again.")
             time.sleep(3)
         except FileNotFoundError:
             cache = {}
@@ -197,16 +197,16 @@ def hsr_module(cache):
     return output
 
 
-def module(config):
+def module(module_config):
     """ Module """
-    if 'game' not in list(config['game']):
-        config['game'] = genshin
+    if 'game' not in list(module_config):
+        module_config['game'] = "genshin"
     config = get_config()
-    cache = asyncio.run(generate_cache(config, config['game']))
+    cache = asyncio.run(generate_cache(config, module_config['game']))
 
-    if config['game'] == "genshin":
+    if module_config['game'] == "genshin":
         output = genshin_module(cache['genshin'])
-    elif config['game'] == "hsr":
+    elif module_config['game'] == "hsr":
         output = hsr_module(cache['hsr'])
     else:
         output = {"text": "Invalid game specified"}
