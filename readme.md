@@ -1,6 +1,7 @@
-# Pybar
+<img src="assets/pybar-light.png#gh-light-mode-only" alt="Pybar">
+<img src="assets/pybar-dark.png#gh-dark-mode-only" alt="Pybar">
 
-![Screenshot](screenshot.png)
+![Screenshot](assets/screenshot.png)
 
 Pybar is a statusbar for Wayland desktops. The main goal of the project is to be compatible with modules written for waybar and to add custom widgets for modules when clicked.
 
