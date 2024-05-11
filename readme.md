@@ -1,9 +1,10 @@
-<img src="assets/pybar-light.png#gh-light-mode-only" alt="Pybar">
-<img src="assets/pybar-dark.png#gh-dark-mode-only" alt="Pybar">
+<center>
+    <img width="600" src="assets/pybar-light.png#gh-light-mode-only" alt="Pybar">
+    <img width="600" src="assets/pybar-dark.png#gh-dark-mode-only" alt="Pybar">
+    A statusbar for Wayland desktops with clickable widgets.
+</center>
 
 ![Screenshot](assets/screenshot.png)
-
-Pybar is a statusbar for Wayland desktops. The main goal of the project is to be compatible with modules written for waybar and to add custom widgets for modules when clicked.
 
 ### Modules with widgets
 - Weather
