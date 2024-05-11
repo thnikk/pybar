@@ -50,19 +50,26 @@ def get_widget(name, info=None):
 def cache(name, command, interval):
     """ Save command output to cache file """
     while True:
+        # Create cache dir if it doesn't exist
         cache_dir = os.path.expanduser('~/.cache/pybar')
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
+        # Expand user for all parts of command
         command = [os.path.expanduser(arg) for arg in command]
+        # Try to get the output of the command
+        try:
+            output = check_output(command).decode()
+        # Print a message if it fails to load
+        except CalledProcessError:
+            c.print_debug('Failed to load module.', color='red', name=name)
+            pass
+        # Save the output to a file
         with open(
             os.path.expanduser(f'{cache_dir}/{name}.json'),
             'w', encoding='utf-8'
         ) as file:
-            try:
-                file.write(check_output(command).decode())
-            except CalledProcessError:
-                c.print_debug('Failed to load module.', color='red', name=name)
-                pass
+            file.write(output)
+        # Wait for the interval specified in the module config
         time.sleep(interval)
 
 
