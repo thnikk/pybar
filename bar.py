@@ -5,6 +5,8 @@ Author: thnikk
 """
 import gi
 import os
+from subprocess import check_output
+import json
 import common as c
 import module
 gi.require_version('Gtk', '3.0')
@@ -19,22 +21,38 @@ class Display:
         self.config = config
         self.bars = []
 
-    def removed(self, display, monitor, user_data):
-        """ Redraw when a monitor is removed """
-        c.print_debug(f"{monitor.get_model()} disconnected.", color='green')
-        self.draw_all()
+    def get_plugs(self):
+        """ Get plugs from swaymsg """
+        return [
+            output['name'] for output in
+            json.loads(
+                check_output(["swaymsg", "-t", "get_outputs"]).decode('utf-8'))
+            if output['active'] is True
+        ]
 
-    def added(self, display, monitor, user_data):
+    def get_monitors(self):
+        """ Get monitor objects from gdk """
+        return [
+            self.display.get_monitor(n)
+            for n in range(self.display.get_n_monitors())
+        ]
+
+    def removed(self, display, monitor):
+        """ Redraw when a monitor is removed """
+        c.print_debug(self.get_plugs())
+        c.print_debug(self.get_monitors())
+        # self.draw_all()
+
+    def added(self, display, monitor):
         """ Redraw when a monitor is added """
-        c.print_debug(f"{monitor.get_model()} connected.", color='green')
+        c.print_debug(self.get_plugs())
+        c.print_debug(self.get_monitors())
         self.draw_all()
 
     def hook(self):
         """ Connect to signal handlers """
-        for n in range(Gdk.Display.get_n_monitors(self.display)):
-            monitor = Gdk.Display.get_monitor(self.display, n)
-            self.display.connect("monitor-added", self.added, monitor)
-            self.display.connect("monitor-removed", self.removed, monitor)
+        self.display.connect("monitor-added", self.added)
+        self.display.connect("monitor-removed", self.removed)
 
     def draw_all(self):
         """ Draw all bars """
