@@ -13,7 +13,6 @@ from modules_waybar import updates
 from modules_waybar import xdrip
 from modules_waybar import weather
 from modules_waybar import vm
-from modules_waybar import ups
 from modules_waybar import privacy
 
 functions = {
@@ -23,13 +22,17 @@ functions = {
     "xdrip": xdrip.module,
     "weather": weather.module,
     "vm": vm.module,
-    "ups": ups.module,
     "privacy": privacy.module,
 }
 
 try:
     from modules_waybar import sales
     functions['sales'] = sales.module
+except ModuleNotFoundError as e:
+    c.print_debug(f'{e}', color='yellow', name='cache-builtin')
+try:
+    from modules_waybar import ups
+    functions['ups'] = ups.module
 except ModuleNotFoundError as e:
     c.print_debug(f'{e}', color='yellow', name='cache-builtin')
 try:
