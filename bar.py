@@ -18,8 +18,12 @@ class Display:
     """ Display class """
     def __init__(self, config):
         self.display = Gdk.Display.get_default()
+        self.display.connect("monitor-added", self.added)
+        self.display.connect("monitor-removed", self.removed)
         self.config = config
         self.bars = []
+        self.monitors = self.get_monitors()
+        self.plugs = self.get_plugs()
 
     def get_plugs(self):
         """ Get plugs from swaymsg """
@@ -38,45 +42,33 @@ class Display:
         ]
 
     def removed(self, display, monitor):
-        """ Redraw when a monitor is removed """
-        c.print_debug(self.get_plugs())
-        c.print_debug(self.get_monitors())
-        # self.draw_all()
+        """ Remove bar from bar list when a monitor is removed """
+        index = self.monitors.index(monitor)
+        self.bars[index].window.destroy()
+        self.bars.remove(self.bars[index])
 
     def added(self, display, monitor):
-        """ Redraw when a monitor is added """
-        c.print_debug(self.get_plugs())
-        c.print_debug(self.get_monitors())
-        self.draw_all()
+        """ Draw a new bar when a monitor is added """
+        if monitor not in self.monitors:
+            self.draw_bar(monitor)
+            self.monitors = self.get_monitors()
+            self.plugs = self.get_plugs()
 
-    def hook(self):
-        """ Connect to signal handlers """
-        self.display.connect("monitor-added", self.added)
-        self.display.connect("monitor-removed", self.removed)
+    def draw_bar(self, monitor):
+        """ Draw a bar on a monitor """
+        bar = Bar(self.config, monitor, spacing=5)
+        bar.populate()
+        css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
+        bar.css(css_path)
+        # bar.css('style.css')
+        bar.css('~/.config/pybar/style.css')
+        bar.start()
+        self.bars.append(bar)
 
     def draw_all(self):
-        """ Draw all bars """
-
-        # Iterate through list and destroy all bars
-        for bar in self.bars:
-            bar.window.destroy()
-            del bar
-
-        # Iterate through monitors and spawn a bar on each
-        for monitor in [
-            Gdk.Display.get_monitor(self.display, n)
-            for n in range(Gdk.Display.get_n_monitors(self.display))
-        ]:
-            if not monitor:
-                continue
-            bar = Bar(self.config, monitor, spacing=5)
-            bar.populate()
-            css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
-            bar.css(css_path)
-            # bar.css('style.css')
-            bar.css('~/.config/pybar/style.css')
-            bar.start()
-            self.bars.append(bar)
+        """ Initialize all monitors """
+        for monitor in self.monitors:
+            self.draw_bar(monitor)
 
 
 class Bar:

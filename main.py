@@ -49,7 +49,6 @@ def main():
         executor.submit(pulse.update)
 
     display = Display(config)
-    display.hook()
     display.draw_all()
     Gtk.main()
 
