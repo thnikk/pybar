@@ -8,6 +8,7 @@ from subprocess import run
 import pulsectl
 import os
 import json
+import time
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
@@ -121,6 +122,8 @@ def switch_outputs(module, event):
             if index > len(sinks) - 1:
                 index = 0
             pulse.sink_default_set(sinks[index])
+            time.sleep(0.1)
+            get_volume(module)
 
 
 def action(module, event):
