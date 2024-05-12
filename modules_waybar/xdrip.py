@@ -70,8 +70,10 @@ def module(_):
 
     data = get_data(config)
 
+    last_sgv = data[1]["sgv"]
     sgv = data[0]["sgv"]
-    delta = data[0]["delta"]
+    # delta = data[0]["delta"]
+    delta = sgv - last_sgv
     direction = data[0]["direction"]
     date = datetime.strptime(data[0]["dateString"], "%Y-%m-%dT%H:%M:%S.%f%z")
     now = datetime.now(timezone.utc)
