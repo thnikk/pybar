@@ -44,18 +44,23 @@ class Display:
     def removed(self, display, monitor):
         """ Remove bar from bar list when a monitor is removed """
         index = self.monitors.index(monitor)
-        self.bars[index].window.destroy()
+        if self.bars[index]:
+            self.bars[index].window.destroy()
         self.bars.remove(self.bars[index])
 
     def added(self, display, monitor):
         """ Draw a new bar when a monitor is added """
-        if monitor not in self.monitors:
-            self.draw_bar(monitor)
-            self.monitors = self.get_monitors()
-            self.plugs = self.get_plugs()
+        self.monitors = self.get_monitors()
+        self.plugs = self.get_plugs()
+        self.draw_bar(monitor)
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
+        index = self.monitors.index(monitor)
+        if 'outputs' in list(self.config):
+            if self.plugs[index] not in self.config['outputs']:
+                self.bars.append(None)
+                return
         bar = Bar(self.config, monitor, spacing=5)
         bar.populate()
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
