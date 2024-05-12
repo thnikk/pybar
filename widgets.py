@@ -129,7 +129,8 @@ def updates_widget(info):
         if not packages:
             continue
         manager_box = c.box('v', spacing=10)
-        heading = c.label(manager, style='title', ha='start')
+        heading = c.label(
+            f"{manager} ({len(packages)} updates)", style='title', ha='start')
         manager_box.add(heading)
         packages_box = c.box('v')
         scroll_box = c.scroll(0, 348)
