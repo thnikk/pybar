@@ -26,10 +26,12 @@
 
 ### Goals
 There are still some things missing, including:
-- [ ] All built-in modules should be included in this repo (they currently expect the waybar-modules repo in ~/.local/bin/bar)
-- [ ] Store module output in memory instead of files. This should improve performance.
-- [x] Allow for more configuration of built-in widgets.
+- [x] All built-in modules should be included in this repo (they currently expect the waybar-modules repo in ~/.local/bin/bar)
+    - Figure out good packaging solution for dependencies like genshin.py
+- [ ] Allow for more configuration of built-in widgets and don't use additional config files for modules.
 - [ ] Allow differently configured bars for different monitors.
+- [ ] Store module output in memory instead of files. This should improve performance.
+- [ ] Don't crash if there's no configuration for a module in the config file.
 
 ### Installation
 As pybar is still under very active development, I haven't looked into packaging yet. For now, you can:
