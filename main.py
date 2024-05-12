@@ -28,20 +28,22 @@ def main():
     )
 
     for name in unique:
-        try:
+        if name in list(config['modules']):
             module_config = config['modules'][name]
-            if 'command' in list(module_config):
-                c.print_debug(
-                    f'Starting thread for {name}', 'cache-waybar',
-                    color='green')
-                executor.submit(
-                    module.cache, name,
-                    module_config['command'],
-                    module_config['interval'])
-            else:
-                executor.submit(cache.cache, name, module_config)
-        except (KeyError, TypeError):
-            pass
+        else:
+            module_config = {}
+        if 'interval' not in list(module_config):
+            module_config['interval'] = 60
+        if 'command' in list(module_config):
+            c.print_debug(
+                f'Starting thread for {name}', 'cache-waybar',
+                color='green')
+            executor.submit(
+                module.cache, name,
+                module_config['command'],
+                module_config['interval'])
+        else:
+            executor.submit(cache.cache, name, module_config)
 
     if 'workspaces' in unique:
         executor.submit(sway.cache)

@@ -13,21 +13,19 @@ def load():
     if not os.path.exists(config_path):
         os.makedirs(config_path)
         default_config = {
-            "modules-left": ["workspaces"],
+            "modules-left": ["workspaces", "privacy"],
             "modules-center": ["updates"],
-            "modules-right": ["volume", "network", "clock", "power"],
+            "modules-right": [
+                "weather", "volume", "network", "clock", "power"],
             "modules": {
-                "workspaces": {
-                    "icons": {
-                    }
+                "weather": {
+                    "zip_code": "94102"
                 },
                 "updates": {
-                    "command": ["~/.local/bin/bar/updates.py"],
                     "interval": 300
                 },
                 "network": {
-                    "command": ["~/.local/bin/bar/network.py"],
-                    "interval": 60
+                    "always_show": True,
                 }
             }
         }
