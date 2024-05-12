@@ -111,6 +111,18 @@ def widget_box(module, cache, widget):
     return main_box
 
 
+def switch_outputs(module, event):
+    """ Right click action """
+    if event.button == 3:
+        with pulsectl.Pulse('sink-switcher') as pulse:
+            default = pulse.server_info().default_sink_name
+            sinks = [sink.name for sink in pulse.sink_list()]
+            index = sinks.index(default) + 1
+            if index > len(sinks) - 1:
+                index = 0
+            pulse.sink_default_set(sinks[index])
+
+
 def action(module, event):
     """ Scroll action """
     with pulsectl.Pulse('volume-increaser') as pulse:
@@ -167,6 +179,7 @@ def module(config=None):
     module = c.Module()
     c.add_style(module, 'module-fixed')
     module.connect('scroll-event', action)
+    module.connect('button-press-event', switch_outputs)
 
     if get_volume(module):
         GLib.timeout_add(250, get_volume, module)
