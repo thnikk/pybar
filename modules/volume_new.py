@@ -50,7 +50,7 @@ def widget_box(module, widget, pulse):
             level.connect('value-changed', set_volume, pulse, sink)
             sink_box.pack_start(level, 1, 1, 0)
             sinks_box.add(sink_box)
-            if id != sink_list[-1]:
+            if sink != sink_list[-1]:
                 sinks_box.add(c.sep('v'))
         section_box.add(sinks_box)
         if sink_list:
