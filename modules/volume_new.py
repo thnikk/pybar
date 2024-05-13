@@ -81,7 +81,7 @@ def pulse_thread(module):
         module.emit('update')
 
 
-def switch_outputs(module, event, pulse):
+def switch_outputs(module, event, pulse, icons):
     """ Right click action """
     if event.button == 3:
         default = pulse.server_info().default_sink_name
@@ -90,6 +90,7 @@ def switch_outputs(module, event, pulse):
         if index > len(sinks) - 1:
             index = 0
         pulse.sink_default_set(sinks[index])
+        update(module, pulse, icons)
 
 
 def scroll(module, event, pulse):
@@ -149,7 +150,8 @@ def module(config=None):
     c.add_style(module, 'module-fixed')
     module.connect('update', update, pulse, config['icons'])
     module.connect('scroll-event', scroll, pulse)
-    module.connect('button-press-event', switch_outputs, pulse)
+    module.connect(
+        'button-press-event', switch_outputs, pulse, config['icons'])
 
     default = pulse.sink_default_get()
     volume = round(default.volume.value_flat * 100)

@@ -11,6 +11,7 @@ import gi
 import common as c
 import widgets
 from modules import sway
+from modules import sway_new
 from modules import clock
 from modules import battery
 from modules import volume
@@ -78,6 +79,7 @@ def module(name, config):
     builtin = {
         'clock': clock.module,
         'workspaces': sway.module,
+        'sway_new': sway_new.module,
         'volume': volume.module,
         'volume_new': volume_new.module,
         'backlight': backlight.module,
@@ -144,13 +146,15 @@ def module(name, config):
         except KeyError:
             pass
 
+        # print(name, module.get_style_context().list_classes())
+
         # Set class
         try:
             if not output['class']:
                 raise ValueError
             c.add_style(module, output['class'])
         except (KeyError, ValueError):
-            for s in ['red', 'green', 'blue', 'orange', 'yellow']:
+            for s in ['red', 'green', 'blue', 'orange', 'yellow', 'gray']:
                 module.get_style_context().remove_class(s)
         return True
     if get_output():
