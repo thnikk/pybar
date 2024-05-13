@@ -58,6 +58,11 @@ def cache(name, config):
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         output = functions[name](config)
+
+        # Don't write to file if module returned nothing
+        if not output:
+            continue
+
         with open(
             os.path.expanduser(f'{cache_dir}/{name}.json'),
             'w', encoding='utf-8'

@@ -110,6 +110,10 @@ def module(name, config):
         # if module.text.get_label() == output['text']:
         #     return True
 
+        # I don't know why this would ever be a string
+        if isinstance(output, str):
+            return True
+
         # Set label
         if output['text']:
             module.set_visible(True)
