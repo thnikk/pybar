@@ -8,10 +8,10 @@ import json
 import os
 
 
-def cache():
-    """ Write events to cache file """
+def get_status():
+    """ Get pulse devices """
     with pulsectl.Pulse() as pulse:
-        output = {
+        return {
             "default-sink": pulse.server_info().default_sink_name,
             "default-source": pulse.server_info().default_source_name,
             "sinks": {
@@ -39,11 +39,15 @@ def cache():
                 for sink_input in pulse.sink_input_list()
             ]
         }
-        with open(
-            os.path.expanduser('~/.cache/pybar/pulse.json'),
-            'w', encoding='utf-8'
-        ) as file:
-            file.write(json.dumps(output, indent=4))
+
+
+def cache(status):
+    """ Write cache to file """
+    with open(
+        os.path.expanduser('~/.cache/pybar/pulse.json'),
+        'w', encoding='utf-8'
+    ) as file:
+        file.write(json.dumps(status, indent=4))
 
 
 def listen():
@@ -61,13 +65,16 @@ def listen():
 def update():
     """ Main function """
     while True:
-        cache()
+        cache(get_status())
         listen()
 
 
 def main():
     """ Debug """
-    cache()
+    # cache()
+    while True:
+        print(json.dumps(get_status(), indent=4))
+        listen()
 
 
 if __name__ == "__main__":
