@@ -11,7 +11,7 @@ import os
 def get_status():
     """ Get pulse devices """
     with pulsectl.Pulse() as pulse:
-        return {
+        output = {
             "default-sink": pulse.server_info().default_sink_name,
             "default-source": pulse.server_info().default_source_name,
             "sinks": {
@@ -30,15 +30,18 @@ def get_status():
                 if 'alsa.card_name' in source.proplist
                 and source.proplist['device.class'] != 'monitor'
             },
-            "sink-inputs": [
-                {
+        }
+        output["sink-inputs"] = []
+        for sink_input in pulse.sink_input_list():
+            try:
+                output["sink-inputs"].append({
                     "id": sink_input.proplist['object.serial'],
                     "name": sink_input.proplist['application.name'],
                     "volume": round(sink_input.volume.value_flat * 100)
-                }
-                for sink_input in pulse.sink_input_list()
-            ]
-        }
+                })
+            except KeyError:
+                pass
+        return output
 
 
 def cache(status):
