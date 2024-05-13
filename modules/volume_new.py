@@ -39,7 +39,12 @@ def widget_box(module, widget, pulse):
         for sink in sink_list:
             sink_box = c.box('v', spacing=10, style='inner-box')
             if name == 'Programs':
-                sink_label = c.button(sink.name, ha='start')
+                try:
+                    prog = sink.proplist[
+                        'application.process.binary']
+                except KeyError:
+                    prog = sink.name
+                sink_label = c.button(prog, ha='start')
             else:
                 if 'Monitor of' in sink.description:
                     continue
