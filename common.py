@@ -12,7 +12,7 @@ from subprocess import check_output
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango  # noqa
+from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject  # noqa
 
 
 align = {
@@ -43,6 +43,10 @@ class Module(Gtk.MenuButton):
         widget.box.add(box)
         widget.draw()
         self.set_popover(widget)
+
+
+GObject.signal_new(
+    'update', Module, GObject.SIGNAL_RUN_LAST, GObject.TYPE_BOOLEAN, ())
 
 
 class Widget(Gtk.Popover):

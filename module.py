@@ -14,10 +14,10 @@ from modules import sway
 from modules import clock
 from modules import battery
 from modules import volume
+from modules import volume_new
 from modules import power
 from modules import backlight
 from modules import test
-# from modules_new import volume as volume_new
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -79,6 +79,7 @@ def module(name, config):
         'clock': clock.module,
         'workspaces': sway.module,
         'volume': volume.module,
+        'volume_new': volume_new.module,
         'backlight': backlight.module,
         'battery': battery.module,
         'power': power.module,
