@@ -90,7 +90,8 @@ def module(config):
                 int(config['product'], 16),
                 config['offset']
             )
-        except IndexError:
+        except IndexError as e:
+            print(e)
             sys.exit(1)
         output = {
             "text": f" {ups.offset_watts()}W",
