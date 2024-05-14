@@ -43,7 +43,7 @@ except ModuleNotFoundError as e:
     c.print_debug(f'{e}', color='yellow', name='cache-builtin')
 
 
-def cache(name, config):
+def cache(name, config, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
 
     # Skip if name isn't in functions
@@ -54,7 +54,7 @@ def cache(name, config):
         f'Starting thread for {name}', 'cache-builtin', color='green')
 
     while True:
-        cache_dir = os.path.expanduser('~/.cache/pybar')
+        cache_dir = os.path.expanduser(cache_dir)
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         output = functions[name](config)
@@ -63,10 +63,7 @@ def cache(name, config):
         if not output:
             continue
 
-        with open(
-            os.path.expanduser(f'{cache_dir}/{name}.json'),
-            'w', encoding='utf-8'
-        ) as file:
+        with open(f'{cache_dir}/{name}.json', 'w', encoding='utf-8') as file:
             try:
                 file.write(json.dumps(output, indent=4))
             except json.decoder.JSONDecodeError:

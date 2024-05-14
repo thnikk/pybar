@@ -37,6 +37,9 @@ def main():
         config['modules-right']
     )
 
+    if "cache" not in list(config):
+        config["cache"] = '~/.cache/pybar'
+
     for name in unique:
         if name in list(config['modules']):
             module_config = config['modules'][name]
@@ -51,9 +54,11 @@ def main():
             executor.submit(
                 module.cache, name,
                 module_config['command'],
-                module_config['interval'])
+                module_config['interval'],
+                config['cache']
+            )
         else:
-            executor.submit(cache.cache, name, module_config)
+            executor.submit(cache.cache, name, module_config, config['cache'])
 
     if 'workspaces' in unique:
         executor.submit(sway.cache)

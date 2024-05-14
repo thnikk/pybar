@@ -48,11 +48,11 @@ def get_widget(name, info=None):
             return widgets.generic_widget(name, info)
 
 
-def cache(name, command, interval):
+def cache(name, command, interval, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
     while True:
         # Create cache dir if it doesn't exist
-        cache_dir = os.path.expanduser('~/.cache/pybar')
+        cache_dir = os.path.expanduser(cache_dir)
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         # Expand user for all parts of command
