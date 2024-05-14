@@ -4,6 +4,7 @@ Description: Loads the config and spawns the bar
 Author: thnikk
 """
 import concurrent.futures
+import argparse
 import sway
 import pulse
 import config as Config
@@ -16,10 +17,19 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk  # noqa
 
 
+def parse_args():
+    """ Parse arguments """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-C', '--config', type=str, default='~/.config/pybar',
+                        help="Configuration path")
+    return parser.parse_args()
+
+
 def main():
     """ Main function """
     executor = concurrent.futures.ThreadPoolExecutor()
-    config = Config.load()
+    args = parse_args()
+    config = Config.load(args.config)
 
     unique = set(
         config['modules-left'] +

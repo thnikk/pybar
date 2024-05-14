@@ -66,7 +66,11 @@ class Display:
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
         bar.css(css_path)
         # bar.css('style.css')
-        bar.css('~/.config/pybar/style.css')
+        # bar.css('~/.config/pybar/style.css')
+        try:
+            bar.css(self.config['style'])
+        except KeyError:
+            pass
         bar.start()
         self.bars.append(bar)
 
