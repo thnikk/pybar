@@ -121,6 +121,12 @@ def updates_widget(info):
         "Flatpak": "https://flathub.org/apps/search?q=",
     }
 
+    def update_packages(widget):
+        """ Update all packages """
+        Popen([
+            "kitty", "zsh", "-c", "paru; flatpak update;"
+            "echo Press enter to close terminal.; read"])
+
     def click_link(_, url):
         """ Click action """
         Popen(['xdg-open', url])
@@ -159,6 +165,11 @@ def updates_widget(info):
             manager_box.add(packages_box)
 
         main_box.add(manager_box)
+
+    if info:
+        update_button = c.button('Update all', style='box')
+        update_button.connect('clicked', update_packages)
+        main_box.add(update_button)
 
     return main_box
 
