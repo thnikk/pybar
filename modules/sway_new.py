@@ -46,7 +46,7 @@ def update(module, buttons):
             button.show()
         else:
             button.hide()
-        if name in workspaces['focused']:
+        if name == workspaces['focused']:
             c.add_style(button, 'focused')
         else:
             c.del_style(button, 'focused')

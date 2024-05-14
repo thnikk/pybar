@@ -60,7 +60,7 @@ def module(config=None):
                 button.show()
             else:
                 button.hide()
-            if name in cache['focused']:
+            if name == cache['focused']:
                 c.add_style(button, 'focused')
             else:
                 c.del_style(button, 'focused')
