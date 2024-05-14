@@ -84,15 +84,11 @@ def module(config):
     if 'offset' not in config:
         config['offset'] = 0
     try:
-        try:
-            ups = CyberPower(
-                int(config['vendor'], 16),
-                int(config['product'], 16),
-                config['offset']
-            )
-        except IndexError as e:
-            print(e)
-            sys.exit(1)
+        ups = CyberPower(
+            int(config['vendor'], 16),
+            int(config['product'], 16),
+            config['offset']
+        )
         output = {
             "text": f" {ups.offset_watts()}W",
             "tooltip": "\n".join([
@@ -120,7 +116,7 @@ def module(config):
         cache.save(json.dumps(output))
         ups.close()
         return output
-    except hid.HIDException:
+    except (hid.HIDException, IndexError):
         return cache.load()
 
 
