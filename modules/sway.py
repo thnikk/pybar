@@ -20,18 +20,24 @@ def switch_workspace(_, workspace):
 def module(config=None):
     """ Workspaces module """
     module = c.box('h', style='workspaces')
+
+    if not config:
+        config = {}
+    if 'icons' not in config:
+        config['icons'] = {}
+
     buttons = []
-    for x in range(0, 11):
+    for n in range(1, 11):
+        button = c.button(style='workspace')
+        button.set_no_show_all(True)
         try:
-            button = c.button(label=config['icons'][str(x)], style='workspace')
-        except (KeyError, TypeError):
+            button.set_label(config['icons'][str(n)])
+        except KeyError:
             try:
-                button = c.button(
-                    label=config['icons']['default'], style='workspace')
-            except (KeyError, TypeError):
-                button = c.button(label=str(x), style='workspace')
-        button.hide()
-        button.connect('clicked', switch_workspace, x)
+                button.set_label(config['icons']['default'])
+            except KeyError:
+                button.set_label(str(n))
+        button.connect('clicked', switch_workspace, n)
         buttons.append(button)
         module.add(button)
 
@@ -47,16 +53,18 @@ def module(config=None):
                     return True
         except FileNotFoundError:
             return True
-        workspaces = cache['workspaces']
-        focused = cache['focused']
-        for x in range(0, 11):
-            if str(x) not in workspaces:
-                buttons[x].hide()
+
+        for n, button in enumerate(buttons):
+            name = str(n+1)
+            if name in cache['workspaces']:
+                button.show()
             else:
-                buttons[x].show()
-        for workspace in buttons:
-            c.del_style(workspace, 'focused')
-        c.add_style(buttons[int(focused)], 'focused')
+                button.hide()
+            if name in cache['focused']:
+                c.add_style(button, 'focused')
+            else:
+                c.del_style(button, 'focused')
+
         return True
     if get_workspaces():
         GLib.timeout_add(50, get_workspaces)
