@@ -23,31 +23,6 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
-def get_widget(name, info=None):
-    """ Get widget box from appropriate widget """
-    match name:
-        case 'weather':
-            return widgets.weather_widget(info)
-        case 'genshin':
-            return widgets.hoyo_widget(info, 'genshin')
-        case 'hsr':
-            return widgets.hoyo_widget(info, 'hsr')
-        case 'updates':
-            return widgets.updates_widget(info)
-        case 'git':
-            return widgets.git_widget(info)
-        case 'ups':
-            return widgets.ups_widget(info)
-        case 'xdrip':
-            return widgets.xdrip(info)
-        case 'network':
-            return widgets.network(info)
-        case 'sales':
-            return widgets.sales(info)
-        case _:
-            return widgets.generic_widget(name, info)
-
-
 def cache(name, command, interval, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
     while True:
@@ -86,6 +61,18 @@ def module(name, config):
         'battery': battery.module,
         'power': power.module,
         'test': test.module
+    }
+
+    all_widgets = {
+        "weather": widgets.weather,
+        "genshin": widgets.hoyo,
+        "hsr": widgets.hoyo,
+        "updates": widgets.updates,
+        "git": widgets.git,
+        "ups": widgets.ups,
+        "xdrip": widgets.xdrip,
+        "network": widgets.network,
+        "sales": widgets.sales,
     }
 
     if "cache" not in list(config):
@@ -139,7 +126,9 @@ def module(name, config):
                 and not module.get_active()
             ):
                 try:
-                    module.set_widget(get_widget(name, info=output['widget']))
+                    module.set_widget(
+                        all_widgets[name](
+                            name, module, output['widget']))
                 except KeyError:
                     pass
                 module.set_tooltip_markup(output['tooltip'])

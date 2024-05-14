@@ -7,7 +7,7 @@ import common as c
 from subprocess import run, Popen
 
 
-def generic_widget(name, cache):
+def generic_widget(name, module, cache):
     """ Generic widget """
     main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -28,7 +28,7 @@ def generic_widget(name, cache):
     return main_box
 
 
-def weather_widget(cache):
+def weather(name, module, cache):
     """ Weather widget """
     widget = c.box('v', spacing=20)
 
@@ -108,7 +108,7 @@ def weather_widget(cache):
     return widget
 
 
-def updates_widget(info):
+def updates(name, module, cache):
     """ Update widget """
     main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -121,8 +121,9 @@ def updates_widget(info):
         "Flatpak": "https://flathub.org/apps/search?q=",
     }
 
-    def update_packages(widget):
+    def update_packages(widget, module):
         """ Update all packages """
+        module.get_popover().popdown()
         Popen([
             "kitty", "zsh", "-c", "paru; flatpak update;"
             "echo Press enter to close terminal.; read"])
@@ -131,7 +132,7 @@ def updates_widget(info):
         """ Click action """
         Popen(['xdg-open', url])
 
-    for manager, packages in info.items():
+    for manager, packages in cache.items():
         if not packages:
             continue
         manager_box = c.box('v', spacing=10)
@@ -166,15 +167,15 @@ def updates_widget(info):
 
         main_box.add(manager_box)
 
-    if info:
+    if cache:
         update_button = c.button('Update all', style='box')
-        update_button.connect('clicked', update_packages)
+        update_button.connect('clicked', update_packages, module)
         main_box.add(update_button)
 
     return main_box
 
 
-def git_widget(cache):
+def git(name, module, cache):
     """ Git widget """
     commits = cache["commits"]
 
@@ -219,7 +220,7 @@ def git_widget(cache):
     return main_box
 
 
-def ups_widget(cache):
+def ups(name, module, cache):
     """ UPS widget """
     main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -257,7 +258,7 @@ def ups_widget(cache):
     return main_box
 
 
-def hoyo_widget(cache, game):
+def hoyo(name, module, cache):
     """ Genshin widget """
     main_box = c.box('v', spacing=20)
     c.add_style(main_box, 'small-widget')
@@ -297,7 +298,7 @@ def hoyo_widget(cache, game):
     return main_box
 
 
-def xdrip(cache):
+def xdrip(name, module, cache):
     """ XDrip widget """
     main_box = c.box('v', spacing=20)
     main_box.add(c.label('XDrip+', style="heading"))
@@ -324,7 +325,7 @@ def xdrip(cache):
     return main_box
 
 
-def network(cache):
+def network(name, module, cache):
     """ Network widget """
     main_box = c.box('v', spacing=20, style='small-widget')
     main_box.add(c.label('Network', style='heading'))
@@ -387,7 +388,7 @@ def power():
     return main_box
 
 
-def sales(cache):
+def sales(name, module, cache):
     main_box = c.box('v', spacing=20)
     main_box.add(c.label('Sales', style='heading'))
 
