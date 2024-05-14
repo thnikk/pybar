@@ -88,6 +88,9 @@ def module(name, config):
         'test': test.module
     }
 
+    if "cache" not in list(config):
+        config['cache'] = '~/.cache/pybar'
+
     if name in list(builtin):
         try:
             config = config['modules'][name]
@@ -104,7 +107,7 @@ def module(name, config):
         # Load cache
         try:
             with open(
-                os.path.expanduser(f'~/.cache/pybar/{name}.json'),
+                os.path.expanduser(f'{config["cache"]}/{name}.json'),
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
