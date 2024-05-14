@@ -97,7 +97,7 @@ def module(_):
             "sgv": sgv,
             "delta": delta,
             "direction": arrows[direction],
-            "date": date.strftime("%m/%d/%y %H:%M:%S"),
+            "date": date.strftime("%m/%d/%y %I:%M:%S %p"),
             "since_last": since_last
         }
     }
