@@ -103,7 +103,9 @@ class Bar:
             "modules-right": self.right,
         }.items():
             for name in self.config[section_name]:
-                section.add(module.module(name, self.config))
+                loaded_module = module.module(name, self.config)
+                if loaded_module:
+                    section.add(loaded_module)
 
     def css(self, file):
         """ Load CSS from file """

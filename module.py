@@ -112,7 +112,9 @@ def module(name, config):
             ) as file:
                 output = json.loads(file.read())
         except (FileNotFoundError, json.decoder.JSONDecodeError):
-            return True
+            c.print_debug("Failed to load module.",
+                          name=f'module-{name}', color='red')
+            return False
         # if module.text.get_label() == output['text']:
         #     return True
 
