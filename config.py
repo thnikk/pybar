@@ -7,9 +7,9 @@ import os
 import json
 
 
-def load():
+def load(path):
     """ Load config from file """
-    config_path = os.path.expanduser('~/.config/pybar/')
+    config_path = os.path.expanduser(path)
     if not os.path.exists(config_path):
         os.makedirs(config_path)
         default_config = {
@@ -33,7 +33,7 @@ def load():
             file.write(json.dumps(default_config, indent=4))
         return default_config
     with open(
-        os.path.expanduser('~/.config/pybar/config.json'),
+        os.path.expanduser(f'{config_path}/config.json'),
         'r', encoding='utf=8'
     ) as file:
         return json.loads(file.read())
