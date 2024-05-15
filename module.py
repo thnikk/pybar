@@ -67,6 +67,7 @@ def module(name, config):
         "weather": widgets.weather,
         "genshin": widgets.hoyo,
         "hsr": widgets.hoyo,
+        "resin": widgets.hoyo,
         "updates": widgets.updates,
         "git": widgets.git,
         "ups": widgets.ups,
@@ -131,7 +132,7 @@ def module(name, config):
                             name, module, output['widget']))
                 except KeyError:
                     pass
-                module.set_tooltip_markup(output['tooltip'])
+                module.set_tooltip_markup(str(output['tooltip']))
             try:
                 output['widget']
                 module.set_has_tooltip(False)
