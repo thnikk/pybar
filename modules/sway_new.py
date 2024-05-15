@@ -1,88 +1,88 @@
 #!/usr/bin/python3 -u
 """
-Description:
-Author:
+Description: Properly threaded workspace module
+Author: thnikk
 """
 from subprocess import Popen, PIPE, STDOUT, check_output
-import concurrent.futures
+import threading
 import json
 import common as c
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject  # noqa
+from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject, GLib  # noqa
 
 
-def get_workspaces():
-    """ Get workspaces """
-    raw = json.loads(check_output(
-        ['swaymsg', '-t', 'get_workspaces']))
-    workspaces = [workspace['name'] for workspace in raw]
-    workspaces.sort()
-    focused = [
-        workspace['name'] for workspace in raw
-        if workspace['focused']
-    ][0]
-    return {
-        'workspaces': workspaces,
-        'focused': focused
-    }
+class Workspaces(Gtk.Box):
+    def __init__(self, config):
+        super().__init__()
+        c.add_style(self, 'workspaces')
 
+        # Set up buttons
+        self.buttons = []
+        for n in range(1, 11):
+            button = c.button(style='workspace')
+            button.set_no_show_all(True)
+            try:
+                button.set_label(config['icons'][str(n)])
+            except KeyError:
+                try:
+                    button.set_label(config['icons']['default'])
+                except KeyError:
+                    button.set_label(str(n))
+            self.buttons.append(button)
+            self.add(button)
 
-def sway_listen(module):
-    """ Listen for events """
-    with Popen(['swaymsg', '-t', 'subscribe', '["workspace"]', '-m'],
-               stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
-        for line in p.stdout:
-            module.emit('update')
+        # Initial update before waiting for listener updates
+        self.update()
 
+        thread = threading.Thread(target=self.listen)
+        thread.daemon = True
+        thread.start()
 
-def update(module, buttons):
-    """ Update module """
-    workspaces = get_workspaces()
-    for n, button in enumerate(buttons):
-        name = str(n+1)
-        if name in workspaces['workspaces']:
-            button.show()
-        else:
-            button.hide()
-        if name == workspaces['focused']:
-            c.add_style(button, 'focused')
-        else:
-            c.del_style(button, 'focused')
+    def listen(self):
+        """ Listen for events and update the box when there's a new one """
+        while True:
+            with Popen(['swaymsg', '-t', 'subscribe', '["workspace"]', '-m'],
+                       stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
+                for line in p.stdout:
+                    GLib.idle_add(self.update)
+
+    def get_workspaces(self):
+        """ Get workspaces with swaymsg """
+        raw = json.loads(check_output(
+            ['swaymsg', '-t', 'get_workspaces']))
+        workspaces = [workspace['name'] for workspace in raw]
+        workspaces.sort()
+        focused = [
+            workspace['name'] for workspace in raw
+            if workspace['focused']
+        ][0]
+        return {'workspaces': workspaces, 'focused': focused}
+
+    def update(self):
+        """ Update the box with new workspace info """
+        workspaces = self.get_workspaces()
+        for n, button in enumerate(self.buttons):
+            name = str(n+1)
+            if name in workspaces['workspaces']:
+                button.show()
+            else:
+                button.hide()
+            if name == workspaces['focused']:
+                c.add_style(button, 'focused')
+            else:
+                c.del_style(button, 'focused')
 
 
 def module(config=None):
     """ Sway module """
-    module = c.box('h', style='workspaces')
 
     if not config:
         config = {}
     if 'icons' not in config:
         config['icons'] = {}
 
-    buttons = []
-    for n in range(1, 11):
-        button = c.button(style='workspace')
-        button.set_no_show_all(True)
-        try:
-            button.set_label(config['icons'][str(n)])
-        except KeyError:
-            try:
-                button.set_label(config['icons']['default'])
-            except KeyError:
-                button.set_label(str(n))
-        buttons.append(button)
-        module.add(button)
-
-    update(module, buttons)
-
-    GObject.signal_new(
-        'update', module,
-        GObject.SIGNAL_RUN_LAST, GObject.TYPE_BOOLEAN, ())
-    module.connect('update', update, buttons)
-
-    executor = concurrent.futures.ThreadPoolExecutor()
-    executor.submit(sway_listen, module)
+    module = Workspaces(config)
 
     return module
