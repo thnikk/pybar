@@ -18,14 +18,17 @@ def get_workspaces():
         workspace['name'] for workspace in raw
         if workspace['focused']
     ][0]
-    with open(
-        os.path.expanduser('~/.cache/pybar/sway.json'),
-        'w', encoding='utf-8'
-    ) as file:
-        file.write(json.dumps({
-            'workspaces': workspaces,
-            'focused': focused
-        }))
+    try:
+        with open(
+            os.path.expanduser('~/.cache/pybar/sway.json'),
+            'w', encoding='utf-8'
+        ) as file:
+            file.write(json.dumps({
+                'workspaces': workspaces,
+                'focused': focused
+            }))
+    except OSError:
+        pass
 
 
 def cache():
