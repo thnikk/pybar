@@ -99,12 +99,8 @@ def module(name, config):
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
-            c.print_debug("Failed to load module.",
-                          name=f'module-{name}', color='red')
-            return False
-        # if module.text.get_label() == output['text']:
-        #     return True
+        except FileNotFoundError:
+            return True
 
         # I don't know why this would ever be a string
         if isinstance(output, str):
