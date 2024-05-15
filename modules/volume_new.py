@@ -21,6 +21,8 @@ class Volume(c.Module):
 
         self.connect('scroll-event', self.scroll)
         self.connect('button-press-event', self.switch_outputs)
+        self.connect('button-release-event', self.debounce)
+        self.pressed = False
 
         default = self.pulse.sink_default_get()
         volume = round(default.volume.value_flat * 100)
@@ -32,6 +34,11 @@ class Volume(c.Module):
         thread = threading.Thread(target=self.pulse_thread)
         thread.daemon = True
         thread.start()
+
+    def debounce(self, module, event):
+        """ Catch releases to debounce button press """
+        print(event.type)
+        # if Gdk
 
     def set_volume(self, module, sink):
         """ Set volume for sink/source/sink-input """
@@ -101,7 +108,8 @@ class Volume(c.Module):
 
     def switch_outputs(self, module, event):
         """ Right click action """
-        if event.button == 3:
+        print(event.type)
+        if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
             default = self.pulse.server_info().default_sink_name
             sinks = [sink.name for sink in self.pulse.sink_list()]
             index = sinks.index(default) + 1
