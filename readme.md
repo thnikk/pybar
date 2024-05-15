@@ -52,7 +52,7 @@ Create a launcher called `pybar` and put it somewhere in your PATH
 pkill -f "python.*pybar"
 
 # Run new bar and log to file
-python -u ~/Git/Python/pybar/main.py > ~/.cache/pybar.log 2>&1
+python -u ~/Git/pybar/main.py > ~/.cache/pybar.log 2>&1
 ```
 
 To use the bar on sway, replace the bar section of your config with:
