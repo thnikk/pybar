@@ -33,11 +33,11 @@ class Volume(c.Module):
         thread.daemon = True
         thread.start()
 
-    def set_volume(self, sink):
+    def set_volume(self, module, sink):
         """ Set volume for sink/source/sink-input """
-        self. pulse.volume_set_all_chans(sink, self.widget.get_value()/100)
+        self.pulse.volume_set_all_chans(sink, module.get_value()/100)
 
-    def set_default(self, sink):
+    def set_default(self, module, sink):
         """ Set default sink/source """
         self.pulse.default_set(sink)
 
