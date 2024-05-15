@@ -51,7 +51,7 @@ def module(config=None):
                     cache = json.loads(file.read())
                 except json.decoder.JSONDecodeError:
                     return True
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             return True
 
         for n, button in enumerate(buttons):

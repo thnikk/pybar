@@ -151,7 +151,7 @@ def get_volume(module):
         ) as file:
             cache_raw = file.read()
             cache = json.loads(cache_raw)
-    except (FileNotFoundError, json.decoder.JSONDecodeError):
+    except (FileNotFoundError, json.decoder.JSONDecodeError, OSError):
         return True
 
     volume = cache['sinks'][cache['default-sink']]['volume']
