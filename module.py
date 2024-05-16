@@ -11,11 +11,9 @@ import gi
 import common as c
 import widgets
 from modules import sway
-from modules import sway_new
 from modules import clock
 from modules import battery
 from modules import volume
-from modules import volume_new
 from modules import power
 from modules import backlight
 from modules import test
@@ -54,9 +52,7 @@ def module(name, config):
     builtin = {
         'clock': clock.module,
         'workspaces': sway.module,
-        'sway_new': sway_new.module,
         'volume': volume.module,
-        'volume_new': volume_new.module,
         'backlight': backlight.module,
         'battery': battery.module,
         'power': power.module,

@@ -5,8 +5,6 @@ Author: thnikk
 """
 import concurrent.futures
 import argparse
-import sway
-import pulse
 import config as Config
 from bar import Display
 import common as c
@@ -59,11 +57,6 @@ def main():
             )
         else:
             executor.submit(cache.cache, name, module_config, config['cache'])
-
-    if 'workspaces' in unique:
-        executor.submit(sway.cache)
-    if 'volume' in unique:
-        executor.submit(pulse.update)
 
     display = Display(config)
     display.draw_all()

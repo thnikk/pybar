@@ -1,189 +1,162 @@
 #!/usr/bin/python3 -u
 """
-Description: Volume module
+Description: Pulse module
 Author: thnikk
 """
 import common as c
-from subprocess import run
 import pulsectl
-import os
-import json
-import time
+import threading
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GLib  # noqa
+from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 
-def sink_volume(widget, sink):
-    """ Action for changing value of scale """
-    run(["pactl", "set-sink-volume", sink, f"{str(widget.get_value())}%"],
-        check=False, capture_output=False)
+class Volume(c.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.pulse = pulsectl.Pulse()
+        c.add_style(self, 'module-fixed')
 
+        self.icons = config['icons']
 
-def source_volume(widget, source):
-    """ Action for changing value of scale """
-    run(["pactl", "set-source-volume", source, f"{str(widget.get_value())}%"],
-        check=False, capture_output=False)
+        self.connect('scroll-event', self.scroll)
+        self.connect('button-press-event', self.switch_outputs)
 
+        default = self.pulse.sink_default_get()
+        volume = round(default.volume.value_flat * 100)
+        self.set_icon(default)
+        self.text.set_label(f'{volume}%')
 
-def sink_input_volume(widget, sink):
-    """ Action for changing value of scale """
-    run([
-        "pactl", "set-sink-input-volume", sink,
-        f"{str(widget.get_value())}%"],
-        check=False, capture_output=False)
+        self.make_widget()
 
+        thread = threading.Thread(target=self.pulse_thread)
+        thread.daemon = True
+        thread.start()
 
-def set_default_sink(button, sink, widget):
-    """ Set the default sink """
-    run(["pactl", "set-default-sink", sink],
-        check=False, capture_output=False)
-    widget.popdown()
+    def set_volume(self, module, sink):
+        """ Set volume for sink/source/sink-input """
+        self.pulse.volume_set_all_chans(sink, module.get_value()/100)
 
+    def set_default(self, module, sink):
+        """ Set default sink/source """
+        self.pulse.default_set(sink)
 
-def set_default_source(button, source):
-    """ Set the default sink """
-    run(["pactl", "set-default-source", source],
-        check=False, capture_output=False)
+    def widget_box(self):
+        """ Volume widget """
+        main_box = c.box('v', style='widget', spacing=20)
+        c.add_style(main_box, 'small-widget')
+        main_box.add(c.label('Volume', style='heading'))
 
+        for name, list_type in {
+            "Outputs": self.pulse.sink_list(),
+            "Inputs": self.pulse.source_list(),
+            "Programs": self.pulse.sink_input_list()
+        }.items():
+            section_box = c.box('v', spacing=10)
+            section_box.add(c.label(name, style='title', ha='start'))
+            sinks_box = c.box('v', style='box')
+            sink_list = list_type
+            for sink in sink_list:
+                sink_box = c.box('v', spacing=10, style='inner-box')
+                if name == 'Programs':
+                    try:
+                        prog = sink.proplist[
+                            'application.process.binary']
+                    except KeyError:
+                        prog = sink.name
+                    sink_label = c.button(prog, ha='start')
+                else:
+                    if 'Monitor of' in sink.description:
+                        continue
+                    sink_label = c.button(sink.description, ha='start')
+                    sink_label.connect(
+                        'clicked', self.set_default, sink)
+                sink_box.add(sink_label)
+                level = c.slider(round(sink.volume.value_flat*100))
+                level.connect('value-changed', self.set_volume, sink)
+                sink_box.pack_start(level, 1, 1, 0)
+                sinks_box.add(sink_box)
+                if sink != sink_list[-1]:
+                    sinks_box.add(c.sep('v'))
+            section_box.add(sinks_box)
+            if sink_list:
+                main_box.add(section_box)
 
-def widget_box(module, cache, widget):
-    """ Volume widget """
-    main_box = c.box('v', style='widget', spacing=20)
-    c.add_style(main_box, 'small-widget')
-    main_box.add(c.label('Volume', style='heading'))
+        return main_box
 
-    section_box = c.box('v', spacing=10)
-    section_box.add(c.label('Outputs', style='title', ha='start'))
-    sinks_box = c.box('v', style='box')
-    for id, info in cache['sinks'].items():
-        sink_box = c.box('v', spacing=10, style='inner-box')
-        sink_label = c.button(info['name'])
-        sink_label.connect('clicked', set_default_sink, id, widget)
-        if id == cache['default-sink']:
-            c.add_style(sink_label, 'active')
-        sink_box.add(sink_label)
-        level = c.slider(info['volume'])
-        level.connect('value-changed', sink_volume, id)
-        sink_box.pack_start(level, 1, 1, 0)
-        sinks_box.add(sink_box)
-        if id != list(cache['sinks'])[-1]:
-            sinks_box.add(c.sep('v'))
-    section_box.add(sinks_box)
-    if cache['sinks']:
-        main_box.add(section_box)
+    def pulse_listen(self):
+        """ Listen for events """
+        with pulsectl.Pulse('event-listener') as pulse:
+            def print_events(ev):
+                raise pulsectl.PulseLoopStop
+            pulse.event_mask_set('sink', 'sink_input', 'source')
+            pulse.event_callback_set(print_events)
+            pulse.event_listen()
 
-    section_box = c.box('v', spacing=10)
-    section_box.add(c.label('Inputs', style='title', ha='start'))
-    sources_box = c.box('v', style='box')
-    for id, info in cache['sources'].items():
-        source_box = c.box('v', spacing=10, style='inner-box')
-        source_label = c.button(info['name'])
-        source_label.connect('clicked', set_default_source, id)
-        if id == cache['default-source']:
-            c.add_style(source_label, 'active')
-        source_box.add(source_label)
-        level = c.slider(info['volume'])
-        level.connect('value-changed', source_volume, id)
-        source_box.pack_start(level, 1, 1, 0)
-        sources_box.add(source_box)
-        if id != list(cache['sources'])[-1]:
-            sinks_box.add(c.sep('v'))
-    section_box.add(sources_box)
-    if cache['sources']:
-        main_box.add(section_box)
+    def pulse_thread(self):
+        """ Seperate thread for listening for events """
+        while True:
+            self.pulse_listen()
+            GLib.idle_add(self.update)
 
-    section_box = c.box('v', spacing=10)
-    section_box.add(c.label('Programs', style='title', ha='start'))
-    sinks_box = c.box('v', style='box')
-    for sink_input in cache['sink-inputs']:
-        sink_box = c.box('v', spacing=10, style='inner-box')
-        sink_box.add(c.label(sink_input['name']))
-        level = c.slider(sink_input['volume'])
-        level.connect('value-changed', sink_input_volume, sink_input['id'])
-        sink_box.pack_start(level, 1, 1, 0)
-        sinks_box.add(sink_box)
-        if sink_input != cache['sink-inputs'][-1]:
-            sinks_box.add(c.sep('v'))
-    section_box.add(sinks_box)
-    if cache['sink-inputs']:
-        main_box.add(section_box)
-
-    return main_box
-
-
-def switch_outputs(module, event):
-    """ Right click action """
-    if event.button == 3:
-        with pulsectl.Pulse('sink-switcher') as pulse:
-            default = pulse.server_info().default_sink_name
-            sinks = [sink.name for sink in pulse.sink_list()]
+    def switch_outputs(self, module, event):
+        """ Right click action """
+        if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
+            default = self.pulse.server_info().default_sink_name
+            sinks = [sink.name for sink in self.pulse.sink_list()]
             index = sinks.index(default) + 1
             if index > len(sinks) - 1:
                 index = 0
-            pulse.sink_default_set(sinks[index])
-            time.sleep(0.1)
-            get_volume(module)
+            self.pulse.sink_default_set(sinks[index])
+            self.update()
 
-
-def action(module, event):
-    """ Scroll action """
-    with pulsectl.Pulse('volume-increaser') as pulse:
-        default = pulse.sink_default_get()
+    def scroll(self, module, event):
+        """ Scroll action """
+        default = self.pulse.sink_default_get()
         if event.direction == Gdk.ScrollDirection.UP:
             if default.volume.value_flat < 1:
-                pulse.volume_change_all_chans(default, 0.01)
+                self.pulse.volume_change_all_chans(default, 0.01)
             else:
-                pulse.volume_set_all_chans(default, 1)
+                self.pulse.volume_set_all_chans(default, 1)
         elif event.direction == Gdk.ScrollDirection.DOWN:
-            pulse.volume_change_all_chans(default, -0.01)
-        # volume = round(pulse.sink_default_get().volume.value_flat * 100)
-        # module.text.set_label(f'{volume}%')
-    get_volume(module)
+            self.pulse.volume_change_all_chans(default, -0.01)
 
+    def update(self):
+        """ Update """
+        default = self.pulse.sink_default_get()
+        volume = round(default.volume.value_flat * 100)
+        self.text.set_label(f"{volume}%")
 
-def get_volume(module):
-    """ Get volume data from cache """
-    try:
-        with open(
-            os.path.expanduser('~/.cache/pybar/pulse.json'),
-            'r', encoding='utf-8'
-        ) as file:
-            cache_raw = file.read()
-            cache = json.loads(cache_raw)
-    except (FileNotFoundError, json.decoder.JSONDecodeError, OSError):
-        return True
+        self.set_icon(default)
 
-    volume = cache['sinks'][cache['default-sink']]['volume']
-    icons = ["", "", ""]
-    icon_index = int(volume // (100 / len(icons)))
-    try:
-        icon = icons[icon_index]
-    except IndexError:
-        icon = icons[-1]
-    if icon != module.icon.get_label():
-        module.icon.set_label(icon)
-    new = f'{volume}%'
-    if new != module.text.get_label():
-        module.text.set_label(new)
-    if not module.get_active():
-        if module.get_tooltip_text() != cache_raw:
-            module.set_tooltip_text(cache_raw)
-            module.set_has_tooltip(False)
-            widget = c.Widget()
-            widget.box.add(widget_box(module, cache, widget))
-            widget.draw()
-            module.set_popover(widget)
-    return True
+        if not self.get_active():
+            self.make_widget()
+
+    def set_icon(self, sink):
+        """ Set icon for module """
+        found = False
+        for name, icon in self.icons.items():
+            if name.lower() in sink.name.lower():
+                self.icon.set_label(icon)
+                found = True
+        if not found:
+            self.icon.set_label('')
+
+    def make_widget(self):
+        """ Make widget for module """
+        widget = c.Widget()
+        widget.box.add(self.widget_box())
+        widget.draw()
+        self.set_popover(widget)
 
 
 def module(config=None):
-    """ Volume module """
-    module = c.Module()
-    c.add_style(module, 'module-fixed')
-    module.connect('scroll-event', action)
-    module.connect('button-press-event', switch_outputs)
+    """ PulseAudio module """
+    if not config:
+        config = {}
+    if 'icons' not in config:
+        config['icons'] = {}
 
-    if get_volume(module):
-        GLib.timeout_add(250, get_volume, module)
-        return module
+    module = Volume(config)
+
+    return module
