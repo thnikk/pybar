@@ -219,6 +219,18 @@ def git(name, module, cache):
         commits_box.add(scroll_holder)
     main_box.add(commits_box)
 
+    def update(event, module, cache):
+        """ Update """
+        module.get_popover().popdown()
+        run(["git", "-C", cache["path"], "stash"])
+        run(["git", "-C", cache["path"], "pull", "--rebase"])
+        run(["swaymsg", "reload"])
+
+    if commits:
+        update_button = c.button('Update', style='box')
+        update_button.connect('clicked', update, module, cache)
+        main_box.add(update_button)
+
     return main_box
 
 

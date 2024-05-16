@@ -133,7 +133,9 @@ def module(config):
         return {
             "text": f"{config['icon']} {len(commits)}",
             "tooltip": "\n".join(tooltip).strip(),
-            "widget": {"name": git.name, "commits": commits}
+            "widget": {
+                "name": git.name, "commits": commits,
+                "path": os.path.expanduser(config["path"])}
         }
     else:
         return {"text": ""}
