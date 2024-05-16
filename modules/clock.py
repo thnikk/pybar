@@ -110,29 +110,26 @@ def draw_events(now, events, combined_calendar):
             if (
                 date.split('/', maxsplit=1)[0] == str(
                     diff_month(now.year, now.month, offset)[1])
-                and (
-                    offset and not
-                    int(date.split('/')[1]) > combined_calendar[-1][-1][0]
-                )
             )
         }
-
-        if not month_events:
-            return None
 
         if month_events:
             event_section = c.box('v', spacing=10)
             event_line = c.box('h')
             event_line.add(c.label(f'{month} month'))
-            event_section.add(event_line)
 
             events_box = c.box('v', style='box')
+            shown_events = []
             for date, event in month_events.items():
                 if (
-                    int(date.split('/')[0]) != now.month and
+                    int(date.split('/')[0]) == now.month and
                     int(date.split('/')[1]) < now.day
+                ) or (
+                    int(date.split('/')[0]) != now.month and
+                    int(date.split('/')[1]) > int(combined_calendar[-1][-1][0])
                 ):
                     continue
+                shown_events.append(event)
                 event_box = c.box('h', style='inner-box', spacing=10)
                 event_dot = c.label('', style='event-dot')
                 event_style = event_lookup(event)
@@ -146,8 +143,10 @@ def draw_events(now, events, combined_calendar):
 
                 if date != list(month_events)[-1]:
                     events_box.add(c.sep('h'))
-            event_section.add(events_box)
-            events_section.add(event_section)
+            if shown_events:
+                event_section.add(event_line)
+                event_section.add(events_box)
+                events_section.add(event_section)
     return events_section
 
 
