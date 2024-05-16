@@ -15,6 +15,7 @@ from modules_waybar import weather
 from modules_waybar import vm
 from modules_waybar import privacy
 from modules_waybar import systemd
+from modules_waybar import sales
 
 functions = {
     "git": git.module,
@@ -25,13 +26,9 @@ functions = {
     "vm": vm.module,
     "privacy": privacy.module,
     "systemd": systemd.module,
+    "sales": sales.module,
 }
 
-try:
-    from modules_waybar import sales
-    functions['sales'] = sales.module
-except ModuleNotFoundError as e:
-    c.print_debug(f'{e}', color='yellow', name='cache-builtin')
 try:
     from modules_waybar import ups
     functions['ups'] = ups.module
