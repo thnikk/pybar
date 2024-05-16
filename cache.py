@@ -38,12 +38,6 @@ try:
 except ModuleNotFoundError as e:
     c.print_debug(f'{e}', color='yellow', name='cache-builtin')
 try:
-    from modules_waybar import hoyo
-    functions['genshin'] = hoyo.module
-    functions['hsr'] = hoyo.module
-except ModuleNotFoundError as e:
-    c.print_debug(f'{e}', color='yellow', name='cache-builtin')
-try:
     from modules_waybar import resin
     functions['resin'] = resin.module
 except ModuleNotFoundError as e:
