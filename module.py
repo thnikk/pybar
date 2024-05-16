@@ -99,6 +99,9 @@ def module(name, config):
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
+        except json.decoder.JSONDecodeError as e:
+            c.print_debug(e.args, name=f'module-{name}', color='red')
+            return True
         except FileNotFoundError:
             c.print_debug("Cache does not exist for module.",
                           name=f'module-{name}', color='red')
