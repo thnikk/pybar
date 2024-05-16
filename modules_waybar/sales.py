@@ -43,7 +43,7 @@ def parse_order(lines):
     return output
 
 
-def module():
+def module(_):
     """ Module """
     widget = []
     messages = get_messages()
