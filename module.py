@@ -11,6 +11,7 @@ import gi
 import common as c
 import widgets
 from modules import sway
+from modules import hypr
 from modules import clock
 from modules import battery
 from modules import volume
@@ -52,6 +53,7 @@ def module(name, config):
     builtin = {
         'clock': clock.module,
         'workspaces': sway.module,
+        'hyprland': hypr.module,
         'volume': volume.module,
         'backlight': backlight.module,
         'battery': battery.module,

@@ -5,7 +5,7 @@ Author: thnikk
 """
 import gi
 import os
-from subprocess import check_output
+from subprocess import check_output, run, CalledProcessError
 import json
 import common as c
 import module
@@ -20,19 +20,37 @@ class Display:
         self.display = Gdk.Display.get_default()
         self.display.connect("monitor-added", self.added)
         self.display.connect("monitor-removed", self.removed)
+        self.wm = self.get_wm()
         self.config = config
         self.bars = []
         self.monitors = self.get_monitors()
         self.plugs = self.get_plugs()
 
+    def get_wm(self):
+        try:
+            run(['swaymsg', '-q'], check=True)
+            return 'sway'
+        except CalledProcessError:
+            return 'hyprland'
+
     def get_plugs(self):
         """ Get plugs from swaymsg """
-        return [
-            output['name'] for output in
-            json.loads(
-                check_output(["swaymsg", "-t", "get_outputs"]).decode('utf-8'))
-            if output['active'] is True
-        ]
+        if self.wm == 'sway':
+            return [
+                output['name'] for output in
+                json.loads(
+                    check_output(
+                        ["swaymsg", "-t", "get_outputs"]).decode('utf-8'))
+                if output['active']
+            ]
+        else:
+            return [
+                output['name'] for output in
+                json.loads(check_output(
+                    ['hyprctl', '-j', 'monitors']
+                ).decode('utf-8'))
+                if not output['disabled']
+            ]
 
     def get_monitors(self):
         """ Get monitor objects from gdk """
