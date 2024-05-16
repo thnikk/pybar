@@ -14,6 +14,7 @@ from modules_waybar import xdrip
 from modules_waybar import weather
 from modules_waybar import vm
 from modules_waybar import privacy
+from modules_waybar import systemd
 
 functions = {
     "git": git.module,
@@ -23,6 +24,7 @@ functions = {
     "weather": weather.module,
     "vm": vm.module,
     "privacy": privacy.module,
+    "systemd": systemd.module,
 }
 
 try:

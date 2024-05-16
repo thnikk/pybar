@@ -100,6 +100,8 @@ def module(name, config):
             ) as file:
                 output = json.loads(file.read())
         except FileNotFoundError:
+            c.print_debug("Cache does not exist for module.",
+                          name=f'module-{name}', color='red')
             return True
 
         # I don't know why this would ever be a string
@@ -127,7 +129,9 @@ def module(name, config):
                         all_widgets[name](
                             name, module, output['widget']))
                 except KeyError:
-                    pass
+                    module.set_widget(
+                        widgets.generic_widget(
+                            name, module, output['widget']))
                 module.set_tooltip_markup(str(output['tooltip']))
             try:
                 output['widget']

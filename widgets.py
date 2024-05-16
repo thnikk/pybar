@@ -15,6 +15,8 @@ def generic_widget(name, module, cache):
     main_box.add(label)
 
     for category, items in cache.items():
+        if not items:
+            continue
         category_box = c.box('v', spacing=10)
         category_box.add(c.label(category, style='title', ha='start'))
         item_box = c.box('v', style='box')

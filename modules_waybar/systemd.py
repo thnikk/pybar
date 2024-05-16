@@ -4,17 +4,7 @@ Description: Improved version of the built-in systemd module.
 Author: thnikk
 """
 from subprocess import run
-import json
-import argparse
-import tooltip as tt
-
-
-def parse_args():
-    """ Parse arguments """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-e', '--exclude', type=str, help='Comma-separated exclude list')
-    return parser.parse_args()
+import modules_waybar.tooltip as tt
 
 
 def get_output(command) -> list:
@@ -33,20 +23,18 @@ def filter_services(services, blacklist):
     ]
 
 
-def main():
-    """ Main function """
-    args = parse_args()
-    try:
-        blacklist = args.exclude.split(',')
-    except AttributeError:
-        blacklist = []
+def module(config={}):
+    """ Module """
+    if 'blacklist' not in list(config):
+        config['blacklist'] = []
+
     failed_system = filter_services(
         get_output(['systemctl', '--failed', '--legend=no']),
-        blacklist
+        config['blacklist']
     )
     failed_user = filter_services(
         get_output(['systemctl', '--user', '--failed', '--legend=no']),
-        blacklist
+        config['blacklist']
     )
 
     num_failed = len(failed_system) + len(failed_user)
@@ -64,8 +52,17 @@ def main():
                 failed_string = "\n".join(failed_list)
                 output['tooltip'] += f'{name}:\n{failed_string}\n'
     output['tooltip'] = output['tooltip'].strip()
+    output['widget'] = {
+        "System": failed_system,
+        "User": failed_user
+    }
 
-    print(json.dumps(output))
+    return output
+
+
+def main():
+    """ Main function """
+    module()
 
 
 if __name__ == "__main__":
