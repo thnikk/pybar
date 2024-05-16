@@ -3,7 +3,7 @@
 Description: Properly threaded workspace module
 Author: thnikk
 """
-from subprocess import Popen, PIPE, STDOUT, check_output
+from subprocess import Popen, PIPE, STDOUT, check_output, run
 import threading
 import json
 import common as c
@@ -30,6 +30,7 @@ class Workspaces(Gtk.Box):
                     button.set_label(config['icons']['default'])
                 except KeyError:
                     button.set_label(str(n))
+            button.connect('clicked', self.switch, n)
             self.buttons.append(button)
             self.add(button)
 
@@ -39,6 +40,10 @@ class Workspaces(Gtk.Box):
         thread = threading.Thread(target=self.listen)
         thread.daemon = True
         thread.start()
+
+    def switch(self, button, workspace):
+        """ Click action """
+        run(['swaymsg', 'workspace', 'number', str(workspace)], check=False)
 
     def listen(self):
         """ Listen for events and update the box when there's a new one """
