@@ -170,7 +170,7 @@ def updates(name, module, cache):
         main_box.add(manager_box)
 
     if cache:
-        update_button = c.button('Update all', style='box')
+        update_button = c.button(' Update all', style='box')
         update_button.connect('clicked', update_packages, module)
         main_box.add(update_button)
 
@@ -227,7 +227,7 @@ def git(name, module, cache):
         run(["swaymsg", "reload"])
 
     if commits:
-        update_button = c.button('Update', style='box')
+        update_button = c.button(' Update', style='box')
         update_button.connect('clicked', update, module, cache)
         main_box.add(update_button)
 
