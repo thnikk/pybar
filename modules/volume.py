@@ -6,6 +6,7 @@ Author: thnikk
 import common as c
 import pulsectl
 import threading
+import time
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
@@ -14,7 +15,19 @@ from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 class Volume(c.Module):
     def __init__(self, config):
         super().__init__()
-        self.pulse = pulsectl.Pulse()
+
+        while True:
+            try:
+                self.pulse = pulsectl.Pulse()
+                default = self.pulse.sink_default_get()
+                break
+            except pulsectl.pulsectl.PulseIndexError:
+                c.print_debug(
+                    "Couldn't connect to pulse server, retrying...",
+                    color='red', name='modules-volume')
+                time.sleep(1)
+                continue
+
         c.add_style(self, 'module-fixed')
 
         self.icons = config['icons']
@@ -22,7 +35,6 @@ class Volume(c.Module):
         self.connect('scroll-event', self.scroll)
         self.connect('button-press-event', self.switch_outputs)
 
-        default = self.pulse.sink_default_get()
         volume = round(default.volume.value_flat * 100)
         self.set_icon(default)
         self.text.set_label(f'{volume}%')
@@ -86,12 +98,21 @@ class Volume(c.Module):
 
     def pulse_listen(self):
         """ Listen for events """
-        with pulsectl.Pulse('event-listener') as pulse:
-            def print_events(ev):
-                raise pulsectl.PulseLoopStop
-            pulse.event_mask_set('sink', 'sink_input', 'source')
-            pulse.event_callback_set(print_events)
-            pulse.event_listen()
+        while True:
+            try:
+                with pulsectl.Pulse('event-listener') as pulse:
+                    def print_events(ev):
+                        raise pulsectl.PulseLoopStop
+                    pulse.event_mask_set('sink', 'sink_input', 'source')
+                    pulse.event_callback_set(print_events)
+                    pulse.event_listen()
+                    break
+            except pulsectl.pulsectl.PulseDisconnected:
+                c.print_debug(
+                    'Reconnecting to pulse', name='volume-listener',
+                    color='red')
+                time.sleep(0.1)
+                pass
 
     def pulse_thread(self):
         """ Seperate thread for listening for events """
@@ -123,7 +144,20 @@ class Volume(c.Module):
 
     def update(self):
         """ Update """
-        default = self.pulse.sink_default_get()
+        while True:
+            try:
+                default = self.pulse.sink_default_get()
+                break
+            except (
+                    pulsectl.pulsectl.PulseIndexError,
+                    pulsectl.pulsectl.PulseOperationFailed
+            ):
+                c.print_debug(
+                    'Reconnecting to pulse', name='volume-updater',
+                    color='red')
+                time.sleep(0.1)
+                self.pulse = pulsectl.Pulse()
+                pass
         volume = round(default.volume.value_flat * 100)
         self.text.set_label(f"{volume}%")
 
@@ -157,11 +191,6 @@ def module(config=None):
     if 'icons' not in config:
         config['icons'] = {}
 
-    while True:
-        try:
-            module = Volume(config)
-            break
-        except pulsectl.pulsectl.PulseIndexError:
-            continue
+    module = Volume(config)
 
     return module
