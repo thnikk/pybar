@@ -404,6 +404,7 @@ def power():
 
 def sales(name, module, cache):
     main_box = c.box('v', spacing=20)
+    c.add_style(main_box, 'small-widget')
     main_box.add(c.label('Sales', style='heading'))
 
     total = 0
@@ -411,7 +412,7 @@ def sales(name, module, cache):
         order_box = c.box('v', style='box')
         for item in order:
             line = c.box('h', style='inner-box', spacing=20)
-            line.add(c.label(f"{item['item']}"))
+            line.add(c.label(f"{item['item']}", length=16))
             line.add(c.label(f"x{item['quantity']}"))
             line_total = item['price'] * item['quantity']
             price = c.label(f"${line_total:.2f}")

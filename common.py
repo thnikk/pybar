@@ -217,5 +217,6 @@ def label(
     if isinstance(length, int):
         text.set_max_width_chars(length)
         text.set_ellipsize(Pango.EllipsizeMode.END)
+        text.set_tooltip_text(input_text)
 
     return text
