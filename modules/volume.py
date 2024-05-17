@@ -157,6 +157,11 @@ def module(config=None):
     if 'icons' not in config:
         config['icons'] = {}
 
-    module = Volume(config)
+    while True:
+        try:
+            module = Volume(config)
+            break
+        except pulsectl.pulsectl.PulseIndexError:
+            continue
 
     return module
