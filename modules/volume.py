@@ -168,6 +168,9 @@ class Volume(c.Module):
 
     def set_icon(self, sink):
         """ Set icon for module """
+        if sink.mute:
+            self.icon.set_label('')
+            return
         found = False
         for name, icon in self.icons.items():
             if name.lower() in sink.name.lower():
