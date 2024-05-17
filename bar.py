@@ -175,7 +175,12 @@ class Bar:
         GtkLayerShell.set_margin(
             self.window, GtkLayerShell.Edge.BOTTOM, margin)
 
-        GtkLayerShell.set_namespace(self.window, 'pybar')
+        # Set namespace based on config
+        if 'namespace' in list(self.config):
+            GtkLayerShell.set_namespace(self.window, self.config['namespace'])
+        else:
+            GtkLayerShell.set_namespace(self.window, 'pybar')
+
         GtkLayerShell.set_monitor(self.window, self.monitor)
 
         # Reserve part of screen
