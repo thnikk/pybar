@@ -12,11 +12,12 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 
-class Privacy(Gtk.MenuButton):
+class Privacy(c.Module):
     def __init__(self, config):
         super().__init__()
-        c.add_style(self, 'module')
         c.add_style(self, 'green')
+        self.text.show()
+        self.box.show()
         self.set_no_show_all(True)
 
         thread = threading.Thread(target=self.listen_wrapper)
@@ -82,6 +83,41 @@ class Privacy(Gtk.MenuButton):
                         device['properties'] = {}
                     device['properties'][parts[0]] = parts[1]
 
+    def get_widget(self, devices):
+        """ Draw widget """
+        box = c.box('v', spacing=20)
+        box.add(c.label('Privacy', style='heading'))
+        c.add_style(box, 'small-widget')
+
+        # Seperate devices by type
+        categories = {}
+        for id, device in devices.items():
+            category = device['properties']['media.class'].split('/')[-1]
+            if category not in list(categories):
+                categories[category] = set()
+            try:
+                name = device['properties'][
+                    'application.process.binary'].title()
+            except KeyError:
+                try:
+                    name = device['properties']['node.name'].title()
+                except KeyError:
+                    name = device['properties']['media.name'].title()
+            categories[category].add(name)
+
+        for category, programs in categories.items():
+            category_box = c.box('v', spacing=10)
+            category_box.add(c.label(category, style='title', ha='start'))
+            program_box = c.box('v', style='box')
+            for program in programs:
+                program_box.add(c.label(program, style='inner-box'))
+                if program != list(programs)[-1]:
+                    program_box.add(c.sep('v'))
+            category_box.add(program_box)
+            box.add(category_box)
+
+        return box
+
     def update(self, devices):
         """ Update module """
         icons = {'Audio': '', 'Video': ''}
@@ -95,12 +131,15 @@ class Privacy(Gtk.MenuButton):
         # Get icons
         text = [icons[item] for item in types]
 
+        # Set widget
+        self.set_widget(self.get_widget(devices))
+
         # Set label
         if text:
-            self.set_label("  ".join(text))
+            self.text.set_label("  ".join(text))
             self.show()
         else:
-            self.set_label('')
+            self.text.set_label('')
             self.hide()
 
 

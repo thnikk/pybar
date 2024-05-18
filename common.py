@@ -30,10 +30,10 @@ class Module(Gtk.MenuButton):
         self.box = box('h', spacing=5)
         if icon:
             self.icon = Gtk.Label()
-            self.box.add(self.icon)
+            self.box.pack_start(self.icon, 0, 0, 0)
         if text:
             self.text = Gtk.Label()
-            self.box.pack_end(self.text, 0, 0, 0)
+            self.box.pack_end(self.text, 1, 1, 0)
         self.add(self.box)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
 
@@ -217,6 +217,7 @@ def label(
     if isinstance(length, int):
         text.set_max_width_chars(length)
         text.set_ellipsize(Pango.EllipsizeMode.END)
-        text.set_tooltip_text(input_text)
+        if len(input_text) > length + 3:
+            text.set_tooltip_text(input_text)
 
     return text
