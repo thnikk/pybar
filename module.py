@@ -18,6 +18,7 @@ from modules import volume
 from modules import power
 from modules import backlight
 from modules import test
+from modules import privacy
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -58,7 +59,8 @@ def module(name, config):
         'backlight': backlight.module,
         'battery': battery.module,
         'power': power.module,
-        'test': test.module
+        'test': test.module,
+        'privacy': privacy.module
     }
 
     all_widgets = {
