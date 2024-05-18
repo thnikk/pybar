@@ -27,6 +27,12 @@ manager_config = {
         "empty_error": 1,
         "values": [0, -1]
     },
+    "Apt": {
+        "command": ["apt", "list", "--upgradable"],
+        "separator": ' ',
+        "empty_error": 1,
+        "values": [0, 1]
+    },
     "Flatpak": {
         "command": ["flatpak", "remote-ls", "--updates"],
         "separator": '\t',
@@ -57,6 +63,8 @@ def get_output(command, separator, values, empty_error) -> list:
                 raise ValueError from error
             # Otherwise set empty output
             output = []
+        except FileNotFoundError:
+            pass
         break
     # Find lines containing alerts
     move = []
