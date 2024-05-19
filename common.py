@@ -174,7 +174,7 @@ def del_style(widget, style):
         widget.get_style_context().remove_class(style)
 
 
-def button(label=None, style=None, ha=None):
+def button(label=None, style=None, ha=None, length=None):
     """ Button """
     widget = Gtk.Button.new()
     if label:
@@ -185,6 +185,12 @@ def button(label=None, style=None, ha=None):
         widget.props.halign = align[ha]
     except KeyError:
         pass
+    if length:
+        widget.get_child().set_max_width_chars(length)
+        widget.get_child().set_ellipsize(
+            Pango.EllipsizeMode.END)
+        if len(label) > length + 3:
+            widget.set_tooltip_text(label)
     return widget
 
 

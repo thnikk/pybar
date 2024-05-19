@@ -9,7 +9,7 @@ import threading
 import time
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
+from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 
 
 class Volume(c.Module):
@@ -76,11 +76,12 @@ class Volume(c.Module):
                             'application.process.binary']
                     except KeyError:
                         prog = sink.name
-                    sink_label = c.button(prog, ha='start')
+                    sink_label = c.button(prog, ha='start', length=25)
                 else:
                     if 'Monitor of' in sink.description:
                         continue
-                    sink_label = c.button(sink.description, ha='start')
+                    sink_label = c.button(
+                        sink.description, ha='start', length=25)
                     sink_label.connect(
                         'clicked', self.set_default, sink)
                 sink_box.add(sink_label)
