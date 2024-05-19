@@ -83,8 +83,6 @@ class Display:
         bar.populate()
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
         bar.css(css_path)
-        # bar.css('style.css')
-        # bar.css('~/.config/pybar/style.css')
         try:
             bar.css(self.config['style'])
         except KeyError:

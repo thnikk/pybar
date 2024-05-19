@@ -1,6 +1,6 @@
-@define-color black rgba(28,31,38,0.9);
-@define-color gray rgba(255,255,255,0.05);
-@define-color light_gray rgba(255,255,255,0.35);
+@define-color black rgba(28, 31, 38, 1);
+@define-color gray rgba(255, 255, 255, 0.05);
+@define-color light_gray rgba(255, 255, 255, 0.35);
 @define-color white rgba(255, 255, 255, 0.7);
 @define-color red   #bf616a;
 @define-color blue  #8fa1be;
@@ -14,7 +14,7 @@ window {
 
 .bar {
 	padding: 5px;
-	background: @black;
+	background: alpha(@black, 0.8);
 	border: 1px solid @gray;
 	border-radius: 10px;
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
