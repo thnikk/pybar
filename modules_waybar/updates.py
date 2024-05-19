@@ -6,35 +6,33 @@ Author: thnikk
 import subprocess
 import concurrent.futures
 import json
-import time
 from datetime import datetime
-import os
 
 # You can add whatever package manager you want here with the appropriate
-# command. Change the separator and values to get the package and version from
+# command. Change the seperator and values to get the package and version from
 # each line.
 manager_config = {
     "Pacman": {
         "command": ["checkupdates"],
-        "separator": ' ',
+        "seperator": ' ',
         "empty_error": 2,
         "values": [0, -1]
     },
     "AUR": {
         "command": ["paru", "-Qum"],
-        "separator": ' ',
+        "seperator": ' ',
         "empty_error": 1,
         "values": [0, -1]
     },
     "Apt": {
         "command": ["apt", "list", "--upgradable"],
-        "separator": ' ',
+        "seperator": ' ',
         "empty_error": 1,
         "values": [0, 1]
     },
     "Flatpak": {
         "command": ["flatpak", "remote-ls", "--updates"],
-        "separator": '\t',
+        "seperator": '\t',
         "empty_error": 0,
         "values": [0, 2]
     },
@@ -44,7 +42,7 @@ manager_config = {
 alerts = ["linux", "discord", "qemu", "libvirt"]
 
 
-def get_output(command, separator, values, empty_error) -> list:
+def get_output(command, seperator, values, empty_error) -> list:
     """ Get formatted command output """
     # Get line-separated output
     while True:
@@ -68,11 +66,11 @@ def get_output(command, separator, values, empty_error) -> list:
     # Split each line into [package, version]
     split_output = [
         [
-            line.split(separator)[value].split('/')
+            line.split(seperator)[value].split('/')[0]
             for value in values
         ]
         for line in output
-        if len(line.split(separator)) > 1
+        if len(line.split(seperator)) > 1
     ]
     return split_output
 
@@ -91,7 +89,7 @@ def module(config) -> None:
     # Get output for each package manager
     for name, info in manager_config.items():
         thread = pool.submit(
-            get_output, info["command"], info["separator"], info["values"],
+            get_output, info["command"], info["seperator"], info["values"],
             info["empty_error"])
         package_managers[name] = thread.result()
     pool.shutdown(wait=True)
