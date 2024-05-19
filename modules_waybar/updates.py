@@ -7,9 +7,8 @@ import subprocess
 import concurrent.futures
 import json
 import time
+from datetime import datetime
 import os
-from modules_waybar.common import print_debug, Cache, ellipse
-import modules_waybar.tooltip as tt
 
 # You can add whatever package manager you want here with the appropriate
 # command. Change the separator and values to get the package and version from
@@ -53,18 +52,8 @@ def get_output(command, separator, values, empty_error) -> list:
             output = subprocess.run(
                 command, check=True, capture_output=True
             ).stdout.decode('utf-8').splitlines()
-        except subprocess.CalledProcessError as error:
-            # Use cache if no updates or command isn't found
-            if error.returncode != empty_error and error.returncode != 127:
-                # Print errors to stderr
-                print_debug(
-                    f"[{error.returncode}] "
-                    f"{vars(error)['stderr'].decode('utf-8').rstrip()}")
-                raise ValueError from error
-            # Otherwise set empty output
+        except (subprocess.CalledProcessError, FileNotFoundError):
             output = []
-        except FileNotFoundError:
-            pass
         break
     # Find lines containing alerts
     move = []
@@ -85,24 +74,6 @@ def get_output(command, separator, values, empty_error) -> list:
     return split_output
 
 
-def get_tooltip(package_managers) -> str:
-    """ Generate tooltip string """
-    tooltip = []
-    for name, packages in package_managers.items():
-        # Skip if no packages
-        if len(packages) == 0:
-            continue
-        # Add an extra list element to create a newline
-        if tooltip and packages:
-            tooltip.append('')
-        # Create package list
-        tooltip += [tt.heading(name)] + [
-            f"{ellipse(package): <20} {tt.span(version[:10], 'green')}"
-            for package, version in packages
-        ][:30]
-    return "\n".join(tooltip)
-
-
 def get_total(package_managers) -> int:
     """ Get total number of updates """
     return sum(len(packages) for packages in package_managers.values())
@@ -110,24 +81,17 @@ def get_total(package_managers) -> int:
 
 def module(config) -> None:
     """ Module """
-    cache = Cache(os.path.expanduser('~/.cache/updates.json'))
     pool = concurrent.futures.ThreadPoolExecutor(
         max_workers=len(manager_config))
-    try:
-        # Initialize dictionary first to set the order based on the config
-        package_managers = {name: [] for name in manager_config}
-        # Get output for each package manager
-        for name, info in manager_config.items():
-            thread = pool.submit(
-                get_output, info["command"], info["separator"], info["values"],
-                info["empty_error"])
-            package_managers[name] = thread.result()
-        pool.shutdown(wait=True)
-        cache.save(package_managers)
-    except ValueError:
-        time.sleep(5)
-        print_debug('Loading data from cache file.')
-        package_managers = cache.load()
+    # Initialize dictionary first to set the order based on the config
+    package_managers = {name: [] for name in manager_config}
+    # Get output for each package manager
+    for name, info in manager_config.items():
+        thread = pool.submit(
+            get_output, info["command"], info["separator"], info["values"],
+            info["empty_error"])
+        package_managers[name] = thread.result()
+    pool.shutdown(wait=True)
 
     # Create variable for output
     total = get_total(package_managers)
@@ -138,7 +102,7 @@ def module(config) -> None:
 
     output = {
         "text": text,
-        "tooltip": get_tooltip(package_managers),
+        "tooltip": datetime.now().timestamp(),
         "widget": package_managers
     }
     # Print for waybar
