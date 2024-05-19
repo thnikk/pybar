@@ -68,8 +68,11 @@ def get_output(command, separator, values, empty_error) -> list:
     # Split each line into [package, version]
     split_output = [
         [
-            line.split(separator)[value] for value in values
-        ] for line in output
+            line.split(separator)[value].split('/')
+            for value in values
+        ]
+        for line in output
+        if len(line.split(separator)) > 1
     ]
     return split_output
 
