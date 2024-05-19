@@ -37,6 +37,7 @@ class Module(Gtk.MenuButton):
         self.add(self.box)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
         self.add_events(Gdk.EventMask.SMOOTH_SCROLL_MASK)
+        self.connect('add', self.arrow)
 
     def set_widget(self, box):
         """ Set widget """
@@ -44,6 +45,15 @@ class Module(Gtk.MenuButton):
         widget.box.add(box)
         widget.draw()
         self.set_popover(widget)
+
+    def arrow(self, _container, _object):
+        """ Set popover direction """
+        window = self.get_toplevel()
+        if isinstance(window, Gtk.Window):
+            bottom = GtkLayerShell.get_anchor(
+                window, GtkLayerShell.Edge.BOTTOM)
+            if not bottom:
+                self.set_direction(Gtk.ArrowType.DOWN)
 
 
 GObject.signal_new(

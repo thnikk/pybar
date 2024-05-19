@@ -35,6 +35,9 @@ There are still some things missing, including:
 - [x] Reconnect to pulse server on connection loss
 - [x] Fix privacy module
 - [ ] Allow differently configured bars for different monitors.
+- [ ] Configurable bar position
+    - Only top and bottom allowed
+    - [ ] Draw widgets in the correct orientation when on top
 - [ ] Dynamically redraw widgets
 - [ ] Remove all custom styles when no module style is specified.
 

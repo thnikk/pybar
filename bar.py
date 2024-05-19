@@ -159,19 +159,31 @@ class Bar:
         """ Start bar """
         GtkLayerShell.init_for_window(self.window)
 
+        pos = {
+            "bottom": GtkLayerShell.Edge.BOTTOM,
+            "top": GtkLayerShell.Edge.TOP}
+
+        try:
+            position = pos[self.config['position']]
+        except KeyError:
+            position = pos['bottom']
+
         # Anchor and stretch to bottom of the screen
-        GtkLayerShell.set_anchor(self.window, GtkLayerShell.Edge.BOTTOM, 1)
+        GtkLayerShell.set_anchor(self.window, position, 1)
         GtkLayerShell.set_anchor(self.window, GtkLayerShell.Edge.LEFT, 1)
         GtkLayerShell.set_anchor(self.window, GtkLayerShell.Edge.RIGHT, 1)
 
         # Set margin to make bar more readable for testing
-        margin = 10
+        try:
+            margin = self.config['margin']
+        except KeyError:
+            margin = 10
+
         GtkLayerShell.set_margin(
             self.window, GtkLayerShell.Edge.LEFT, margin)
         GtkLayerShell.set_margin(
             self.window, GtkLayerShell.Edge.RIGHT, margin)
-        GtkLayerShell.set_margin(
-            self.window, GtkLayerShell.Edge.BOTTOM, margin)
+        GtkLayerShell.set_margin(self.window, position, margin)
 
         # Set namespace based on config
         if 'namespace' in list(self.config):
