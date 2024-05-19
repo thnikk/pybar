@@ -133,13 +133,24 @@ class Volume(c.Module):
 
     def scroll(self, module, event):
         """ Scroll action """
+        smooth, x, y = event.get_scroll_deltas()
+        smooth_dir = x + (y * -1)
         default = self.pulse.sink_default_get()
-        if event.direction == Gdk.ScrollDirection.UP:
+
+        if (
+            event.direction == Gdk.ScrollDirection.UP or
+            event.direction == Gdk.ScrollDirection.RIGHT or
+            (smooth and smooth_dir > 0)
+        ):
             if default.volume.value_flat < 1:
                 self.pulse.volume_change_all_chans(default, 0.01)
             else:
                 self.pulse.volume_set_all_chans(default, 1)
-        elif event.direction == Gdk.ScrollDirection.DOWN:
+        elif (
+            event.direction == Gdk.ScrollDirection.DOWN or
+            event.direction == Gdk.ScrollDirection.LEFT or
+            (smooth and smooth_dir < 0)
+        ):
             self.pulse.volume_change_all_chans(default, -0.01)
 
     def update(self):

@@ -37,24 +37,32 @@ def module(config=None):
 
     def scroll_action(button, event):
         """ Scroll action """
+        smooth, x, y = event.get_scroll_deltas()
+        smooth_dir = x + (y * -1)
         info = get_brightness()
-        if event.direction == Gdk.ScrollDirection.UP:
-            if info['brightness'] < info['max_brightness']:
-                info['brightness'] = round(
-                    info['brightness'] + (info['max_brightness'] * 0.01))
-            else:
-                info['brighntess'] = info['max_brightness']
-        elif event.direction == Gdk.ScrollDirection.DOWN:
-            if info['brightness'] > (info['max_brightness'] * 0.01):
-                info['brightness'] = round(
-                    info['brightness'] - (info['max_brightness'] * 0.01))
-            else:
-                info['brighntess'] = round(info['max_brightness'] * 0.01)
+        m, b = info['max_brightness'], info['brightness']
+
+        if (
+            event.direction == Gdk.ScrollDirection.UP or
+            event.direction == Gdk.ScrollDirection.RIGHT or
+            (smooth and smooth_dir > 0)
+        ):
+            b = round(b + (m * 0.01))
+        elif (
+            event.direction == Gdk.ScrollDirection.DOWN or
+            event.direction == Gdk.ScrollDirection.LEFT or
+            (smooth and smooth_dir < 0)
+        ):
+            b = round(b - (m * 0.01))
+
+        # Max/min values
+        b = round(max(min(b, m), m * 0.01))
+
         with open(
             "/sys/class/backlight/intel_backlight/brightness", 'w',
             encoding='utf-8'
         ) as file:
-            file.write(f"{round(info['brightness'])}")
+            file.write(f'{b}')
         update_module(info)
     module.connect('scroll-event', scroll_action)
 
