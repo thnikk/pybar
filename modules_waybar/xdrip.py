@@ -10,7 +10,7 @@ import os
 import configparser
 import sys
 import requests
-from modules_waybar.common import print_debug, Cache
+from modules_waybar.common import Cache
 
 
 def get_config() -> configparser.ConfigParser:
@@ -39,7 +39,8 @@ def get_data(config):
         try:
             data = cache.load()
         except FileNotFoundError:
-            print_debug("Couldn't connect to api or use cache file.")
+            print("Couldn't connect to api or use cache file.",
+                  file=sys.stderr)
             sys.exit(1)
     return data
 
@@ -77,7 +78,7 @@ def module(config):
 
     out_dict = {
         "text": f" {sgv} {arrows[direction]}",
-        "tooltip": f"{since_last} minute(s) ago\ndelta: {delta}",
+        "tooltip": datetime.now().timestamp(),
         "widget": {
             "sgv": sgv,
             "delta": delta,

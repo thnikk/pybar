@@ -10,7 +10,6 @@ import os
 import argparse
 import requests
 from modules_waybar.common import print_debug, Cache
-import modules_waybar.tooltip as tt
 
 
 def parse_args():
@@ -280,54 +279,6 @@ class Pollution():
         return self.__aqi_to_desc__(self.aqi[index])
 
 
-def tooltip(om, index, hours) -> str:
-    """ Generate tooltip """
-
-    if om.weather.daily.sunset > index > om.weather.daily.sunrise:
-        sun_status = f"Sunset at {om.weather.daily.sunset - 12}PM\n"
-    else:
-        sun_status = f"Sunrise at {om.weather.daily.sunrise}AM\n"
-
-    output = (
-        tt.heading('Today') + '\n'
-        f"City: {om.city}\n"
-        f"Description: {om.weather.hourly.description(index)}\n"
-        f"Temperature: {om.weather.hourly.temp(index)}\n"
-        f"Feels like: {om.weather.hourly.feelslike(index)}\n"
-        f"Humidity: {om.weather.hourly.humidity(index)}%\n"
-        f"Wind: {om.weather.hourly.wind(index)} mph\n"
-        f"Air quality: {om.pollution.description(index)}\n"
-        f"{sun_status}"
-        '\n' + tt.heading('Hourly forecast') + '\n'
-    )
-
-    hourly_output = []
-    for hour in range(1, (hours or 5) + 1):
-        hour_index = int(
-            (datetime.now() + timedelta(hours=hour)).strftime('%H'))
-        text = (datetime.now() + timedelta(hours=hour)).strftime("%l%P")
-        hourly_output.append(
-            f"{text}: {om.weather.hourly.temp(hour_index)} "
-            f"{om.weather.hourly.description(hour_index)}"
-        )
-    # Strip whitespace from hour if all shown hours have whitespace
-    if set(item[0] for item in hourly_output) == {' '}:
-        hourly_output = [item[1:] for item in hourly_output]
-    output += "\n".join(hourly_output) + "\n"
-
-    output += '\n' + tt.heading('Weekly forecast') + '\n'
-
-    for day in range(0, 6):
-        abbr = (datetime.now() + timedelta(days=day)).strftime('%A')[:2]
-        output += (
-            f"{abbr}: "
-            f"{om.weather.daily.low(day)}/{om.weather.daily.high(day)} "
-            f"{om.weather.daily.wind(day)} "
-            f"{om.weather.daily.description(day)}\n"
-        )
-    return output.strip()
-
-
 def widget(om, index, hours, night) -> dict:
     """ Generate tooltip """
 
@@ -418,7 +369,7 @@ def module(config):
     return {
             "text": f"{om.weather.hourly.icon(hour_now, night)} "
             f"{om.weather.hourly.temp(hour_now)}°F",
-            "tooltip": tooltip(om, hour_now, config['hours']),
+            "tooltip": datetime.now().timestamp(),
             "widget": widget(
                 om, hour_now, config['hours'], config['night_icons'])
         }

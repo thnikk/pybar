@@ -10,8 +10,6 @@ import json
 import re
 from datetime import datetime, timezone
 import sys
-from modules_waybar.common import print_debug
-import modules_waybar.tooltip as tt
 
 
 class Git:
@@ -74,9 +72,7 @@ class Git:
                     check=True, capture_output=True
                 ).stdout.decode('utf-8')
             except CalledProcessError as e:
-                lines = e.stderr.decode('utf-8').splitlines()
-                for line in lines:
-                    print_debug(line)
+                print(e, file=sys.stderr)
                 sys.exit(1)
         output = {}
         for line in command_output.splitlines():
@@ -119,20 +115,10 @@ def module(config):
     git.fetch()
     commits = git.commits()
 
-    tooltip = []
-    for commit, info in commits.items():
-        tooltip.append(
-            f"{tt.span(commit, 'blue')} {info['msg']} "
-            f"({tt.span(info['date'], 'green')})"
-        )
-        for file in info['files']:
-            tooltip.append(f'  {file}')
-        tooltip.append('')
-
     if commits:
         return {
             "text": f"{config['icon']} {len(commits)}",
-            "tooltip": "\n".join(tooltip).strip(),
+            "tooltip": datetime.now().timestamp(),
             "widget": {
                 "name": git.name, "commits": commits,
                 "path": os.path.expanduser(config["path"])}

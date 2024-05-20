@@ -6,7 +6,7 @@ Author: thnikk
 """
 import glob
 import json
-import modules_waybar.tooltip as tt
+from datetime import datetime
 
 
 def get_libvirt():
@@ -24,7 +24,7 @@ def module(_):
 
     return {
         "text": f" {str(len(domains))}",
-        "tooltip": "\n".join([tt.heading('Running VMs')] + domains),
+        "tooltip": datetime.now().timestamp(),
         "widget": {"libvirt": domains}
     }
 

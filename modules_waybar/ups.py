@@ -6,11 +6,8 @@ Author: thnikk
 """
 import json
 import argparse
-import sys
-import os
 import hid
-from modules_waybar.common import Cache
-import modules_waybar.tooltip as tt
+from datetime import datetime
 
 
 def parse_args():
@@ -76,7 +73,6 @@ class CyberPower:
 
 def module(config):
     """ Module """
-    cache = Cache(os.path.expanduser("~/.cache/ups.json"))
     if 'vendor' not in config:
         config['vendor'] = "0764"
     if 'product' not in config:
@@ -91,15 +87,7 @@ def module(config):
         )
         output = {
             "text": f" {ups.offset_watts()}W",
-            "tooltip": "\n".join([
-                tt.heading('UPS stats'),
-                f"Runtime: {ups.runtime()} minutes",
-                f"Load: {ups.load_watts()} Watts ({ups.load_percent()}%)",
-                f"Battery: {ups.battery_percent()}%",
-                f"AC power: {ups.ac()}",
-                f"Charging: {ups.charging()}",
-                f"Battery full: {ups.full()}",
-            ]),
+            "tooltip": datetime.now().timestamp(),
             "widget": {
                 "load_offset": ups.offset_watts(),
                 "runtime": ups.runtime(),
@@ -113,11 +101,10 @@ def module(config):
         }
         if not ups.ac():
             output['class'] = 'red'
-        cache.save(json.dumps(output))
         ups.close()
         return output
     except (hid.HIDException, IndexError):
-        return cache.load()
+        return None
 
 
 def main():
