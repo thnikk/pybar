@@ -39,6 +39,11 @@ class Module(Gtk.MenuButton):
         self.add_events(Gdk.EventMask.SMOOTH_SCROLL_MASK)
         self.connect('add', self.arrow)
 
+    def style(self, style_class):
+        """ Set style """
+        self.get_style_context().add_class(style_class)
+        return self
+
     def set_widget(self, box):
         """ Set widget """
         widget = Widget()
