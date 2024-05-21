@@ -14,35 +14,36 @@ from datetime import datetime
 manager_config = {
     "Pacman": {
         "command": ["checkupdates"],
+        "update_command": "sudo pacman -Syu",
         "seperator": ' ',
         "empty_error": 2,
         "values": [0, -1]
     },
     "AUR": {
         "command": ["paru", "-Qum"],
+        "update_command": "paru -Syua",
         "seperator": ' ',
         "empty_error": 1,
         "values": [0, -1]
     },
     "Apt": {
         "command": ["apt", "list", "--upgradable"],
+        "update_command": "sudo apt update && sudo apt upgrade",
         "seperator": ' ',
         "empty_error": 1,
         "values": [0, 1]
     },
     "Flatpak": {
         "command": ["flatpak", "remote-ls", "--updates"],
+        "update_command": "flatpak update",
         "seperator": '\t',
         "empty_error": 0,
         "values": [0, 2]
     },
 }
 
-# Alert for these packages
-alerts = ["linux", "discord", "qemu", "libvirt"]
 
-
-def get_output(command, seperator, values, empty_error) -> list:
+def get_output(command, seperator, values, empty_error, alerts) -> list:
     """ Get formatted command output """
     # Get line-separated output
     while True:
@@ -82,16 +83,23 @@ def get_total(package_managers) -> int:
 
 def module(config) -> None:
     """ Module """
+
+    if 'alerts' not in list(config):
+        config['alerts'] = ["linux", "discord", "qemu", "libvirt"]
+    if 'terminal' not in list(config):
+        config['terminal'] = 'kitty'
+
     pool = concurrent.futures.ThreadPoolExecutor(
         max_workers=len(manager_config))
     # Initialize dictionary first to set the order based on the config
-    package_managers = {name: [] for name in manager_config}
+    package_managers = {name: {} for name in manager_config}
     # Get output for each package manager
     for name, info in manager_config.items():
         thread = pool.submit(
             get_output, info["command"], info["seperator"], info["values"],
-            info["empty_error"])
-        package_managers[name] = thread.result()
+            info["empty_error"], config["alerts"])
+        package_managers[name]["packages"] = thread.result()
+        package_managers[name]["command"] = info["update_command"]
     pool.shutdown(wait=True)
 
     # Create variable for output
@@ -104,7 +112,10 @@ def module(config) -> None:
     output = {
         "text": text,
         "tooltip": datetime.now().timestamp(),
-        "widget": package_managers
+        "widget": {
+            "managers": package_managers,
+            "terminal": config["terminal"]
+        }
     }
     # Print for waybar
     return output

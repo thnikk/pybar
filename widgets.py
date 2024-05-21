@@ -125,18 +125,26 @@ def updates(name, module, cache):
         "Flatpak": "https://flathub.org/apps/search?q=",
     }
 
+    commands = [
+        info['command']
+        for manager, info in cache['managers'].items()
+        if info['packages']
+    ] + ['echo "Packages updated, press enter to close terminal."', 'read']
+
     def update_packages(widget, module):
         """ Update all packages """
         module.get_popover().popdown()
         Popen([
-            "kitty", "zsh", "-c", "paru; flatpak update;"
-            "echo Press enter to close terminal.; read"])
+            cache['terminal'], 'sh', '-c',
+            '; '.join(commands)
+        ])
 
     def click_link(_, url):
         """ Click action """
         Popen(['xdg-open', url])
 
-    for manager, packages in cache.items():
+    for manager, info in cache['managers'].items():
+        packages = info['packages']
         if not packages:
             continue
         manager_box = c.box('v', spacing=10)
