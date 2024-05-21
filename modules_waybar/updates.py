@@ -103,9 +103,14 @@ def module(config) -> None:
     pool.shutdown(wait=True)
 
     # Create variable for output
-    total = get_total(package_managers)
-    if total:
-        text = f" {total}"
+    packages = [manager['packages'] for manager in package_managers.values()]
+    print(packages)
+    num = 0
+    for group in packages:
+        num += len(group)
+
+    if num:
+        text = f" {num}"
     else:
         text = ""
 
