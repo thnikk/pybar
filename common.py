@@ -27,6 +27,7 @@ class Module(Gtk.MenuButton):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
+        self.default_styles = self.get_style_context().list_classes()
         self.box = box('h', spacing=5)
         if icon:
             self.icon = Gtk.Label()
@@ -38,6 +39,17 @@ class Module(Gtk.MenuButton):
         self.add_events(Gdk.EventMask.SCROLL_MASK)
         self.add_events(Gdk.EventMask.SMOOTH_SCROLL_MASK)
         self.connect('add', self.arrow)
+
+    def reset_style(self):
+        """ Reset module style back to default """
+        if self.default_styles != self.get_styles():
+            for style in self.get_styles():
+                if style not in self.default_styles:
+                    self.get_style_context().remove_class(style)
+
+    def get_styles(self):
+        """ Get styles """
+        return self.get_style_context().list_classes()
 
     def set_widget(self, box):
         """ Set widget """

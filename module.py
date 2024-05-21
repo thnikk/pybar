@@ -144,16 +144,11 @@ def module(name, config):
         except KeyError:
             pass
 
-        # print(name, module.get_style_context().list_classes())
-
         # Set class
-        try:
-            if not output['class']:
-                raise ValueError
+        module.reset_style()
+        if 'class' in list(output):
             c.add_style(module, output['class'])
-        except (KeyError, ValueError):
-            for s in ['red', 'green', 'blue', 'orange', 'yellow', 'gray']:
-                module.get_style_context().remove_class(s)
+
         return True
     if get_output():
         # Timeout of less than 1 second breaks tooltips

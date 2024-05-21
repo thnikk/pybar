@@ -34,12 +34,12 @@ There are still some things missing, including:
 - [x] Don't crash if there's no configuration for a module in the config file.
 - [x] Reconnect to pulse server on connection loss
 - [x] Fix privacy module
+- [x] Remove all custom styles when no module style is specified.
 - [ ] Allow differently configured bars for different monitors.
 - [ ] Configurable bar position
     - Only top and bottom allowed
     - [ ] Draw widgets in the correct orientation when on top
 - [ ] Dynamically redraw widgets
-- [ ] Remove all custom styles when no module style is specified.
 
 ### Installation
 As pybar is still under very active development, I haven't looked into packaging yet. For now, you can:
