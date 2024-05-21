@@ -129,7 +129,7 @@ def updates(name, module, cache):
         info['command']
         for manager, info in cache['managers'].items()
         if info['packages']
-    ] + ['echo "Packages updated, press enter to close terminal."', 'read']
+    ] + ['echo "Packages updated, press enter to close terminal."', 'read x']
 
     def update_packages(widget, module):
         """ Update all packages """
