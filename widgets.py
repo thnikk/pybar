@@ -20,6 +20,8 @@ def generic_widget(name, module, cache):
         category_box = c.box('v', spacing=10)
         category_box.add(c.label(category, style='title', ha='start'))
         item_box = c.box('v', style='box')
+        if not isinstance(items, list):
+            continue
         for item in items:
             item_box.add(c.label(item, style='inner-box'))
             if item != items[-1]:
@@ -279,6 +281,12 @@ def hoyo(name, module, cache):
     label = c.label(cache['Name'], style='heading')
     main_box.add(label)
 
+    # Icons
+    icons = [{
+        "Dailies completed": "", "Realm currency": "",
+        "Remaining boss discounts": ""},
+        {"Abyss progress": "", "Abyss stars": ""}]
+
     # Top section
     top_box = c.box('h', spacing=20)
     top_box.pack_start(c.label(
@@ -296,17 +304,18 @@ def hoyo(name, module, cache):
 
     # Info section
     info_box = c.box('v', style='box')
-    info = convert_list(cache)
-    for line in info:
+    for line in icons:
         info_line = c.box('h')
-        for item in line:
-            info_line.pack_start(
-                c.label(item, style='inner-box'), True, False, 0)
-            if item != line[-1] and item:
-                info_line.pack_start(c.sep('v'), 0, 0, 0)
-        info_box.pack_start(info_line, 0, 0, 0)
-        if line != info[-1] and line:
-            info_box.pack_start(c.sep('h'), 0, 0, 0)
+        for name, icon in line.items():
+            label = c.label(f'{icon} {cache[name]}', style='inner-box')
+            label.set_tooltip_text(name)
+            info_line.pack_start(label, 1, 0, 0)
+            if name != list(line)[-1]:
+                info_line.add(c.sep('v'))
+        info_box.add(info_line)
+        if line != list(icons)[-1]:
+            info_box.add(c.sep('h'))
+
     main_box.add(info_box)
 
     return main_box
@@ -441,29 +450,3 @@ def time_to_text(time_string) -> str:
         if value == 1:
             output.append(f'{value} {unit}')
     return " ".join(output)
-
-
-def convert_list(info) -> list:
-    """ test """
-    icons = [
-        {
-            "Dailies completed": "",
-            "Realm currency": "",
-            "SU weekly score": "",
-            "Remaining boss discounts": ""
-        },
-        {
-            "Abyss progress": "", "Abyss stars": ""
-        }
-    ]
-
-    output = []
-    for group in icons:
-        line = []
-        for item, icon in group.items():
-            try:
-                line.append(f'{icon} {info[item]}')
-            except KeyError:
-                pass
-        output.append(line)
-    return output
