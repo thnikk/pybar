@@ -104,7 +104,6 @@ def module(config) -> None:
 
     # Create variable for output
     packages = [manager['packages'] for manager in package_managers.values()]
-    print(packages)
     num = 0
     for group in packages:
         num += len(group)
