@@ -3,7 +3,7 @@
 Description: Loads the config and spawns the bar
 Author: thnikk
 """
-import concurrent.futures
+import threading
 import argparse
 import config as Config
 from bar import Display
@@ -25,7 +25,6 @@ def parse_args():
 
 def main():
     """ Main function """
-    executor = concurrent.futures.ThreadPoolExecutor()
     args = parse_args()
     config = Config.load(args.config)
 
@@ -57,15 +56,20 @@ def main():
             c.print_debug(
                 f'Starting thread for {name}', 'cache-waybar',
                 color='green')
-            executor.submit(
-                module.cache, name,
-                module_config['command'],
-                module_config['interval'],
-                config['cache']
-            )
+            thread = threading.Thread(
+                target=module.cache, args=(
+                    module_config['command'],
+                    module_config['interval'],
+                    config['cache']))
+            thread.daemon = True
+            thread.start()
         # Otherwise, load a built-in module
         else:
-            executor.submit(cache.cache, name, module_config, config['cache'])
+            thread = threading.Thread(
+                target=cache.cache, args=(
+                    name, module_config, config['cache']))
+            thread.daemon = True
+            thread.start()
 
     # Create display object
     display = Display(config)
