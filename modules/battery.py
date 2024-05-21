@@ -38,10 +38,19 @@ def widget(cache):
 def module(config=None):
     """ Battery module """
     module = c.Module()
+    c.add_style(module, 'module-fixed')
     module.icon.set_text('')
     icons = ['', '', '', '', '']
 
+    def get_ac():
+        """ Get AC status """
+        with open(
+            '/sys/class/power_supply/AC/online', 'r', encoding='utf-8'
+        ) as file:
+            return int(file.read().strip())
+
     def get_percent():
+        """ Get combined battery percentage"""
         info = {}
         full = 0
         now = 0
@@ -60,9 +69,15 @@ def module(config=None):
             module.set_widget(widget(info))
         percentage = round((now/full)*100)
         icon_index = int(percentage // (100 / len(icons)))
-        module.icon.set_label(icons[icon_index])
+        if get_ac():
+            module.icon.set_label('')
+        else:
+            try:
+                module.icon.set_label(icons[icon_index])
+            except IndexError:
+                module.icon.set_label(icons[-1])
         module.text.set_label(f'{percentage}%')
         return True
     if get_percent():
-        GLib.timeout_add(60000, get_percent)
+        GLib.timeout_add(10000, get_percent)
         return module

@@ -51,6 +51,11 @@ class Module(Gtk.MenuButton):
         """ Get styles """
         return self.get_style_context().list_classes()
 
+    def style(self, style_class):
+        """ Set style """
+        self.get_style_context().add_class(style_class)
+        return self
+
     def set_widget(self, box):
         """ Set widget """
         widget = Widget()
