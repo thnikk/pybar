@@ -26,17 +26,9 @@
 
 ### Goals
 There are still some things missing, including:
-- [x] All built-in modules should be included in this repo (they currently expect the waybar-modules repo in ~/.local/bin/bar)
-    - Figure out good packaging solution for dependencies like genshin.py
-- [x] Allow for more configuration of built-in widgets and don't use additional config files for modules.
-- [x] Store module output in memory instead of files. This should improve performance.
-    - Some modules still cache to a file, but I don't think this is an issue for modules that update frequently.
-- [x] Don't crash if there's no configuration for a module in the config file.
-- [x] Reconnect to pulse server on connection loss
-- [x] Fix privacy module
-- [x] Remove all custom styles when no module style is specified.
+- [ ] Implement system tray
 - [ ] Allow differently configured bars for different monitors.
-- [ ] Configurable bar position
+- [x] Configurable bar position
     - Only top and bottom allowed
     - [ ] Draw widgets in the correct orientation when on top
 - [ ] Dynamically redraw widgets
