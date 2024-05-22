@@ -22,6 +22,11 @@ from modules import privacy
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
+try:
+    import sni_system_tray
+except ImportError:
+    pass
+
 
 def cache(name, command, interval, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
@@ -49,6 +54,14 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
         time.sleep(interval)
 
 
+def tray_module(_):
+    """ tray """
+    tray = sni_system_tray.Tray({}, 'bottom')
+    c.add_style(tray, 'module')
+    sni_system_tray.init_tray([tray])
+    return tray
+
+
 def module(name, config):
     """ Waybar module """
     builtin = {
@@ -60,7 +73,8 @@ def module(name, config):
         'battery': battery.module,
         'power': power.module,
         'test': test.module,
-        'privacy': privacy.module
+        'privacy': privacy.module,
+        'tray': tray_module
     }
 
     all_widgets = {
