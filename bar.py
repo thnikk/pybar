@@ -70,16 +70,17 @@ class Display:
         """ Draw a new bar when a monitor is added """
         self.monitors = self.get_monitors()
         self.plugs = self.get_plugs()
-        self.draw_bar(monitor)
+        index = self.monitors.index(monitor)
+        self.draw_bar(monitor, self.plugs[index])
 
-    def draw_bar(self, monitor):
+    def draw_bar(self, monitor, plug):
         """ Draw a bar on a monitor """
         index = self.monitors.index(monitor)
         if 'outputs' in list(self.config):
             if self.plugs[index] not in self.config['outputs']:
                 self.bars.append(None)
                 return
-        bar = Bar(self.config, monitor, spacing=5)
+        bar = Bar(self.config, monitor, plug, spacing=5)
         bar.populate()
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
         bar.css(css_path)
@@ -93,12 +94,13 @@ class Display:
     def draw_all(self):
         """ Initialize all monitors """
         for monitor in self.monitors:
-            self.draw_bar(monitor)
+            index = self.monitors.index(monitor)
+            self.draw_bar(monitor, self.plugs[index])
 
 
 class Bar:
     """ Bar class"""
-    def __init__(self, config, monitor, spacing=0):
+    def __init__(self, config, monitor, plug, spacing=0):
         self.window = Gtk.Window()
         self.config = config
         self.bar = c.box('h', style='bar', spacing=spacing)
@@ -110,6 +112,7 @@ class Bar:
         self.bar.pack_end(self.right, 0, 0, 0)
         self.window.add(self.bar)
         self.monitor = monitor
+        self.plug = plug
 
     def populate(self):
         """ Populate bar with modules """
