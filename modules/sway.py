@@ -3,7 +3,7 @@
 Description: Properly threaded workspace module
 Author: thnikk
 """
-from subprocess import Popen, PIPE, STDOUT, DEVNULL, check_output, run
+from subprocess import Popen, PIPE, STDOUT, DEVNULL, run
 import threading
 import json
 import common as c
@@ -57,8 +57,10 @@ class Workspaces(Gtk.Box):
 
     def get_workspaces(self):
         """ Get workspaces with swaymsg """
-        raw = json.loads(check_output(
-            ['swaymsg', '-t', 'get_workspaces']))
+        raw = json.loads(run(
+            ['swaymsg', '-t', 'get_workspaces'],
+            check=True, capture_output=True
+        ).stdout.decode('utf-8'))
         workspaces = [workspace['name'] for workspace in raw]
         workspaces.sort()
         focused = [

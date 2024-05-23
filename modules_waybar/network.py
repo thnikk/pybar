@@ -3,7 +3,7 @@
 Description: Network module
 Author: thnikk
 """
-from subprocess import check_output
+from subprocess import run
 import json
 import argparse
 import sys
@@ -20,7 +20,9 @@ def get_args() -> argparse.ArgumentParser:
 
 def get_devices():
     """ Get active NetworkManager connections """
-    raw = check_output(['nmcli', 'd', 'show']).decode('utf-8')
+    raw = run(
+        ['nmcli', 'd', 'show'], check=True,
+        capture_output=True).stdout.decode('utf-8')
     devices = raw.split('\n\n')
     output = [
         {

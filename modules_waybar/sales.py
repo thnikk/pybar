@@ -3,7 +3,7 @@
 Description: Daily Etsy sales tracker that uses subprocess
 Author: thnikk
 """
-from subprocess import check_output
+from subprocess import run
 from datetime import datetime
 import json
 
@@ -12,15 +12,19 @@ def get_messages():
     """ Get email messages from notmuch matching criteria """
     mail = [
         line.split(':')[1].split()[0] for line in
-        check_output([
+        run([
             "notmuch", "search",
             "from:transaction@etsy.com and date:today "
             "and (subject:'Etsy order confirmation for' or "
-            "subject:'You made a sale on Etsy')"]).decode('utf-8').splitlines()
+            "subject:'You made a sale on Etsy')"],
+            check=False, capture_output=True
+            ).stdout.decode('utf-8').splitlines()
     ]
 
     messages = [
-        check_output(["notmuch", "show", id]).decode('utf-8')
+        run(
+            ["notmuch", "show", id], check=False, capture_output=True
+        ).stdout.decode('utf-8')
         for id in mail
     ]
     return messages

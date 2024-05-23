@@ -3,12 +3,9 @@
 Description: Helper functions
 Author: thnikk
 """
-import os
-import json
 import inspect
 from datetime import datetime
 import sys
-from subprocess import check_output
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
@@ -128,12 +125,6 @@ def slider(value, min=0, max=100, style=None):
     if style:
         widget.get_style_context().add_class(style)
     return widget
-
-
-def dict_from_cmd(command) -> dict:
-    """ Get json output of command """
-    command = [os.path.expanduser(part) for part in command]
-    return json.loads(check_output(command))
 
 
 def scroll(width=0, height=0, style=None):

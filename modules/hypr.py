@@ -5,7 +5,7 @@ Author: thnikk
 """
 import socket
 import os
-from subprocess import Popen, PIPE, STDOUT, DEVNULL, check_output, run
+from subprocess import DEVNULL, run
 import threading
 import json
 import common as c
@@ -66,13 +66,16 @@ class Workspaces(Gtk.Box):
             "workspaces": [
                 workspace['name'] for workspace in
                 json.loads(
-                    check_output(
-                        ['hyprctl', '-j', 'workspaces']).decode('utf-8'))
+                    run(
+                        ['hyprctl', '-j', 'workspaces'],
+                        check=True, capture_output=True
+                    ).stdout.decode('utf-8'))
             ],
             "focused": json.loads(
-                check_output(
-                    ['hyprctl', '-j', 'activeworkspace']
-                ).decode('utf-8'))['name']
+                run(
+                    ['hyprctl', '-j', 'activeworkspace'],
+                    check=True, capture_output=True
+                ).stdout.decode('utf-8'))['name']
         }
 
     def update(self):

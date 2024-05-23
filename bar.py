@@ -5,7 +5,7 @@ Author: thnikk
 """
 import gi
 import os
-from subprocess import check_output, run, CalledProcessError
+from subprocess import run, CalledProcessError
 import json
 import common as c
 import module
@@ -38,17 +38,19 @@ class Display:
         if self.wm == 'sway':
             return [
                 output['name'] for output in
-                json.loads(
-                    check_output(
-                        ["swaymsg", "-t", "get_outputs"]).decode('utf-8'))
+                json.loads(run(
+                    ["swaymsg", "-t", "get_outputs"],
+                    check=True, capture_output=True
+                ).stdout.decode('utf-8'))
                 if output['active']
             ]
         else:
             return [
                 output['name'] for output in
-                json.loads(check_output(
-                    ['hyprctl', '-j', 'monitors']
-                ).decode('utf-8'))
+                json.loads(run(
+                    ['hyprctl', '-j', 'monitors'],
+                    check=True, capture_output=True
+                ).stdout.decode('utf-8'))
                 if not output['disabled']
             ]
 

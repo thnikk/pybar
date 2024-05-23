@@ -4,7 +4,7 @@ Description: Track updates from git repo
 Author: thnikk
 """
 import os
-from subprocess import run, check_output, CalledProcessError
+from subprocess import run, CalledProcessError
 import argparse
 import json
 import re
@@ -20,10 +20,12 @@ class Git:
 
     def get_name(self) -> str:
         """ Get name of repo """
-        name = check_output(
-            ['git', '-C', os.path.expanduser(self.path),
-             'config', '--get', 'remote.origin.url']
-        ).decode().strip().split('/')[-1].split('.')[0].replace('-', ' ')
+        output = run([
+            'git', '-C', os.path.expanduser(self.path),
+            'config', '--get', 'remote.origin.url'],
+            check=True, capture_output=True
+        ).stdout.decode('utf-8')
+        name = output.strip().split('/')[-1].split('.')[0].replace('-', ' ')
         return name.capitalize()
 
     def fetch(self) -> None:

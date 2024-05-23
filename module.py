@@ -3,7 +3,7 @@
 Description: Load module and popover widgets
 Author: thnikk
 """
-from subprocess import check_output, CalledProcessError
+from subprocess import run, CalledProcessError
 import json
 import os
 import time
@@ -34,7 +34,9 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
         command = [os.path.expanduser(arg) for arg in command]
         # Try to get the output of the command
         try:
-            output = check_output(command).decode()
+            output = run(
+                command, check=True, capture_output=True
+            ).stdout.decode()
         # Print a message if it fails to load
         except CalledProcessError:
             c.print_debug('Failed to load module.', color='red', name=name)
