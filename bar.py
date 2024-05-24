@@ -65,6 +65,9 @@ class Display:
         """ Remove bar from bar list when a monitor is removed """
         index = self.monitors.index(monitor)
         plug = self.plugs[index]
+        if 'outputs' in list(self.config):
+            if plug not in self.config['outputs']:
+                return
         self.bars[plug].window.destroy()
         self.bars.pop(plug)
 
