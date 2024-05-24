@@ -22,7 +22,7 @@ class Display:
         self.display.connect("monitor-removed", self.removed)
         self.wm = self.get_wm()
         self.config = config
-        self.bars = []
+        self.bars = {}
         self.monitors = self.get_monitors()
         self.plugs = self.get_plugs()
 
@@ -64,9 +64,9 @@ class Display:
     def removed(self, display, monitor):
         """ Remove bar from bar list when a monitor is removed """
         index = self.monitors.index(monitor)
-        if self.bars[index]:
-            self.bars[index].window.destroy()
-        self.bars.remove(self.bars[index])
+        plug = self.plugs[index]
+        self.bars[plug].window.destroy()
+        self.bars.pop(plug)
 
     def added(self, display, monitor):
         """ Draw a new bar when a monitor is added """
@@ -77,9 +77,9 @@ class Display:
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
         index = self.monitors.index(monitor)
+        plug = self.plugs[index]
         if 'outputs' in list(self.config):
-            if self.plugs[index] not in self.config['outputs']:
-                self.bars.append(None)
+            if plug not in self.config['outputs']:
                 return
         bar = Bar(self.config, monitor, spacing=5)
         bar.populate()
@@ -90,7 +90,7 @@ class Display:
         except KeyError:
             pass
         bar.start()
-        self.bars.append(bar)
+        self.bars[plug] = bar
 
     def draw_all(self):
         """ Initialize all monitors """
