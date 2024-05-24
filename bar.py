@@ -84,7 +84,7 @@ class Display:
         if 'outputs' in list(self.config):
             if plug not in self.config['outputs']:
                 return
-        bar = Bar(self.config, monitor, spacing=5)
+        bar = Bar(self, monitor, spacing=5)
         bar.populate()
         css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
         bar.css(css_path)
@@ -103,9 +103,10 @@ class Display:
 
 class Bar:
     """ Bar class"""
-    def __init__(self, config, monitor, spacing=0):
+    def __init__(self, display, monitor, spacing=0):
         self.window = Gtk.Window()
-        self.config = config
+        self.display = display
+        self.config = display.config
         self.bar = c.box('h', style='bar', spacing=spacing)
         self.left = c.box('h', style='modules-left', spacing=spacing)
         self.center = c.box('h', style='modules-center', spacing=spacing)
@@ -124,7 +125,7 @@ class Bar:
             "modules-right": self.right,
         }.items():
             for name in self.config[section_name]:
-                loaded_module = module.module(name, self.config)
+                loaded_module = module.module(self, name, self.config)
                 if loaded_module:
                     section.add(loaded_module)
 

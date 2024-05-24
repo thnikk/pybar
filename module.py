@@ -51,7 +51,7 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
         time.sleep(interval)
 
 
-def module(name, config):
+def module(bar, name, config):
     """ Waybar module """
     builtin = {
         'clock': clock.module,
