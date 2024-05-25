@@ -126,7 +126,7 @@ def module(bar, name, config):
         # Set tooltip or popover
         try:
             if (
-                module.get_tooltip_markup() != output['tooltip']
+                module.get_tooltip_markup() != str(output['tooltip'])
                 and not module.get_active()
             ):
                 try:
