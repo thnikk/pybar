@@ -22,9 +22,8 @@ def parse_args():
 
 class CyberPower:
     """ Class for CyberPower UPS """
-    def __init__(self, vendor, product, offset) -> None:
-        self.device = hid.Device(
-            path=hid.enumerate(vendor, product)[0]['path'])
+    def __init__(self, device, offset) -> None:
+        self.device = device
         self.offset = offset
         self.status_report = self.device.get_feature_report(0x0b, 3)[1]
 
@@ -66,10 +65,6 @@ class CyberPower:
         """ Full status """
         return bool((self.status_report & 16) > 0)
 
-    def close(self) -> None:
-        """ Close device """
-        self.device.close()
-
 
 def module(config):
     """ Module """
@@ -80,28 +75,29 @@ def module(config):
     if 'offset' not in config:
         config['offset'] = 0
     try:
-        ups = CyberPower(
-            int(config['vendor'], 16),
-            int(config['product'], 16),
-            config['offset']
-        )
-        output = {
-            "text": f" {ups.offset_watts()}W",
-            "widget": {
-                "load_offset": ups.offset_watts(),
-                "runtime": ups.runtime(),
-                "load_watts": ups.load_watts(),
-                "load_percent": ups.load_percent(),
-                "battery": ups.battery_percent(),
-                "ac_power": ups.ac(),
-                "charging": ups.charging(),
-                "battery_full": ups.full()
+        with hid.Device(
+            path=hid.enumerate(
+                int(config['vendor'], 16),
+                int(config['product'], 16),
+            )[0]['path']
+        ) as device:
+            ups = CyberPower(device, config['offset'])
+            output = {
+                "text": f" {ups.offset_watts()}W",
+                "widget": {
+                    "load_offset": ups.offset_watts(),
+                    "runtime": ups.runtime(),
+                    "load_watts": ups.load_watts(),
+                    "load_percent": ups.load_percent(),
+                    "battery": ups.battery_percent(),
+                    "ac_power": ups.ac(),
+                    "charging": ups.charging(),
+                    "battery_full": ups.full()
+                }
             }
-        }
-        if not ups.ac():
-            output['class'] = 'red'
-        ups.close()
-        return output
+            if not ups.ac():
+                output['class'] = 'red'
+            return output
     except (hid.HIDException, IndexError):
         return None
 
