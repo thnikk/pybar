@@ -87,7 +87,6 @@ def module(config):
         )
         output = {
             "text": f" {ups.offset_watts()}W",
-            "tooltip": datetime.now().timestamp(),
             "widget": {
                 "load_offset": ups.offset_watts(),
                 "runtime": ups.runtime(),

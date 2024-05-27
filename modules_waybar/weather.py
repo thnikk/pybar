@@ -369,7 +369,6 @@ def module(config):
     return {
             "text": f"{om.weather.hourly.icon(hour_now, night)} "
             f"{om.weather.hourly.temp(hour_now)}°F",
-            "tooltip": datetime.now().timestamp(),
             "widget": widget(
                 om, hour_now, config['hours'], config['night_icons'])
         }

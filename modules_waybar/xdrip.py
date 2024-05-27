@@ -78,7 +78,6 @@ def module(config):
 
     out_dict = {
         "text": f" {sgv} {arrows[direction]}",
-        "tooltip": datetime.now().timestamp(),
         "widget": {
             "sgv": sgv,
             "delta": delta,

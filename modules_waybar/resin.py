@@ -67,8 +67,6 @@ def genshin_module(cache):
 
     output['text'] = f"{cache['Icon']} {cache['Resin']}"
 
-    output['tooltip'] = cache['timestamp']
-
     output['widget'] = cache
     return output
 

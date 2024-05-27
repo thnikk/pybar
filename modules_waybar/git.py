@@ -120,7 +120,6 @@ def module(config):
     if commits:
         return {
             "text": f"{config['icon']} {len(commits)}",
-            "tooltip": datetime.now().timestamp(),
             "widget": {
                 "name": git.name, "commits": commits,
                 "path": os.path.expanduser(config["path"])}

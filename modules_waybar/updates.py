@@ -115,7 +115,6 @@ def module(config) -> None:
 
     output = {
         "text": text,
-        "tooltip": datetime.now().timestamp(),
         "widget": {
             "managers": package_managers,
             "terminal": config["terminal"]

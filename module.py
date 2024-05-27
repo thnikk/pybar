@@ -111,22 +111,25 @@ def module(bar, name, config):
 
         # I don't know why this would ever be a string
         if isinstance(output, str):
+            c.print_debug(output)
             return True
 
-        # Set label
-        if output['text']:
-            module.set_visible(True)
-            module.set_label(output['text'])
-        else:
-            if module.get_visible():
+        if output['text'] != module.cache.text:
+            if output['text']:
+                module.set_label(output['text'])
+                module.set_visible(True)
+            else:
                 module.set_visible(False)
-                module.set_label('')
-            return True
+            module.cache.text = output['text']
 
-        # Set tooltip or popover
-        try:
+        if 'tooltip' in output and output['tooltip'] != module.cache.tooltip:
+            if output['tooltip']:
+                module.set_tooltip_text(str(output['tooltip']))
+                module.cache.tooltip = output['tooltip']
+
+        if 'widget' in output:
             if (
-                module.get_tooltip_markup() != str(output['tooltip'])
+                output['widget'] != module.cache.widget
                 and not module.get_active()
             ):
                 try:
@@ -137,14 +140,7 @@ def module(bar, name, config):
                     module.set_widget(
                         widgets.generic_widget(
                             name, module, output['widget']))
-                module.set_tooltip_markup(str(output['tooltip']))
-            try:
-                output['widget']
-                module.set_has_tooltip(False)
-            except KeyError:
-                pass
-        except KeyError:
-            pass
+                module.cache.widget = output['widget']
 
         # Set class
         module.reset_style()

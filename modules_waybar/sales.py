@@ -62,7 +62,6 @@ def module(_):
     if messages:
         output = {
             "text": f' {len(messages)}',
-            "tooltip": f'{datetime.now().timestamp()}',
             "widget": {"orders": widget}
         }
     else:

@@ -24,7 +24,6 @@ def module(_):
 
     return {
         "text": f" {str(len(domains))}",
-        "tooltip": datetime.now().timestamp(),
         "widget": {"libvirt": domains}
     }
 

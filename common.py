@@ -18,10 +18,19 @@ align = {
 }
 
 
+class ModuleCache():
+    def __init__(self):
+        self.text = None
+        self.icon = None
+        self.tooltip = None
+        self.widget = None
+
+
 class Module(Gtk.MenuButton):
     """ Template module """
     def __init__(self, icon=True, text=True):
         super().__init__()
+        self.cache = ModuleCache()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
         self.default_styles = self.get_style_context().list_classes()

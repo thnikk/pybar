@@ -42,7 +42,6 @@ def module(config={}):
     output = {'text': '', 'tooltip': ''}
     if num_failed >= 1:
         output['text'] = f' {num_failed}'
-    output['tooltip'] = datetime.now().timestamp()
     output['widget'] = {
         "System": failed_system,
         "User": failed_user
