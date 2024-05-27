@@ -6,6 +6,8 @@ Author: thnikk
 import common as c
 import threading
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
+import os
+import signal
 import gi
 import time
 gi.require_version('Gtk', '3.0')
@@ -15,6 +17,8 @@ from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 class Privacy(c.Module):
     def __init__(self, config):
         super().__init__()
+        self.alive = True
+        self.pid = None
         c.add_style(self, 'green')
         self.text.show()
         self.box.show()
@@ -23,10 +27,17 @@ class Privacy(c.Module):
         thread = threading.Thread(target=self.listen_wrapper)
         thread.daemon = True
         thread.start()
+        self.connect('destroy', self.destroy)
+
+    def destroy(self, _):
+        """ Clean up thread """
+        os.kill(self.pid, signal.SIGTERM)
+        self.alive = False
+        c.print_debug('thread killed')
 
     def listen_wrapper(self):
         """ Wrapper to auto-reconnect to listen function """
-        while True:
+        while self.alive:
             try:
                 self.listen()
             except CalledProcessError:
@@ -39,6 +50,7 @@ class Privacy(c.Module):
         device = {}
         with Popen(['pw-mon', '-a'],
                    stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
+            self.pid = p.pid
             for line in p.stdout:
                 line = line.decode('utf-8').rstrip()
 

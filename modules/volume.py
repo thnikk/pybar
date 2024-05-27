@@ -15,6 +15,7 @@ from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 class Volume(c.Module):
     def __init__(self, config):
         super().__init__()
+        self.alive = True
 
         while True:
             try:
@@ -44,6 +45,12 @@ class Volume(c.Module):
         thread = threading.Thread(target=self.pulse_thread)
         thread.daemon = True
         thread.start()
+
+        self.connect('destroy', self.destroy)
+
+    def destroy(self, _):
+        """ Clean up thread """
+        self.alive = False
 
     def set_volume(self, module, sink):
         """ Set volume for sink/source/sink-input """
@@ -117,9 +124,10 @@ class Volume(c.Module):
 
     def pulse_thread(self):
         """ Seperate thread for listening for events """
-        while True:
+        while self.alive:
             self.pulse_listen()
             GLib.idle_add(self.update)
+        c.print_debug('thread killed')
 
     def switch_outputs(self, module, event):
         """ Right click action """

@@ -6,6 +6,8 @@ Author: thnikk
 from subprocess import Popen, PIPE, STDOUT, DEVNULL, run
 import threading
 import json
+import os
+import signal
 import common as c
 import gi
 gi.require_version('Gtk', '3.0')
@@ -16,6 +18,8 @@ from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject, GLib  # noqa
 class Workspaces(Gtk.Box):
     def __init__(self, config):
         super().__init__()
+        self.alive = True
+        self.pid = None
         c.add_style(self, 'workspaces')
 
         # Set up buttons
@@ -40,6 +44,13 @@ class Workspaces(Gtk.Box):
         thread = threading.Thread(target=self.listen)
         thread.daemon = True
         thread.start()
+        self.connect('destroy', self.destroy)
+
+    def destroy(self, _):
+        """ Clean up thread """
+        os.kill(self.pid, signal.SIGTERM)
+        self.alive = False
+        c.print_debug('thread killed')
 
     def switch(self, button, workspace):
         """ Click action """
@@ -49,9 +60,10 @@ class Workspaces(Gtk.Box):
 
     def listen(self):
         """ Listen for events and update the box when there's a new one """
-        while True:
+        while self.alive:
             with Popen(['swaymsg', '-t', 'subscribe', '["workspace"]', '-m'],
                        stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
+                self.pid = p.pid
                 for line in p.stdout:
                     GLib.idle_add(self.update)
 
