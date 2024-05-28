@@ -84,6 +84,10 @@ scrollbar {
 
 scrollbar slider { background: none; border: none; }
 
+levelbar trough { border-radius: 6px; min-height: 6px; border: none; background: @black; }
+levelbar block { border-radius: 3px; border: none; }
+levelbar block.filled { background-color: @green; }
+
 scale contents trough { background: @black; border: 1px solid @gray; }
 scale contents trough highlight { background: @blue; }
 

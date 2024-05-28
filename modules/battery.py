@@ -19,11 +19,16 @@ def widget(cache):
     outer_box.add(c.label('Devices', style='title', ha='start'))
     battery_box = c.box('v', style='box')
     for device, info in cache.items():
-        device_box = c.box('h', style='inner-box')
-        percentage = str(round((
+        device_box = c.box('h', style='inner-box', spacing=10)
+        percentage = round((
             info['energy_now'] / info['energy_full']
-        )*100))
+        )*100)
+        level = Gtk.LevelBar().new_for_interval(0, 100)
+        level.set_value(percentage)
         device_box.pack_start(c.label(device), 0, 0, 0)
+        level_box = c.box('v')
+        level_box.pack_start(level, 1, 0, 0)
+        device_box.pack_start(level_box, 1, 1, 0)
         device_box.pack_end(c.label(f'{percentage}%'), 0, 0, 0)
         battery_box.add(device_box)
         if device != list(cache)[-1]:
