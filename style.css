@@ -88,11 +88,17 @@ levelbar trough { border-radius: 6px; min-height: 6px; border: none; background:
 levelbar block { border-radius: 3px; border: none; }
 levelbar block.filled { background-color: @green; }
 
-scale contents trough { background: @black; border: 1px solid @gray; }
-scale contents trough highlight { background: @blue; }
+scale contents trough { padding: 3px; background: @black; border: none; }
+scale contents trough highlight {
+	border: none;
+	min-height: 4px;
+	background: alpha(@blue, 1);
+}
 
 scale contents trough slider {
-	background: #1c1f26;
+	background: #4b505b;
+	border: 1px solid @gray;
+	box-shadow: none;
 	/* border-radius: 0px; */
 }
 
