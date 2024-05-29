@@ -26,12 +26,12 @@
 
 ### Goals
 There are still some things missing, including:
-- [ ] Implement system tray
-- [ ] Allow differently configured bars for different monitors.
+- [ ] ~~Implement system tray~~
+    - I don't like trays and would like for there to be no need for one. Some programs require a tray, so I would like to split this into a separate project that pybar can interface with. Ideally, pybar would show the number of active tray icons and have a widget for accessing icons, but a separate daemon would be running.
 - [x] Configurable bar position
     - Only top and bottom allowed
-    - [ ] Draw widgets in the correct orientation when on top
-- [ ] Dynamically redraw widgets
+    - [x] Draw widgets in the correct orientation when on top
+- [ ] Allow differently configured bars for different monitors.
 
 ### Installation
 As pybar is still under very active development, I haven't looked into packaging yet. For now, you can:
