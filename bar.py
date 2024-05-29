@@ -7,6 +7,7 @@ import gi
 import os
 from subprocess import run, CalledProcessError
 import json
+import time
 import common as c
 import module
 gi.require_version('Gtk', '3.0')
@@ -79,8 +80,17 @@ class Display:
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
-        index = self.monitors.index(monitor)
-        plug = self.plugs[index]
+        try_count = 0
+        while True:
+            try:
+                index = self.monitors.index(monitor)
+                plug = self.plugs[index]
+                break
+            except IndexError:
+                if try_count >= 3:
+                    return
+                time.sleep(1)
+                try_count += 1
         if 'outputs' in list(self.config):
             if plug not in self.config['outputs']:
                 return
