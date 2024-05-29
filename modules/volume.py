@@ -13,8 +13,9 @@ from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 
 
 class Volume(c.Module):
-    def __init__(self, config):
+    def __init__(self, bar, config):
         super().__init__()
+        self.set_position(bar.position)
         self.alive = True
 
         while True:
@@ -207,13 +208,13 @@ class Volume(c.Module):
         self.set_popover(widget)
 
 
-def module(config=None):
+def module(bar, config=None):
     """ PulseAudio module """
     if not config:
         config = {}
     if 'icons' not in config:
         config['icons'] = {}
 
-    module = Volume(config)
+    module = Volume(bar, config)
 
     return module

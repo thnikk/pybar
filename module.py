@@ -53,7 +53,7 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
 
 def module(bar, name, config):
     """ Waybar module """
-    builtin = {
+    cacheless = {
         'clock': clock.module,
         'workspaces': sway.module,
         'hyprland': hypr.module,
@@ -81,14 +81,15 @@ def module(bar, name, config):
     if "cache" not in list(config):
         config['cache'] = '~/.cache/pybar'
 
-    if name in list(builtin):
+    if name in list(cacheless):
         try:
             config = config['modules'][name]
         except KeyError:
             config = None
-        return builtin[name](config)
+        return cacheless[name](bar, config)
 
     module = c.Module(0, 1)
+    module.set_position(bar.position)
     module.set_visible(False)
     module.set_no_show_all(True)
 

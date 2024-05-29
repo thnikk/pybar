@@ -96,7 +96,7 @@ class Workspaces(Gtk.Box):
                 c.del_style(button, 'focused')
 
 
-def module(config=None):
+def module(bar, config=None):
     """ Sway module """
 
     if not config:

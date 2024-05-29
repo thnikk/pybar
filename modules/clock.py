@@ -207,9 +207,10 @@ def widget():
     return widget
 
 
-def module(config=None):
+def module(bar, config=None):
     """ Clock module """
     module = c.Module()
+    module.set_position(bar.position)
     module.icon.set_label('')
 
     module.set_widget(widget())

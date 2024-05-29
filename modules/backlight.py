@@ -31,9 +31,10 @@ def widget(cache):
     return main_box
 
 
-def module(config=None):
+def module(bar, config=None):
     """ Backlight module """
     module = c.Module()
+    module.set_position(bar.position)
     c.add_style(module, 'module-fixed')
     module.icon.set_label('')
 

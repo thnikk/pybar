@@ -7,9 +7,10 @@ import common as c
 from subprocess import run
 
 
-def module(config=None):
+def module(bar, config=None):
     """ Power module """
     module = c.Module(1, 0)
+    module.set_position(bar.position)
     module.icon.set_label('')
 
     def power_action(button, command, widget):

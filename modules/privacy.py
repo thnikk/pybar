@@ -15,8 +15,9 @@ from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 
 class Privacy(c.Module):
-    def __init__(self, config):
+    def __init__(self, bar, config):
         super().__init__()
+        self.set_position(bar.position)
         self.alive = True
         self.pid = None
         c.add_style(self, 'green')
@@ -155,9 +156,9 @@ class Privacy(c.Module):
             self.hide()
 
 
-def module(config=None):
+def module(bar, config=None):
     """ PulseAudio module """
 
-    module = Privacy(config)
+    module = Privacy(bar, config)
 
     return module

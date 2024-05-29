@@ -117,6 +117,10 @@ class Bar:
         self.window = Gtk.Window()
         self.display = display
         self.config = display.config
+        try:
+            self.position = display.config['position']
+        except KeyError:
+            self.position = 'bottom'
         self.bar = c.box('h', style='bar', spacing=spacing)
         self.left = c.box('h', style='modules-left', spacing=spacing)
         self.center = c.box('h', style='modules-center', spacing=spacing)
@@ -177,10 +181,11 @@ class Bar:
 
         pos = {
             "bottom": GtkLayerShell.Edge.BOTTOM,
-            "top": GtkLayerShell.Edge.TOP}
+            "top": GtkLayerShell.Edge.TOP
+        }
 
         try:
-            position = pos[self.config['position']]
+            position = pos[self.position]
         except KeyError:
             position = pos['bottom']
 

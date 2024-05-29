@@ -9,8 +9,9 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
-def module(config=None):
+def module(bar, config=None):
     module = c.Module()
+    module.set_position(bar.position)
     module.icon.set_label('')
     module.text.set_label('0')
 
