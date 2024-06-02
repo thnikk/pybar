@@ -16,3 +16,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/thnikk/pybar"
 Issues = "https://github.com/thnikk/pybar/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
