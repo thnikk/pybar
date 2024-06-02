@@ -1,0 +1,18 @@
+[project]
+name = "pybar_thnikk"
+version = "0.9.0"
+authors = [
+  { name="Jack Reitano", email="thnikk645@gmail.com" },
+]
+description = "A statusbar for sway with clickable widgets"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/thnikk/pybar"
+Issues = "https://github.com/thnikk/pybar/issues"
