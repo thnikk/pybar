@@ -6,15 +6,15 @@ Author: thnikk
 import os
 import time
 import json
-import common as c
-from modules_waybar import git
-from modules_waybar import network
-from modules_waybar import updates
-from modules_waybar import xdrip
-from modules_waybar import weather
-from modules_waybar import vm
-from modules_waybar import systemd
-from modules_waybar import sales
+from . import common as c
+from .modules_waybar import git
+from .modules_waybar import network
+from .modules_waybar import updates
+from .modules_waybar import xdrip
+from .modules_waybar import weather
+from .modules_waybar import vm
+from .modules_waybar import systemd
+from .modules_waybar import sales
 
 functions = {
     "git": git.module,

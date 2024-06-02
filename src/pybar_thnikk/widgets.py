@@ -3,7 +3,7 @@
 Description: Widgets
 Author: thnikk
 """
-import common as c
+from . import common as c
 from subprocess import run, Popen
 
 

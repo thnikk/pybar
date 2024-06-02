@@ -8,7 +8,7 @@ import os
 from subprocess import DEVNULL, run
 import threading
 import json
-import common as c
+from .. import common as c
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')

@@ -3,7 +3,7 @@
 Description: Privacy module
 Author: thnikk
 """
-import common as c
+from .. import common as c
 import threading
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import os

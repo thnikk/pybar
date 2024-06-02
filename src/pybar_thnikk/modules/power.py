@@ -3,7 +3,7 @@
 Description: Power module
 Author: thnikk
 """
-import common as c
+from .. import common as c
 from subprocess import run
 
 

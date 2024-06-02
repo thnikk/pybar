@@ -5,11 +5,11 @@ Author: thnikk
 """
 import threading
 import argparse
-import config as Config
-from bar import Display
-import common as c
-import module
-import cache
+from . import config as Config
+from .bar import Display
+from . import common as c
+from . import module
+from . import cache
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk  # noqa

@@ -3,7 +3,7 @@
 Description: Battery module
 Author: thnikk
 """
-import common as c
+from .. import common as c
 from glob import glob
 import gi
 gi.require_version('Gtk', '3.0')

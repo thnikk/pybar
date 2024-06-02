@@ -9,7 +9,7 @@ import json
 import os
 import argparse
 import requests
-from modules_waybar.common import print_debug, Cache
+from ..modules_waybar.common import print_debug, Cache
 
 
 def parse_args():
