@@ -18,6 +18,7 @@ from modules import volume
 from modules import power
 from modules import backlight
 from modules import test
+from modules import toggle
 from modules import privacy
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
@@ -62,6 +63,7 @@ def module(bar, name, config):
         'battery': battery.module,
         'power': power.module,
         'test': test.module,
+        'toggle': toggle.module,
         'privacy': privacy.module
     }
 

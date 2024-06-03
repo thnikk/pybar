@@ -102,6 +102,21 @@ scale contents trough slider {
 	/* border-radius: 0px; */
 }
 
+switch {
+	/* border: 1px solid @gray; */
+	border: none;
+	background: @white;
+	min-height: 1px;
+	min-width: 1px;
+}
+switch slider {
+	background: @black;
+	margin: 2px;
+	border: none;
+	min-height: 1px;
+	min-width: 1px;
+}
+
 /* levelbar trough { */
 /* 	border: 1px solid @gray; */
 /* 	padding: 2px; */
