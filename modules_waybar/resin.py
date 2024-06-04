@@ -73,9 +73,12 @@ def genshin_module(cache):
 
 def module(module_config):
     """ Module """
-    cache = asyncio.run(generate_cache(module_config))
-    output = genshin_module(cache)
-    return output
+    try:
+        cache = asyncio.run(generate_cache(module_config))
+        output = genshin_module(cache)
+        return output
+    except (TypeError, TimeoutError):
+        return None
 
 
 def main():
