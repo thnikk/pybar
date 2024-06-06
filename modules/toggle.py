@@ -42,8 +42,8 @@ def module(bar, config=None):
         icon = config['icon']
     else:
         icon = ''
-    if 'command' in list(config):
-        command = config['command']
+    if 'program' in list(config):
+        command = config['program']
     else:
         command = ['tail', '-f', '/dev/null']
     module = switch(icon, command)
