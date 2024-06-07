@@ -8,18 +8,18 @@ import json
 import os
 import time
 import gi
-import common as c
-import widgets
-from modules import sway
-from modules import hypr
-from modules import clock
-from modules import battery
-from modules import volume
-from modules import power
-from modules import backlight
-from modules import test
-from modules import toggle
-from modules import privacy
+from . import common as c
+from . import widgets
+from .modules import sway
+from .modules import hypr
+from .modules import clock
+from .modules import battery
+from .modules import volume
+from .modules import power
+from .modules import backlight
+from .modules import test
+from .modules import toggle
+from .modules import privacy
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 

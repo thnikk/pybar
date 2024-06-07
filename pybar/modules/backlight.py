@@ -3,7 +3,7 @@
 Description: Backlight module
 Author: thnikk
 """
-import common as c
+from .. import common as c
 import os
 import gi
 gi.require_version('Gtk', '3.0')

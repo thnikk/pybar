@@ -3,7 +3,7 @@
 Description: Toggle module
 Author: thnikkk
 """
-import common as c
+from .. import common as c
 from subprocess import Popen, DEVNULL
 import gi
 gi.require_version('Gtk', '3.0')

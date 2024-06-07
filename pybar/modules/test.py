@@ -3,7 +3,7 @@
 Description: Test module
 Author: thnikkk
 """
-import common as c
+from .. import common as c
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa

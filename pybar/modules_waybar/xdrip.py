@@ -10,7 +10,7 @@ import os
 import configparser
 import sys
 import requests
-from modules_waybar.common import Cache
+from .common import Cache
 
 
 def get_config() -> configparser.ConfigParser:

@@ -3,7 +3,7 @@
 Description: Pulse module
 Author: thnikk
 """
-import common as c
+from .. import common as c
 import pulsectl
 import threading
 import time

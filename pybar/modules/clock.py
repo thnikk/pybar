@@ -3,7 +3,7 @@
 Description: Clock widget
 Author: thnikk
 """
-import common as c
+from .. import common as c
 from datetime import datetime
 import calendar
 import os
