@@ -54,7 +54,10 @@ def module(config):
     ):
         return None
 
-    data = get_data(config)
+    try:
+        data = get_data(config)
+    except TimeoutError:
+        return False
 
     last_sgv = data[1]["sgv"]
     sgv = data[0]["sgv"]
