@@ -59,9 +59,11 @@ def module(config):
     except TimeoutError:
         return False
 
-    last_sgv = data[1]["sgv"]
     sgv = data[0]["sgv"]
-    # delta = data[0]["delta"]
+    try:
+        last_sgv = data[1]["sgv"]
+    except IndexError:
+        last_sgv = sgv
     delta = sgv - last_sgv
     direction = data[0]["direction"]
     date = datetime.strptime(data[0]["dateString"], "%Y-%m-%dT%H:%M:%S.%f%z")
