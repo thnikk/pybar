@@ -56,8 +56,8 @@ def module(config):
 
     try:
         data = get_data(config)
-    except TimeoutError:
-        return False
+    except (requests.exceptions.ReadTimeout, TimeoutError):
+        return None
 
     sgv = data[0]["sgv"]
     try:
