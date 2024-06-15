@@ -7,6 +7,7 @@ from subprocess import run, CalledProcessError
 import json
 import os
 import time
+from datetime import datetime
 import gi
 import common as c
 import widgets
@@ -83,12 +84,13 @@ def module(bar, name, config):
     if "cache" not in list(config):
         config['cache'] = '~/.cache/pybar'
 
+    try:
+        module_config = config['modules'][name]
+    except KeyError:
+        module_config = {}
+
     if name in list(cacheless):
-        try:
-            config = config['modules'][name]
-        except KeyError:
-            config = None
-        return cacheless[name](bar, config)
+        return cacheless[name](bar, module_config)
 
     module = c.Module(0, 1)
     module.set_position(bar.position)
@@ -144,6 +146,14 @@ def module(bar, name, config):
                         widgets.generic_widget(
                             name, module, output['widget']))
                 module.cache.widget = output['widget']
+
+        # Override class and set to gray if module is stale
+        if 'interval' in module_config and 'timestamp' in output:
+            if (
+                datetime.now() -
+                datetime.fromtimestamp(output['timestamp'])
+            ).seconds > module_config['interval'] * 2:
+                output['class'] = 'gray'
 
         # Set class
         module.reset_style()

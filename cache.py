@@ -6,6 +6,7 @@ Author: thnikk
 import os
 import time
 import json
+from datetime import datetime
 import traceback
 import common as c
 from modules_waybar import git
@@ -64,6 +65,7 @@ def cache(name, config, cache_dir='~/.cache/pybar'):
 
         # Don't write to file if module returned nothing
         if output:
+            output['timestamp'] = datetime.now().timestamp()
             with open(
                 f'{cache_dir}/{name}.json', 'w', encoding='utf-8'
             ) as file:
