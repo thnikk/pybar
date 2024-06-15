@@ -6,6 +6,7 @@ Author: thnikk
 import os
 import time
 import json
+import traceback
 import common as c
 from modules_waybar import git
 from modules_waybar import network
@@ -53,18 +54,25 @@ def cache(name, config, cache_dir='~/.cache/pybar'):
         cache_dir = os.path.expanduser(cache_dir)
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
-        output = functions[name](config)
+        try:
+            output = functions[name](config)
+        except BaseException:
+            c.print_debug(
+                "Caught exception:", name=f"cache-{name}", color='red')
+            print(traceback.format_exc())
+            output = None
 
         # Don't write to file if module returned nothing
-        if not output:
-            continue
+        if output:
+            with open(
+                f'{cache_dir}/{name}.json', 'w', encoding='utf-8'
+            ) as file:
+                try:
+                    file.write(json.dumps(output, indent=4))
+                except json.decoder.JSONDecodeError:
+                    c.print_debug(
+                        'Failed to load module.', color='red', name=name)
 
-        with open(f'{cache_dir}/{name}.json', 'w', encoding='utf-8') as file:
-            try:
-                file.write(json.dumps(output, indent=4))
-            except json.decoder.JSONDecodeError:
-                c.print_debug('Failed to load module.', color='red', name=name)
-                pass
         try:
             time.sleep(config['interval'])
         except KeyError:
