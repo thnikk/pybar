@@ -91,7 +91,6 @@ levelbar block.filled { background-color: @green; }
 scale contents trough { padding: 3px; background: @black; border: none; }
 scale contents trough highlight {
 	border: none;
-	min-height: 4px;
 	background: alpha(@blue, 1);
 }
 
@@ -99,11 +98,9 @@ scale contents trough slider {
 	background: #4b505b;
 	border: 1px solid @gray;
 	box-shadow: none;
-	/* border-radius: 0px; */
 }
 
 switch {
-	/* border: 1px solid @gray; */
 	border: none;
 	background: @white;
 	min-height: 1px;
