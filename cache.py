@@ -34,11 +34,20 @@ try:
     functions['ups'] = ups.module
 except ModuleNotFoundError as e:
     c.print_debug(f'{e}', color='yellow', name='cache-builtin')
+except BaseException:
+    c.print_debug(
+        "Library import failed with error:", color='red', name='cache-ups')
+    print(traceback.print_exc())
+
 try:
     from modules_waybar import resin
     functions['resin'] = resin.module
 except ModuleNotFoundError as e:
     c.print_debug(f'{e}', color='yellow', name='cache-builtin')
+except BaseException:
+    c.print_debug(
+        "Library import failed with error:", color='red', name='cache-resin')
+    print(traceback.print_exc())
 
 
 def cache(name, config, cache_dir='~/.cache/pybar'):
