@@ -12,8 +12,8 @@ idna==3.7
 multidict==6.0.5
 pulsectl==24.4.0
 pycairo==1.26.0
-pydantic==2.7.1
-pydantic_core==2.18.2
+pydantic==2.7.4
+pydantic_core==2.18.4
 PyGObject==3.48.2
 pypng==0.20220715.0
 qrcode==7.4.2
