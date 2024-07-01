@@ -106,18 +106,8 @@ def module(bar, name, config):
                 'r', encoding='utf-8'
             ) as file:
                 output = json.loads(file.read())
-        except json.decoder.JSONDecodeError as e:
-            # c.print_debug(e, name=f'module-{name}', color='red')
+        except (json.decoder.JSONDecodeError, FileNotFoundError):
             return True
-        except FileNotFoundError:
-            # c.print_debug("Cache does not exist for module.",
-            #               name=f'module-{name}', color='red')
-            return True
-
-        # I don't know why this would ever be a string
-        # if isinstance(output, str):
-            # c.print_debug(output)
-            # return True
 
         if output['text'] != module.cache.text:
             if output['text']:
