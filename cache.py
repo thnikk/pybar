@@ -17,6 +17,7 @@ from modules_waybar import weather
 from modules_waybar import vm
 from modules_waybar import systemd
 from modules_waybar import sales
+from modules_waybar import hass
 
 functions = {
     "git": git.module,
@@ -27,6 +28,7 @@ functions = {
     "vm": vm.module,
     "systemd": systemd.module,
     "sales": sales.module,
+    "hass": hass.module,
 }
 
 try:
