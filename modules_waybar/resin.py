@@ -84,7 +84,7 @@ def module(module_config):
 def main():
     """ Main function """
     with open(
-        os.path.expanduser('~/.config/pybar-testing/config.json'),
+        os.path.expanduser('~/.config/pybar/config.json'),
         'r', encoding='utf-8'
     ) as file:
         config = json.loads(file.read())['modules']['resin']
