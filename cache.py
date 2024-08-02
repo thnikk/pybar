@@ -18,6 +18,7 @@ from modules_waybar import vm
 from modules_waybar import systemd
 from modules_waybar import sales
 from modules_waybar import hass
+from modules_waybar import power_supply
 
 functions = {
     "git": git.module,
@@ -29,6 +30,7 @@ functions = {
     "systemd": systemd.module,
     "sales": sales.module,
     "hass": hass.module,
+    "power_supply": power_supply.module,
 }
 
 try:

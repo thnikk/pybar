@@ -128,6 +128,15 @@ def print_debug(msg, name=None, color=38) -> None:
     print(f'[{timestamp}] [{colored_name}] {msg}', file=sys.stderr)
 
 
+def level(min, max, value):
+    """ Level bar """
+    bar_box = box('v')
+    bar = Gtk.LevelBar().new_for_interval(min, max)
+    bar.set_value(value)
+    bar_box.pack_start(bar, 1, 0, 0)
+    return bar_box
+
+
 def slider(value, min=0, max=100, style=None):
     """ Create a slider """
     widget = Gtk.Scale().new_with_range(

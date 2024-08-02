@@ -79,6 +79,7 @@ def module(bar, name, config):
         "xdrip": widgets.xdrip,
         "network": widgets.network,
         "sales": widgets.sales,
+        "power_supply": widgets.power_supply,
     }
 
     if "cache" not in list(config):
@@ -127,11 +128,11 @@ def module(bar, name, config):
                 output['widget'] != module.cache.widget
                 and not module.get_active()
             ):
-                try:
+                if name in list(all_widgets):
                     module.set_widget(
                         all_widgets[name](
                             name, module, output['widget']))
-                except KeyError:
+                else:
                     module.set_widget(
                         widgets.generic_widget(
                             name, module, output['widget']))

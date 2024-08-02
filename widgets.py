@@ -329,6 +329,31 @@ def hoyo(name, module, cache):
     return main_box
 
 
+def power_supply(name, module, cache):
+    """ Power supply widget """
+    main_box = c.box('v', spacing=20, style='small-widget')
+    outer_box = c.box('v', style='box')
+    for device in cache:
+        for x, y in device.items():
+            name = x
+            value = y
+        device_box = c.box('h', spacing=10, style="inner-box")
+        device_box.pack_start(
+            c.label(name, ha="start"), 1, 1, 0)
+        device_box.pack_start(c.level(0, 4, value), 0, 0, 0)
+        if value != -1:
+            device_box.pack_end(
+                c.label(f"{value*25}%", style='percent'), 0, 1, 0)
+        else:
+            device_box.pack_end(
+                c.label("??%", style='percent'), 0, 1, 0)
+        outer_box.add(device_box)
+        if name != list(cache)[-1]:
+            outer_box.add(c.sep('v'))
+    main_box.add(outer_box)
+    return main_box
+
+
 def xdrip(name, module, cache):
     """ XDrip widget """
     main_box = c.box('v', spacing=20)
