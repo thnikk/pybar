@@ -21,6 +21,7 @@ from modules import backlight
 from modules import test
 from modules import toggle
 from modules import privacy
+from modules import hass_2
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -65,7 +66,8 @@ def module(bar, name, config):
         'power': power.module,
         'test': test.module,
         'toggle': toggle.module,
-        'privacy': privacy.module
+        'privacy': privacy.module,
+        'hass_2': hass_2.module
     }
 
     all_widgets = {
