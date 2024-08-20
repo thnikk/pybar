@@ -5,6 +5,7 @@ Author: thnikk
 """
 import common as c
 import requests
+import traceback
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
@@ -65,20 +66,24 @@ def widget(config):
                     c.label(value, ha="end"), 1, 1, 0)
 
             if id.split('.')[0] == 'switch' or id.split('.')[0] == 'light':
-                switch = Gtk.Switch.new()
-                c.add_style(switch, 'switch')
-                switch_v = c.box('v')
-                switch_h = c.box('h')
-                switch_v.pack_start(switch, 1, 0, 0)
-                switch_h.pack_start(switch_v, 1, 0, 0)
+                try:
+                    switch = Gtk.Switch.new()
+                    c.add_style(switch, 'switch')
+                    switch_v = c.box('v')
+                    switch_h = c.box('h')
+                    switch_v.pack_start(switch, 1, 0, 0)
+                    switch_h.pack_start(switch_v, 1, 0, 0)
 
-                data = get_data(
-                    config['server'], id, config['bearer_token'])
-                values = ["off", "on"]
-                switch.set_state(values.index(data['state']))
-                switch.connect('state_set', switch_action, config, id)
+                    data = get_data(
+                        config['server'], id, config['bearer_token'])
+                    values = ["off", "on"]
+                    switch.set_state(values.index(data['state']))
+                    switch.connect('state_set', switch_action, config, id)
 
-                line_box.pack_end(switch_h, 0, 0, 0)
+                    line_box.pack_end(switch_h, 0, 0, 0)
+                except KeyError:
+                    # continue
+                    line_box.pack_end(c.label('???'), 0, 0, 0)
 
             lines_box.add(line_box)
             if name != list(devices)[-1]:
@@ -101,7 +106,7 @@ def module(bar, config=None):
                 module.set_widget(widget(config))
             except BaseException as e:
                 c.print_debug('Caught exception:')
-                print(e)
+                print(traceback.print_exc())
         return True
 
     if update_module():

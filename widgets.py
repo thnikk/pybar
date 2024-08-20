@@ -348,7 +348,7 @@ def power_supply(name, module, cache):
             device_box.pack_end(
                 c.label("??%", style='percent'), 0, 1, 0)
         outer_box.add(device_box)
-        if name != list(cache)[-1]:
+        if device != list(cache)[-1]:
             outer_box.add(c.sep('v'))
     main_box.add(outer_box)
     return main_box

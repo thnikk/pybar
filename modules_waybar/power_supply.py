@@ -52,11 +52,6 @@ def module(config) -> dict:
             for name, icon in icon_lookup.items():
                 if name in parsed["Model name"]:
                     device_icon = icon
-                    for key, value in device.items():
-                        if value == 1 or value == 0:
-                            device_icon = (
-                                "<span color='#FF0000'>"
-                                f"{device_icon}</span")
             # Append the icon to the icons list
             icons.append(device_icon)
 
