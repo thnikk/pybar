@@ -28,8 +28,8 @@ async def generate_cache(config):
             "ltuid": config["ltuid"],
             "ltoken": config["ltoken"]})
         genshin_notes = await genshin_client.get_notes()
-        genshin_user = await genshin_client.get_full_genshin_user(
-                config["uid"])
+        # genshin_user = await genshin_client.get_full_genshin_user(
+        #         config["uid"])
         com_prog = genshin_notes.completed_commissions + \
             int(genshin_notes.claimed_commission_reward)
         cache = {
@@ -42,8 +42,8 @@ async def generate_cache(config):
             "Remaining boss discounts":
             genshin_notes.remaining_resin_discounts,
             "Realm currency": genshin_notes.current_realm_currency,
-            "Abyss progress": genshin_user.abyss.current.max_floor,
-            "Abyss stars": genshin_user.abyss.current.total_stars,
+            # "Abyss progress": genshin_user.abyss.current.max_floor,
+            # "Abyss stars": genshin_user.abyss.current.total_stars,
             "timestamp": datetime.timestamp(time_now)
         }
     except genshin.errors.GenshinException:
