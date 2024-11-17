@@ -11,8 +11,7 @@ from datetime import datetime
 import gi
 import common as c
 import widgets
-from modules import sway
-from modules import hypr
+from modules import workspaces
 from modules import clock
 from modules import battery
 from modules import volume
@@ -58,8 +57,7 @@ def module(bar, name, config):
     """ Waybar module """
     cacheless = {
         'clock': clock.module,
-        'workspaces': sway.module,
-        'hyprland': hypr.module,
+        'workspaces': workspaces.module,
         'volume': volume.module,
         'backlight': backlight.module,
         'battery': battery.module,
