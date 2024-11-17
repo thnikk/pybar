@@ -315,11 +315,14 @@ def hoyo(name, module, cache):
     for line in icons:
         info_line = c.box('h')
         for name, icon in line.items():
-            label = c.label(f'{icon} {cache[name]}', style='inner-box')
-            label.set_tooltip_text(name)
-            info_line.pack_start(label, 1, 0, 0)
-            if name != list(line)[-1]:
-                info_line.add(c.sep('v'))
+            try:
+                label = c.label(f'{icon} {cache[name]}', style='inner-box')
+                label.set_tooltip_text(name)
+                info_line.pack_start(label, 1, 0, 0)
+                if name != list(line)[-1]:
+                    info_line.add(c.sep('v'))
+            except KeyError:
+                pass
         info_box.add(info_line)
         if line != list(icons)[-1]:
             info_box.add(c.sep('h'))
