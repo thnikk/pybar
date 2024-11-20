@@ -37,20 +37,32 @@ def module(config) -> dict:
             uevent = file.read()
             # Parse the data
             parsed = parse(uevent)
-            # Try to set the battery level
-            try:
-                device = {
-                    parsed["Model name"]:
-                    capacity_lookup.index(parsed["Capacity level"].lower())
-                }
-            # If the battery level is unknown, set the value to -1
-            except ValueError:
-                device = {parsed["Model name"]: -1}
+
+            # Set the device name
+            if "Model name" in parsed:
+                device_name = parsed["Model name"]
+            elif "Name" in parsed:
+                device_name = parsed["Name"]
+                device_name = device_name.split(
+                    "battery")[0].replace('-', ' ').strip().title()
+            else:
+                device_name = "Unknown"
+
+            # Set the battery level
+            if "Capacity level" in parsed:
+                level = capacity_lookup.index(parsed["Capacity level"].lower())
+            elif "Capacity" in parsed:
+                level = int(parsed["Capacity"])//20
+            else:
+                level = -1
+
+            # Create device dictionary
+            device = {device_name: level}
 
             # Set a default icon if the device type isn't in the icon lookup
             device_icon = ""
             for name, icon in icon_lookup.items():
-                if name in parsed["Model name"]:
+                if name.lower() in device_name.lower():
                     device_icon = icon
             # Append the icon to the icons list
             icons.append(device_icon)
