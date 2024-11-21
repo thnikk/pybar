@@ -52,7 +52,7 @@ def module(config) -> dict:
             if "Capacity level" in parsed:
                 level = capacity_lookup.index(parsed["Capacity level"].lower())
             elif "Capacity" in parsed:
-                level = int(parsed["Capacity"])//20
+                level = (int(parsed["Capacity"])//20) - 1
             else:
                 level = -1
 
