@@ -22,11 +22,15 @@ def module(config):
     torrents = c.get_torrents()
     downloads = 0
     uploads = 0
+    downloading = []
+    uploading = []
     for torrent in torrents:
         if torrent.status == 'downloading':
             downloads += 1
+            downloading.append(f'{torrent.name} {int(torrent.progress)}%')
         if torrent.status == 'seeding':
             uploads += 1
+            uploading.append(torrent.name)
 
     n = []
     if downloads:
@@ -34,7 +38,27 @@ def module(config):
     if uploads:
         n.append(f" {uploads}")
     text = "  ".join(n)
-    return {"text": text}
+
+    m = []
+    if downloading:
+        section = []
+        section.append('Downloading:')
+        for name in downloading:
+            section.append(name)
+        if section:
+            m.append('\n'.join(section))
+
+    if uploading:
+        section = []
+        section.append('Uploading:')
+        for name in uploading:
+            section.append(name)
+        if section:
+            m.append('\n'.join(section))
+
+    tooltip = "\n\n".join(m) if m else ""
+
+    return {"text": text, "tooltip": tooltip}
 
 
 def main():
