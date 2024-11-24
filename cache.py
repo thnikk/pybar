@@ -19,6 +19,7 @@ from modules_waybar import systemd
 from modules_waybar import sales
 from modules_waybar import hass
 from modules_waybar import power_supply
+from modules_waybar import transmission
 
 functions = {
     "git": git.module,
@@ -31,6 +32,7 @@ functions = {
     "sales": sales.module,
     "hass": hass.module,
     "power_supply": power_supply.module,
+    "transmission": transmission.module,
 }
 
 try:
