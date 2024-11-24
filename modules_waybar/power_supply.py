@@ -49,11 +49,15 @@ def module(config) -> dict:
                 device_name = "Unknown"
 
             # Set the battery level
-            if "Capacity level" in parsed:
-                level = capacity_lookup.index(parsed["Capacity level"].lower())
-            elif "Capacity" in parsed:
-                level = (int(parsed["Capacity"])//20) - 1
-            else:
+            try:
+                if "Capacity level" in parsed:
+                    level = capacity_lookup.index(
+                        parsed["Capacity level"].lower())
+                elif "Capacity" in parsed:
+                    level = (int(parsed["Capacity"])//20) - 1
+                else:
+                    raise ValueError
+            except ValueError:
                 level = -1
 
             # Create device dictionary
