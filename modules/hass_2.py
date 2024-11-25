@@ -104,7 +104,7 @@ def module(bar, config=None):
         if not module.get_active():
             try:
                 module.set_widget(widget(config))
-            except BaseException as e:
+            except BaseException:
                 c.print_debug('Caught exception:')
                 print(traceback.print_exc())
         return True
