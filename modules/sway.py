@@ -1,19 +1,14 @@
 #!/usr/bin/python3 -u
-"""
-Description: Properly threaded workspace module
-Author: thnikk
-"""
 from subprocess import Popen, PIPE, STDOUT, DEVNULL, run, CalledProcessError
 import threading
-import socket
-import json
 import os
 import signal
+import json
+import socket
 import common as c
 import gi
-gi.require_version('Gtk', '3.0')
-gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject, GLib  # noqa
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gtk, GLib # noqa
 
 
 class Workspaces(Gtk.Box):
@@ -21,7 +16,7 @@ class Workspaces(Gtk.Box):
         super().__init__()
         self.alive = True
         self.pid = None
-        c.add_style(self, 'workspaces')
+        self.add_css_class('workspaces')
         try:
             run(
                 ['swaymsg', '-t', 'get_version'],
@@ -35,7 +30,7 @@ class Workspaces(Gtk.Box):
         self.buttons = []
         for n in range(1, 11):
             button = c.button(style='workspace')
-            button.set_no_show_all(True)
+            # button.set_no_show_all(True)
             try:
                 button.set_label(config['icons'][str(n)])
             except KeyError:
@@ -45,7 +40,7 @@ class Workspaces(Gtk.Box):
                     button.set_label(str(n))
             button.connect('clicked', self.switch, n)
             self.buttons.append(button)
-            self.add(button)
+            self.append(button)
 
         # Initial update before waiting for listener updates
         self.update()
@@ -63,9 +58,11 @@ class Workspaces(Gtk.Box):
 
     def switch(self, button, workspace):
         """ Click action """
-        run(
-            ['swaymsg', 'workspace', 'number', str(workspace)],
-            stdout=DEVNULL, stderr=DEVNULL, check=False, capture_output=False)
+        if self.wm == 'sway':
+            run(
+                ['swaymsg', 'workspace', 'number', str(workspace)],
+                stdout=DEVNULL, stderr=DEVNULL,
+                check=False, capture_output=False)
 
     def listen(self):
         """ Listen for events and update the box when there's a new one """
@@ -129,12 +126,12 @@ class Workspaces(Gtk.Box):
             else:
                 button.hide()
             if name == workspaces['focused']:
-                c.add_style(button, 'focused')
+                button.add_css_class('focused')
             else:
-                c.del_style(button, 'focused')
+                button.remove_css_class('focused')
 
 
-def module(bar, config=None):
+def module(config=None):
     """ Sway module """
 
     if not config:

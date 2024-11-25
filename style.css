@@ -1,46 +1,49 @@
-@define-color black rgba(28, 31, 38, 1);
-@define-color gray rgba(255, 255, 255, 0.05);
-@define-color light_gray rgba(255, 255, 255, 0.35);
-@define-color white rgba(255, 255, 255, 0.7);
+@define-color black #1c1f26;
+@define-color white #d8dee9;
+@define-color gray alpha(@white, 0.7);
+@define-color dark rgba(0, 0, 0, 0.05);
+@define-color darker rgba(0, 0, 0, 0.1);
+@define-color light rgba(255, 255, 255, 0.05);
+@define-color lighter rgba(255, 255, 255, 0.1);
 @define-color red   #bf616a;
 @define-color blue  #8fa1be;
 @define-color green #a3be8c;
 @define-color orange #d08770;
 
-/* bar */
-window {
-	background: none;
+* {
+	font-family: "Nunito", "Sans serrif", "Font Awesome 6 Free Solid";
 }
 
-.bar {
-	padding: 5px;
-	background: alpha(@black, 0.8);
-	border: 1px solid @gray;
-	border-radius: 10px;
-	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
+window {
+	background: none;
 	font-size: 16px;
 	color: @white;
 }
 
-button { color: inherit; }
-
-.module {
+button, .button {
 	padding: 2px 5px;
-	background: @gray;
-	border: 1px solid @gray;
+	font-weight: normal;
+	background: @light;
+	color: @gray;
+	border: 1px solid @light;
 	border-radius: 5px;
-	color: @white;
-	text-shadow: none;
+	/* margin: 0; */
 }
 
 .module-fixed {
-	min-width: 70px;
+	min-width: 80px;
 }
 
-/* workspaces */
+.bar {
+	border-radius: 10px;
+	padding: 5px;
+	border: 1px solid @light;
+	background: alpha(@black, 0.9);
+}
+
 .workspaces {
-	background: @gray;
-	border: 1px solid @gray;
+	background: @light;
+	border: 1px solid @light;
 	border-radius: 5px;
 }
 
@@ -48,191 +51,108 @@ button { color: inherit; }
 	padding: 0px 5px;
 	background: transparent;
 	border-radius: 5px;
-	color: @white;
+	color: @gray;
 	border: 1px solid transparent;
 	min-width: 20px;
 }
 
 .focused {
-	background: @white;
+	background: @gray;
 	color: @black;
 	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
-/* colorize modules */
-.green { background: alpha(@green, 0.2); color: @white; border: 1px solid @gray; }
-.red { background: alpha(@red, 0.2); color: @white; border: 1px solid @gray; }
-.orange { background: alpha(@orange, 0.2); color: @white; border: 1px solid @gray; }
-.gray { color: @light_gray; }
-
-/* colorize text */
-.green-fg { color: @green; }
-.blue-fg { color: @blue; }
-.red-fg { color: @red; }
-.orange-fg { color: @orange; }
-
-
-/* Override default rules */
-tooltip {
-	font-family: "Iosevka Custom"
+popover {
+	/* padding-left: 10px; */
+	/* padding-right: 10px; */
 }
 
-scrollbar {
-	background: none;
-	border: none;
+popover contents, popover arrow {
+	font-family: "Nunito", "Sans serrif";
+	background: alpha(@black, 0.9);
+	color: @white;
+	border: 1px solid rgba(255,255,255,0.1);
+	border-radius: 20px;
+	padding: 0px;
 }
 
-scrollbar slider { background: none; border: none; }
-
-levelbar trough { border-radius: 6px; min-height: 6px; min-width: 100px; border: none; background: @black; }
-levelbar block { border-radius: 3px; border: none; }
-levelbar block.filled { background-color: @green; }
-
-scale contents trough { padding: 3px; min-width: 100px; background: @black; border: none; }
-scale contents trough highlight {
-	border: none;
-	background: alpha(@blue, 1);
+.widget-outer contents {
+	background: #2b303b;
 }
 
-scale contents trough slider {
-	background: #4b505b;
-	border: 1px solid @gray;
-	box-shadow: none;
+.widget-outer arrow {
+	background: #1c1f26;
 }
 
-switch {
-	border: none;
-	background: @white;
-	min-height: 1px;
-	min-width: 1px;
-}
-switch slider {
-	background: @black;
-	margin: 2px;
-	border: none;
-	min-height: 1px;
-	min-width: 1px;
+.widget-header {
+	font-size: 24px;
 }
 
-/* levelbar trough { */
-/* 	border: 1px solid @gray; */
-/* 	padding: 2px; */
-/* 	border-radius: 10px; */
-/* 	color: black; */
-/* 	background: @gray; */
-/* } */
-/**/
-/* levelbar block { */
-/* 	background: none; */
-/* 	color: @blue; */
-/* 	border-radius: 10px; */
-/* 	border: none; */
-/* } */
-/**/
-/* levelbar block.high, levelbar block:not(.empty) { border: 1px solid @gray; background-color: @blue; } */
-/* levelbar block.low, levelbar block.high, levelbar block.full, levelbar block.empty { background: @blue; border: 1px solid @gray; } */
+.widget-inner {
+	background: #1c1f26;
+	padding: 10px;
+	border-radius: 20px;
+	/* border: 1px solid alpha(white, 0.1); */
+	min-width: 200px;
+}
 
-button {
-	background: none;
-	border: 0;
+popover .header {
+	background: @lighter;
+	border-bottom: @light;
+	padding: 0px 20px;
+	font-size: 24px;
+}
+
+popover .content {
+	padding: 10px;
+}
+
+separator {
 	margin: 0;
 	padding: 0;
-	text-shadow: none;
-	box-shadow: none;
-	transition: none;
+	background: @light;
 }
 
-/* widgets */
-popover, .popover {
-	background: @black;
-	color: @white;
-	border: 1px solid @gray;
-	border-radius: 20px;
-	box-shadow: none;
-	padding: 10px;
-	font-family: "Nunito", "Font Awesome 6 Free Solid";
-}
+/* .today { */
+/* 	font-size: 64px; */
+/* } */
 
-.music .title {
+.hour-temp {
 	font-size: 20px;
 }
 
-separator { background: @gray; padding: 0; margin: 0; }
-
-.heading {
-	padding: 0px 10px;
-	border-radius: 10px;
-	border: 1px solid @gray;
-	background: @gray;
-	font-size: 24px;
-	font-weight: normal;
-}
-.heading-small {
-	padding: 0px 10px;
-	border-radius: 10px;
-	border: 1px solid @gray;
-	background: @gray;
-	font-size: 20px;
-	font-weight: normal;
-}
-
-.box {
-	background: @gray;
-	border: solid 1px @gray;
-	border-radius: 10px;
-}
-
-.inner-box {
-	padding: 10px;
-	font-size: 16px;
-}
-
-.inner-box-wide {
-	padding: 10px 20px;
-	font-size: 16px;
-}
-
-.active { border: 1px solid @gray; background: @gray; border-radius: 10px; }
-
-.icon-small {
+.hour-icon {
 	font-size: 32px;
+}
+
+.split-container {
+	background: @light;
+	border: 1px solid @light;
+	border-radius: 10px;
+}
+
+.split-box {
+	padding: 10px;
+}
+
+.scrolledwindow, .viewport {
+	border-radius: 10px;
+}
+
+calendar {
+	border-radius: 10px;
+	background: @light;
+	border-color: @light;
+	color: @white;
+}
+
+calendar header{
 	padding: 5px;
+	border-bottom: 1px solid @light;
 }
 
-.icon-volume {
-	min-width: 20px;
-}
-
-.hour-temp { font-size: 24px; }
-
-.today-weather {
-	font-size: 64px;
-	margin: -10px 0px;
-}
-
-.large-text { font-size: 64px; margin: -15px 0px; }
-.arrow { font-size: 24px; }
-
-.power-item { font-size: 16px; padding: 10px; }
-
-.temp-label {
-	font-size: 80px;
-}
-
-.small-widget {
-	min-width: 300px;
-}
-
-/* calendar */
-.day { min-width: 30px; font-size: 16px; }
-.old { color: @light_gray; }
-.dow { color: @blue; }
-.today {
-	background: @gray;
-	border: 1px solid @gray;
+calendar header button {
 	border-radius: 5px;
-}
-
-.percent {
-	min-width: 60px;
+	border: none;
+	background: none;
 }

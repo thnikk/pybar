@@ -1,22 +1,18 @@
 #!/usr/bin/python3 -u
-"""
-Description: Pulse module
-Author: thnikk
-"""
 import common as c
 import pulsectl
 import threading
 import time
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 
 
 class Volume(c.Module):
-    def __init__(self, bar, config):
+    def __init__(self, config):
         super().__init__()
-        self.set_position(bar.position)
         self.alive = True
+        self.set_widget('test')
 
         while True:
             try:
@@ -30,18 +26,11 @@ class Volume(c.Module):
                 time.sleep(1)
                 continue
 
-        c.add_style(self, 'module-fixed')
-
-        self.icons = config['icons']
-
-        self.connect('scroll-event', self.scroll)
-        self.connect('button-press-event', self.switch_outputs)
+        self.add_css_class('module-fixed')
 
         volume = round(default.volume.value_flat * 100)
         self.set_icon(default)
         self.text.set_label(f'{volume}%')
-
-        self.make_widget()
 
         thread = threading.Thread(target=self.pulse_thread)
         thread.daemon = True
@@ -60,51 +49,6 @@ class Volume(c.Module):
     def set_default(self, module, sink):
         """ Set default sink/source """
         self.pulse.default_set(sink)
-
-    def widget_box(self):
-        """ Volume widget """
-        main_box = c.box('v', style='widget', spacing=20)
-        c.add_style(main_box, 'small-widget')
-        main_box.add(c.label('Volume', style='heading'))
-
-        for name, list_type in {
-            "Outputs": self.pulse.sink_list(),
-            "Inputs": self.pulse.source_list(),
-            "Programs": self.pulse.sink_input_list()
-        }.items():
-            section_box = c.box('v', spacing=10)
-            section_box.add(c.label(name, style='title', ha='start'))
-            sinks_box = c.box('v', style='box')
-            sink_list = list_type
-            for sink in sink_list:
-                sink_box = c.box('v', spacing=10, style='inner-box')
-                if name == 'Programs':
-                    # c.print_debug(sink.proplist)
-                    try:
-                        prog = sink.proplist[
-                            'application.process.binary']
-                    except KeyError:
-                        prog = sink.name
-                    sink_label = c.button(prog, ha='start', length=25)
-                else:
-                    if 'Monitor of' in sink.description:
-                        continue
-                    sink_label = c.button(
-                        sink.description, ha='start', length=25)
-                    sink_label.connect(
-                        'clicked', self.set_default, sink)
-                sink_box.add(sink_label)
-                level = c.slider(round(sink.volume.value_flat*100))
-                level.connect('value-changed', self.set_volume, sink)
-                sink_box.pack_start(level, 1, 1, 0)
-                sinks_box.add(sink_box)
-                if sink != sink_list[-1]:
-                    sinks_box.add(c.sep('v'))
-            section_box.add(sinks_box)
-            if sink_list:
-                main_box.add(section_box)
-
-        return main_box
 
     def pulse_listen(self):
         """ Listen for events """
@@ -185,37 +129,21 @@ class Volume(c.Module):
 
         self.set_icon(default)
 
-        if not self.get_active():
-            self.make_widget()
-
     def set_icon(self, sink):
         """ Set icon for module """
         if sink.mute:
             self.icon.set_label('')
             return
-        found = False
-        for name, icon in self.icons.items():
-            if name.lower() in sink.name.lower():
-                self.icon.set_label(icon)
-                found = True
-        if not found:
-            self.icon.set_label('')
-
-    def make_widget(self):
-        """ Make widget for module """
-        widget = c.Widget()
-        widget.box.add(self.widget_box())
-        widget.draw()
-        self.set_popover(widget)
+        icons = {'headset': ''}
+        try:
+            self.icon.set_label(icons[sink.proplist['device.form_factor']])
+            return
+        except KeyError:
+            pass
+        self.icon.set_label('')
 
 
-def module(bar, config=None):
+def module(config=None):
     """ PulseAudio module """
-    if not config:
-        config = {}
-    if 'icons' not in config:
-        config['icons'] = {}
-
-    module = Volume(bar, config)
-
+    module = Volume(config)
     return module
