@@ -79,6 +79,7 @@ class Volume(c.Module):
             for sink in sink_list:
                 sink_box = c.box('v', spacing=10, style='inner-box')
                 if name == 'Programs':
+                    # c.print_debug(sink.proplist)
                     try:
                         prog = sink.proplist[
                             'application.process.binary']
