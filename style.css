@@ -88,7 +88,7 @@ levelbar trough { border-radius: 6px; min-height: 6px; min-width: 100px; border:
 levelbar block { border-radius: 3px; border: none; }
 levelbar block.filled { background-color: @green; }
 
-scale contents trough { padding: 3px; background: @black; border: none; }
+scale contents trough { padding: 3px; min-width: 100px; background: @black; border: none; }
 scale contents trough highlight {
 	border: none;
 	background: alpha(@blue, 1);
@@ -143,7 +143,7 @@ button {
 }
 
 /* widgets */
-popover {
+popover, .popover {
 	background: @black;
 	color: @white;
 	border: 1px solid @gray;
@@ -151,6 +151,10 @@ popover {
 	box-shadow: none;
 	padding: 10px;
 	font-family: "Nunito", "Font Awesome 6 Free Solid";
+}
+
+.music .title {
+	font-size: 20px;
 }
 
 separator { background: @gray; padding: 0; margin: 0; }
