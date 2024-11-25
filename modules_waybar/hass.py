@@ -22,6 +22,15 @@ def get_data(server, sensor, bearer_token):
 def module(config):
     """ Module """
     data = get_data(config['server'], config['sensor'], config['bearer_token'])
-    return {
+    output = {
         "text": config['format'].replace('{}', data['state'].split('.')[0])
     }
+    tooltip = []
+    for name, item in config['widget'].items():
+        data = get_data(config['server'], item, config['bearer_token'])
+        tooltip.append(
+            f"{name}: {data['state']}"
+            f"{data['attributes']['unit_of_measurement']}"
+        )
+    output['tooltip'] = "\n".join(tooltip)
+    return output
