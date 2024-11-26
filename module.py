@@ -25,7 +25,7 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
-def cache(name, command, interval, cache_dir='~/.cache/pybar'):
+def cache(name, config, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
     while True:
         # Create cache dir if it doesn't exist
@@ -33,7 +33,7 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         # Expand user for all parts of command
-        command = [os.path.expanduser(arg) for arg in command]
+        command = [os.path.expanduser(arg) for arg in config['command']]
         # Try to get the output of the command
         try:
             output = run(
@@ -50,7 +50,7 @@ def cache(name, command, interval, cache_dir='~/.cache/pybar'):
         ) as file:
             file.write(output)
         # Wait for the interval specified in the module config
-        time.sleep(interval)
+        time.sleep(config['interval'])
 
 
 def module(bar, name, config):
@@ -90,7 +90,12 @@ def module(bar, name, config):
     except KeyError:
         module_config = {}
 
-    if name in list(cacheless):
+    module_type = module_config['type'] if 'type' in module_config else None
+
+    if module_type and module_type in list(cacheless):
+        return cacheless[module_type](bar, module_config)
+
+    if not module_type and name in list(cacheless):
         return cacheless[name](bar, module_config)
 
     module = c.Module(0, 1)
@@ -128,14 +133,18 @@ def module(bar, name, config):
                 output['widget'] != module.cache.widget
                 and not module.get_active()
             ):
-                if name in list(all_widgets):
+                if 'type' in module_config:
+                    widget = module_config['type']
+                else:
+                    widget = name
+                if widget in list(all_widgets):
                     module.set_widget(
-                        all_widgets[name](
-                            name, module, output['widget']))
+                        all_widgets[widget](
+                            widget, module, output['widget']))
                 else:
                     module.set_widget(
                         widgets.generic_widget(
-                            name, module, output['widget']))
+                            widget, module, output['widget']))
                 module.cache.widget = output['widget']
 
         # Override class and set to gray if module is stale

@@ -59,8 +59,10 @@ except BaseException:
 def cache(name, config, cache_dir='~/.cache/pybar'):
     """ Save command output to cache file """
 
-    # Skip if name isn't in functions
-    if name not in list(functions):
+    # Skip if name/type isn't in functions
+    if 'type' in config and config['type'] not in list(functions):
+        return
+    elif 'type' not in config and name not in list(functions):
         return
 
     c.print_debug(
@@ -71,7 +73,10 @@ def cache(name, config, cache_dir='~/.cache/pybar'):
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         try:
-            output = functions[name](config)
+            if 'type' in config:
+                output = functions[config['type']](config)
+            else:
+                output = functions[name](config)
         except BaseException:
             c.print_debug(
                 "Caught exception:", name=f"cache-{name}", color='red')
