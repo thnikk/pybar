@@ -25,12 +25,15 @@ def module(config):
     output = {
         "text": config['format'].replace('{}', data['state'].split('.')[0])
     }
-    tooltip = []
-    for name, item in config['widget'].items():
-        data = get_data(config['server'], item, config['bearer_token'])
-        tooltip.append(
-            f"{name}: {data['state']}"
-            f"{data['attributes']['unit_of_measurement']}"
-        )
-    output['tooltip'] = "\n".join(tooltip)
+    try:
+        tooltip = []
+        for name, item in config['widget'].items():
+            data = get_data(config['server'], item, config['bearer_token'])
+            tooltip.append(
+                f"{name}: {data['state']}"
+                f"{data['attributes']['unit_of_measurement']}"
+            )
+        output['tooltip'] = "\n".join(tooltip)
+    except (NameError, KeyError):
+        pass
     return output
