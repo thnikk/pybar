@@ -22,6 +22,10 @@ def get_data(server, sensor, bearer_token):
 def module(config):
     """ Module """
     data = get_data(config['server'], config['sensor'], config['bearer_token'])
+
+    if data['state'] == 'unavailable':
+        return {"text": ""}
+
     output = {
         "text": config['format'].replace('{}', data['state'].split('.')[0])
     }
