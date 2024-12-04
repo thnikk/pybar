@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Ubuntu dependencies
-        run: sudo apt install -y libgirepository1.0-dev
+        run: sudo apt install -y libgirepository1.0-dev libgtk-3-dev libatk1.0-dev
 
       - name: Checkout
         uses: actions/checkout@v3
@@ -33,9 +33,9 @@ jobs:
           pyinstaller main.py --add-data="style.css:." --onefile --clean --noconfirm -n pybar
 
       - name: Create Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: pybar
           path: dist/
 
       - name: List files in dist folder
