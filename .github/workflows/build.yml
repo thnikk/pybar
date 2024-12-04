@@ -7,6 +7,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Install Ubuntu dependencies
+        run: sudo apt install -y libgirepository1.0-dev
+
       - name: Checkout
         uses: actions/checkout@v3
 
