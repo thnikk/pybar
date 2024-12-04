@@ -1,0 +1,40 @@
+name: Build pybar binary with Pyinstaller
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix['python-version'] }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+        working-directory: ./
+
+      - name: Install PyInstaller
+        run: |
+          pip install pyinstaller
+        working-directory: ./
+
+      - name: Build binary
+        run: |
+          pyinstaller main.py --add-data="style.css:." --onefile --clean --noconfirm -n pybar
+
+      - name: Create Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux
+          path: dist/
+
+      - name: List files in dist folder
+        run: ls -R ./dist/
+
