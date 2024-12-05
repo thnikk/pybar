@@ -117,7 +117,8 @@ def module(bar, name, config):
 
         if output['text'] != module.cache.text:
             if output['text']:
-                module.set_label(output['text'])
+                module.text.set_label(output['text'])
+                module.text.set_visible(True)
                 module.set_visible(True)
             else:
                 module.set_visible(False)
@@ -153,12 +154,14 @@ def module(bar, name, config):
                 datetime.now() -
                 datetime.fromtimestamp(output['timestamp'])
             ).seconds > module_config['interval'] * 2:
-                output['class'] = 'gray'
+                c.add_style(module, 'gray')
+            else:
+                module.reset_style()
 
         # Set class
-        module.reset_style()
+        module.indicator.reset_style()
         if 'class' in list(output):
-            c.add_style(module, output['class'])
+            c.add_style(module.indicator, output['class'])
 
         return True
     if get_output():

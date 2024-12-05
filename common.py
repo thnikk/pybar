@@ -34,14 +34,20 @@ class Module(Gtk.MenuButton):
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
         self.default_styles = self.get_style_context().list_classes()
+        self.con = box('v')
+        self.indicator = box('h', style='indicator')
         self.box = box('h', spacing=5)
+        self.con.pack_start(self.box, 1, 1, 0)
+        self.con.add(self.indicator)
+        self.con.show_all()
+
         if icon:
             self.icon = Gtk.Label()
             self.box.pack_start(self.icon, 0, 0, 0)
         if text:
             self.text = Gtk.Label()
             self.box.pack_end(self.text, 1, 1, 0)
-        self.add(self.box)
+        self.add(self.con)
         self.add_events(Gdk.EventMask.SCROLL_MASK)
         self.add_events(Gdk.EventMask.SMOOTH_SCROLL_MASK)
 

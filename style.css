@@ -6,6 +6,7 @@
 @define-color blue  #8fa1be;
 @define-color green #a3be8c;
 @define-color orange #d08770;
+@define-color yellow #ebcb8b;
 
 /* bar */
 window {
@@ -60,9 +61,10 @@ button { color: inherit; }
 }
 
 /* colorize modules */
-.green { background: alpha(@green, 0.2); color: @white; border: 1px solid @gray; }
-.red { background: alpha(@red, 0.2); color: @white; border: 1px solid @gray; }
-.orange { background: alpha(@orange, 0.2); color: @white; border: 1px solid @gray; }
+.green { background: @green; }
+.red { background: @red;}
+.orange { background: @orange;}
+.yellow { background: @yellow;}
 .gray { color: @light_gray; }
 
 /* colorize text */
@@ -70,6 +72,12 @@ button { color: inherit; }
 .blue-fg { color: @blue; }
 .red-fg { color: @red; }
 .orange-fg { color: @orange; }
+
+
+.indicator {
+	margin-top: -1px;
+	border-radius: 2px;
+}
 
 
 /* Override default rules */
