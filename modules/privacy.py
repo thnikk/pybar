@@ -5,7 +5,8 @@ Author: thnikk
 """
 import common as c
 import threading
-from subprocess import Popen, PIPE, STDOUT, CalledProcessError
+from subprocess import run, Popen, PIPE, STDOUT, DEVNULL, CalledProcessError
+from glob import glob
 import os
 import signal
 import gi
@@ -20,14 +21,21 @@ class Privacy(c.Module):
         self.set_position(bar.position)
         self.alive = True
         self.pid = None
-        c.add_style(self, 'green')
+        c.add_style(self.indicator, 'green')
         self.text.show()
         self.box.show()
         self.set_no_show_all(True)
+        self.webcams = []
+        self.devices = {}
 
         thread = threading.Thread(target=self.listen_wrapper)
         thread.daemon = True
         thread.start()
+
+        webcam_thread = threading.Thread(target=self.get_webcams)
+        webcam_thread.daemon = True
+        webcam_thread.start()
+
         self.connect('destroy', self.destroy)
 
     def destroy(self, _):
@@ -44,6 +52,43 @@ class Privacy(c.Module):
             except CalledProcessError:
                 time.sleep(1)
                 continue
+
+    # def lsof(self):
+    #   """ Use lsof to get usage of /dev/video* devices """
+    #     while True:
+    #         for device in glob('/dev/video*'):
+    #             try:
+    #                 output = run(
+    #                     ['lsof', device],
+    #                     check=True, capture_output=True
+    #                 ).stdout.decode('utf-8').splitlines()
+    #                 valid = [
+    #                     line.split(' ')[-1]
+    #                     for line in output
+    #                     if 'COMMAND' not in line
+    #                     and 'scrcpy' not in line]
+    #             except (CalledProcessError, AttributeError):
+    #                 valid = []
+    #         if self.devices != set(valid):
+    #             self.webcams = set(valid)
+    #         GLib.idle_add(self.update)
+    #         time.sleep(3)
+
+    def get_webcams(self):
+        """ Check device status directly from v4l2 """
+        while True:
+            devices = []
+            for path in glob('/sys/class/video4linux/video*'):
+                with open(f'{path}/state', 'r') as file:
+                    state = file.read().strip()
+                with open(f'{path}/name', 'r') as file:
+                    name = file.read().strip()
+                if "capture" in state:
+                    devices.append(name)
+            if devices != self.webcams:
+                self.webcams = devices
+                GLib.idle_add(self.update)
+            time.sleep(1)
 
     def listen(self):
         """ Listen for new event """
@@ -63,7 +108,8 @@ class Privacy(c.Module):
                                 device['properties']['media.class']
                         ):
                             devices[device['id']] = device
-                            GLib.idle_add(self.update, devices)
+                            self.devices = devices
+                            GLib.idle_add(self.update)
                     except KeyError:
                         pass
                     device = {}
@@ -72,7 +118,8 @@ class Privacy(c.Module):
                 if 'removed' in line:
                     try:
                         devices.pop(device['id'])
-                        GLib.idle_add(self.update, devices)
+                        self.devices = devices
+                        GLib.idle_add(self.update)
                     except KeyError:
                         pass
                     device = {}
@@ -131,21 +178,23 @@ class Privacy(c.Module):
 
         return box
 
-    def update(self, devices):
+    def update(self):
         """ Update module """
         icons = {'Audio': '', 'Video': ''}
 
         # Get unique media types
         types = []
-        for id, device in devices.items():
+        for id, device in self.devices.items():
             types.append(device['properties']['media.class'].split('/')[-1])
         types = set(types)
 
         # Get icons
         text = [icons[item] for item in types]
+        if self.webcams:
+            text += [""]
 
         # Set widget
-        self.set_widget(self.get_widget(devices))
+        self.set_widget(self.get_widget(self.devices))
 
         # Set label
         if text:
