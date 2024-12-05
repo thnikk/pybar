@@ -159,9 +159,14 @@ def module(bar, name, config):
                 module.reset_style()
 
         # Set class
-        module.indicator.reset_style()
-        if 'class' in list(output):
-            c.add_style(module.indicator, output['class'])
+        if 'indicator' in config and config['indicator']:
+            module.indicator.reset_style()
+            if 'class' in list(output):
+                c.add_style(module.indicator, output['class'])
+        else:
+            module.reset_style()
+            if 'class' in list(output):
+                c.add_style(module, output['class'])
 
         return True
     if get_output():

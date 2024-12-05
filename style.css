@@ -61,10 +61,10 @@ button { color: inherit; }
 }
 
 /* colorize modules */
-.green { background: @green; }
-.red { background: @red;}
-.orange { background: @orange;}
-.yellow { background: @yellow;}
+.green { background: @green; color: @black; }
+.red { background: @red; color: @black; }
+.orange { background: @orange; color: @black; }
+.yellow { background: @yellow; color: @black; }
 .gray { color: @light_gray; }
 
 /* colorize text */

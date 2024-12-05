@@ -53,27 +53,6 @@ class Privacy(c.Module):
                 time.sleep(1)
                 continue
 
-    # def lsof(self):
-    #   """ Use lsof to get usage of /dev/video* devices """
-    #     while True:
-    #         for device in glob('/dev/video*'):
-    #             try:
-    #                 output = run(
-    #                     ['lsof', device],
-    #                     check=True, capture_output=True
-    #                 ).stdout.decode('utf-8').splitlines()
-    #                 valid = [
-    #                     line.split(' ')[-1]
-    #                     for line in output
-    #                     if 'COMMAND' not in line
-    #                     and 'scrcpy' not in line]
-    #             except (CalledProcessError, AttributeError):
-    #                 valid = []
-    #         if self.devices != set(valid):
-    #             self.webcams = set(valid)
-    #         GLib.idle_add(self.update)
-    #         time.sleep(3)
-
     def get_webcams(self):
         """ Check device status directly from v4l2 """
         while True:
