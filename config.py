@@ -27,12 +27,12 @@ def load(path):
             "interval": 300
         },
         "network": {
-            "always_show": True,
+            "always_show": true
         }
     }
 }"""
         with open(f"{config_path}/config.json", 'w', encoding='utf-8') as file:
-            file.write(json.dumps(default_config, indent=4))
+            file.write(default_config)
         return default_config
     with open(
         os.path.expanduser(f'{config_path}/config.json'),
