@@ -149,22 +149,19 @@ def module(bar, name, config):
                 module.cache.widget = output['widget']
 
         # Override class and set to gray if module is stale
+        module.reset_style()
         if 'interval' in module_config and 'timestamp' in output:
             if (
                 datetime.now() -
                 datetime.fromtimestamp(output['timestamp'])
             ).seconds > module_config['interval'] * 2:
                 c.add_style(module, 'gray')
-            else:
-                module.reset_style()
 
         # Set class
         if 'indicator' in config and config['indicator']:
-            module.indicator.reset_style()
             if 'class' in list(output):
                 c.add_style(module.indicator, output['class'])
         else:
-            module.reset_style()
             if 'class' in list(output):
                 c.add_style(module, output['class'])
 

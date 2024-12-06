@@ -36,6 +36,8 @@ class Module(Gtk.MenuButton):
         self.default_styles = self.get_style_context().list_classes()
         self.con = box('v')
         self.indicator = box('h', style='indicator')
+        self.indicator_styles = \
+            self.indicator.get_style_context().list_classes()
         self.box = box('h', spacing=5)
         self.con.pack_start(self.box, 1, 1, 0)
         self.con.add(self.indicator)
@@ -57,6 +59,12 @@ class Module(Gtk.MenuButton):
             for style in self.get_styles():
                 if style not in self.default_styles:
                     self.get_style_context().remove_class(style)
+
+        indicator_styles = self.indicator.get_style_context().list_classes()
+        if self.indicator_styles != indicator_styles:
+            for style in indicator_styles:
+                if style not in self.indicator_styles:
+                    self.indicator.get_style_context().remove_class(style)
 
     def get_styles(self):
         """ Get styles """
