@@ -30,7 +30,7 @@ jobs:
 
       - name: Build binary
         run: |
-          pyinstaller main.py --add-data="style.css:." --onefile --clean --noconfirm -n pybar
+          pyinstaller pybar.spec
 
       - name: Create Artifact
         uses: actions/upload-artifact@v4
