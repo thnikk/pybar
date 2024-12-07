@@ -17,10 +17,11 @@ from gi.repository import Gtk  # noqa
 
 def parse_args():
     """ Parse arguments """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(exit_on_error=False)
     parser.add_argument('-C', '--config', type=str, default='~/.config/pybar',
                         help="Configuration path")
-    return parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    return args
 
 
 def main():
