@@ -58,12 +58,15 @@ class Privacy(c.Module):
         while True:
             devices = []
             for path in glob('/sys/class/video4linux/video*'):
-                with open(f'{path}/state', 'r') as file:
-                    state = file.read().strip()
-                with open(f'{path}/name', 'r') as file:
-                    name = file.read().strip()
-                if "capture" in state:
-                    devices.append(name)
+                try:
+                    with open(f'{path}/state', 'r') as file:
+                        state = file.read().strip()
+                    with open(f'{path}/name', 'r') as file:
+                        name = file.read().strip()
+                    if "capture" in state:
+                        devices.append(name)
+                except FileNotFoundError:
+                    pass
             if devices != self.webcams:
                 self.webcams = devices
                 GLib.idle_add(self.update)
