@@ -22,6 +22,7 @@ from modules import toggle
 from modules import privacy
 from modules import hass_2
 from modules import mpc
+from modules import memory
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -67,6 +68,7 @@ def module(bar, name, config):
         'toggle': toggle.module,
         'privacy': privacy.module,
         'hass_2': hass_2.module,
+        'memory': memory.module,
         'mpc': mpc.module
     }
 
