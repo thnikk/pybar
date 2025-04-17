@@ -19,7 +19,7 @@ def module(bar, config=None):
     def get_memory():
         total = int(psutil.virtual_memory().total / (1024.0 ** 3))
         used = int(psutil.virtual_memory().used / (1024.0 ** 3))
-        new = f"{used}/{total}"
+        new = f"{used}"
         last = module.text.get_label()
         if new != last:
             module.text.set_label(new)
