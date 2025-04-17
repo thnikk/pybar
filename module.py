@@ -23,6 +23,8 @@ from modules import privacy
 from modules import hass_2
 from modules import mpc
 from modules import memory
+from modules import docker
+from modules import rocm
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -69,6 +71,9 @@ def module(bar, name, config):
         'privacy': privacy.module,
         'hass_2': hass_2.module,
         'memory': memory.module,
+        'docker': docker.module,
+        'docker2': docker2.module,
+        'rocm': rocm.module,
         'mpc': mpc.module
     }
 
