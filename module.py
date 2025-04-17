@@ -72,7 +72,6 @@ def module(bar, name, config):
         'hass_2': hass_2.module,
         'memory': memory.module,
         'docker': docker.module,
-        'docker2': docker2.module,
         'rocm': rocm.module,
         'mpc': mpc.module
     }
