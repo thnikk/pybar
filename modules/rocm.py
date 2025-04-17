@@ -15,13 +15,30 @@ class Rocm(c.Module):
         self.icon.set_text('')
         self.devices = []
 
-        self.widgets = [
-            {item: {
-                'level': Gtk.LevelBar.new(), 'label': Gtk.Label.new("0%")
-            } for item in ["load", "mem"]}
-            for x in range(0, 2)
-        ]
-        c.print_debug(self.widgets)
+        self.levels = []
+        self.widgets = []
+        for x in range(0, 2):
+            levels = []
+            levels_box = c.box('h')
+            for y in range(0, 2):
+                level = Gtk.LevelBar.new()
+                Gtk.Orientable.set_orientation(level, Gtk.Orientation.VERTICAL)
+                level.set_value(0.5)
+                level.set_inverted(True)
+                levels.append(level)
+                levels_box.add(level)
+            self.box.add(levels_box)
+            self.levels.append(levels)
+
+            device = {}
+            for item in ["load", "mem"]:
+                level = Gtk.LevelBar.new()
+                c.add_style(level, 'level-horizontal')
+                label = Gtk.Label.new('0%')
+                device[item] = {'level': level, 'label': label}
+            self.widgets.append(device)
+
+        # c.print_debug(self.widgets)
         self.set_widget(self.widget())
 
         thread = threading.Thread(target=self.listen)
@@ -61,42 +78,31 @@ class Rocm(c.Module):
 
     def update(self):
         loads = []
-        for num, device in enumerate(self.devices):
-            loads.append(device['gpu'])
+        for device, info in self.devices.items():
+            if 'card' in device:
+                loads.append(info['GPU use (%)'])
+                num = int(device.strip('card'))
 
-            load = float(device['gpu'].split('%')[0])/100
-            self.widgets[num]['load']['level'].set_value(load)
-            self.widgets[num]['load']['label'].set_text(device['gpu'])
+                load = float(info['GPU use (%)'].split('%')[0])/100
+                self.widgets[num]['load']['level'].set_value(load)
+                self.widgets[num]['load']['label'].set_text(
+                        info['GPU use (%)'])
+                self.levels[num][0].set_value(load)
 
-            mem = float(device['vram'].split('%')[0])/100
-            self.widgets[num]['mem']['level'].set_value(mem)
-            self.widgets[num]['mem']['label'].set_text(device['vram'])
-
-        self.text.set_text(' '.join(loads))
+                mem = float(info['GPU Memory Allocated (VRAM%)'])/100
+                self.widgets[num]['mem']['level'].set_value(mem)
+                self.widgets[num]['mem']['label'].set_text(
+                        info['GPU Memory Allocated (VRAM%)']
+                    )
+                self.levels[num][1].set_value(mem)
 
     def get_devices(self):
-        output = run(
-            ["rocm-smi"], capture_output=True, check=True
-        ).stdout.decode('utf-8').splitlines()
-
-        devices = []
-        columns = [
-            'device', 'node', 'did', 'guid', 'temp', 'power', 'mem',
-            'compute', 'id', 'sclk', 'mclk', 'fan', 'perf', 'pwr_cap',
-            'vram', 'gpu']
-        for line in output:
-            if len(line) > 0 and line[0].isdigit():
-                device = {}
-                parts = ' '.join(line.split()).split()
-                for num, part in enumerate(parts):
-                    device[columns[num]] = part
-                devices.append(device)
-        return devices
-        # return json.loads(
-        #         run(
-        #             ['rocm-smi'], capture_output=True, check=True
-        #             ).stdout.decode('utf-8')
-        #         )
+        return json.loads(
+                run(
+                    ['rocm-smi', '-a', '--json'],
+                    capture_output=True, check=True
+                    ).stdout.decode('utf-8')
+                )
 
 
 def module(bar, config):

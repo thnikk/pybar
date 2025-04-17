@@ -60,6 +60,17 @@ button { color: inherit; }
 	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+.scroll-box {
+	padding: 10px;
+	border-radius: 10px;
+	background: #2b303b;
+	border: 1px solid @gray;
+}
+
+text {
+	background: #2b303b;
+}
+
 /* colorize modules */
 .green { background: @green; color: @black; }
 .red { background: @red; color: @black; }
@@ -94,9 +105,13 @@ scrollbar {
 
 scrollbar slider { background: none; border: none; }
 
-levelbar trough { border-radius: 6px; min-height: 6px; min-width: 100px; border: none; background: @black; }
-levelbar block { border-radius: 3px; border: none; }
-levelbar block.filled { background-color: @green; }
+.horizontal levelbar trough { border-radius: 6px; min-height: 6px; min-width: 100px; border: none; background: @black; }
+.horizontal levelbar block { border-radius: 3px; border: none; }
+.horizontal levelbar block.filled { background-color: @green; }
+
+.module levelbar trough { min-width: 3px; min-height: 3px; border: none; background: none; margin: 3px 0px;}
+.module levelbar block { border-radius: 3px; border: none; background: @gray; }
+.module levelbar block.filled { background-color: alpha(@white, 0.8); }
 
 scale contents trough { padding: 3px; min-width: 100px; background: @black; border: none; }
 scale contents trough highlight {
