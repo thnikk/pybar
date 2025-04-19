@@ -166,16 +166,9 @@ switch slider {
 	transition: none;
 }
 
-.custom-button { background: #2b303b; border: @gray; }
-.custom-button:hover {
-	background: #1c1f26;
-	border: rgba(255,255,255,0.2);
-}
-.custom-button:active {
-	background: #d8dee9;
-	color: #2b303b;
-	border: rgba(0,0,0,0.1);
-}
+.normal { background: #2b303b; border: @gray; }
+.normal:hover { background: #1c1f26; border: rgba(255,255,255,0.2); }
+.normal:active { background: #d8dee9; color: #2b303b; border: rgba(0,0,0,0.1); }
 
 /* widgets */
 popover, .popover {

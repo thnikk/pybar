@@ -15,6 +15,7 @@ class Rocm(c.Module):
         self.icon.set_text('')
         self.devices = []
 
+        self.device_labels = []
         self.levels = []
         self.widgets = []
         for x in range(0, 2):
@@ -46,22 +47,22 @@ class Rocm(c.Module):
         thread.start()
 
     def widget(self):
-        box = c.box('v', spacing=20)
+        box = c.box('v', spacing=10)
         box.add(c.label('GPU info', style='heading'))
 
         # Make boxes for 2 gpus
         for x in range(0, 2):
-            device_box = c.box('v', spacing=10)
+            device_box = c.box('v', spacing=0)
             c.add_style(device_box, 'box')
-            device_box.add(c.label(f'Device {x}'))
+            label = c.label(f'Device {x}')
+            self.device_labels.append(label)
+            device_box.add(label)
             info_box = c.box('v', spacing=10, style='inner-box')
             for line, widgets in self.widgets[x].items():
                 line_box = c.box('h', spacing=10)
                 for name, item in widgets.items():
                     line_box.add(item)
                 info_box.add(line_box)
-            # for label, level in self.widgets[x].items():
-            #     info_box.add(level)
             device_box.add(info_box)
             box.add(device_box)
 
@@ -78,6 +79,9 @@ class Rocm(c.Module):
 
     def update(self):
         loads = []
+        for num, info in enumerate(self.devices.values()):
+            if 'Subsystem ID' in info:
+                self.device_labels[num].set_text(info['Subsystem ID'])
         for device, info in self.devices.items():
             if 'card' in device:
                 loads.append(info['GPU use (%)'])
@@ -86,13 +90,14 @@ class Rocm(c.Module):
                 load = float(info['GPU use (%)'].split('%')[0])/100
                 self.widgets[num]['load']['level'].set_value(load)
                 self.widgets[num]['load']['label'].set_text(
-                        info['GPU use (%)'])
+                        f"{info['GPU use (%)']:02}%"
+                    )
                 self.levels[num][0].set_value(load)
 
                 mem = float(info['GPU Memory Allocated (VRAM%)'])/100
                 self.widgets[num]['mem']['level'].set_value(mem)
                 self.widgets[num]['mem']['label'].set_text(
-                        info['GPU Memory Allocated (VRAM%)']
+                        f"{info['GPU Memory Allocated (VRAM%)']:02}%"
                     )
                 self.levels[num][1].set_value(mem)
 
