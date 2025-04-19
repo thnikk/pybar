@@ -155,7 +155,7 @@ def updates(name, module, cache):
         scroll_box = c.scroll(0, 348)
         for package in packages:
             package_box = c.box('h', style='inner-box', spacing=20)
-            package_label = c.button(package[0], style='none')
+            package_label = c.button(package[0], style='minimal')
             try:
                 package_label.connect(
                     'clicked', click_link,

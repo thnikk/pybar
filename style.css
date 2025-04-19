@@ -23,8 +23,6 @@ window {
 	color: @white;
 }
 
-button { color: inherit; }
-
 .module {
 	padding: 2px 5px;
 	background: #2b303b;
@@ -157,7 +155,8 @@ switch slider {
 /* levelbar block.high, levelbar block:not(.empty) { border: 1px solid @gray; background-color: @blue; } */
 /* levelbar block.low, levelbar block.high, levelbar block.full, levelbar block.empty { background: @blue; border: 1px solid @gray; } */
 
-button {
+/* button { color: inherit; } */
+.minimal {
 	background: none;
 	border: 0;
 	margin: 0;
@@ -165,6 +164,17 @@ button {
 	text-shadow: none;
 	box-shadow: none;
 	transition: none;
+}
+
+.custom-button { background: #2b303b; border: @gray; }
+.custom-button:hover {
+	background: #1c1f26;
+	border: rgba(255,255,255,0.2);
+}
+.custom-button:active {
+	background: #d8dee9;
+	color: #2b303b;
+	border: rgba(0,0,0,0.1);
 }
 
 /* widgets */
