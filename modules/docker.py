@@ -36,7 +36,7 @@ def widget(path, log):
     }
     button_box = c.box('h', spacing=10)
     for icon, func in funcs.items():
-        button = c.button(label=icon)
+        button = c.button(label=icon, style='normal')
         # c.add_style(button, 'module')
         button.connect('clicked', event_action, func, path)
         button_box.pack_start(button, 1, 1, 0)
@@ -71,14 +71,14 @@ def module(bar, config=None):
         if 'running' in state:
             module.icon.set_label('')
             c.add_style(module.indicator, 'green')
-            # output = run(
-            #     ['docker', 'compose', 'logs', '--no-log-prefix'],
-            #     cwd=path,
-            #     capture_output=True, check=True
-            # ).stdout.decode('utf-8')
-            # log.set_text(
-            #     '\n'.join(
-            #         reversed(output.splitlines())))
+            output = run(
+                ['docker', 'compose', 'logs', '--no-log-prefix'],
+                cwd=path,
+                capture_output=True, check=True
+            ).stdout.decode('utf-8').splitlines()
+            log.set_text(
+                '\n'.join(output[-14:])
+            )
         else:
             module.icon.set_label('')
             module.reset_style()
