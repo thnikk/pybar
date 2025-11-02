@@ -10,34 +10,38 @@ jobs:
       image: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Sy --noconfirm python python-pip base-devel openssl git
+        run: |
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm python python-pip base-devel openssl git
 
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.14.0
-
-      - name: Install dependencies
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+
+      - name: Install Python dependencies
+        run: |
+          source venv/bin/activate
           pip install -r requirements.txt
-        working-directory: ./
 
       - name: Install PyInstaller
         run: |
+          source venv/bin/activate
           pip install pyinstaller
-        working-directory: ./
 
       - name: Build binary
         run: |
+          source venv/bin/activate
           pyinstaller pybar.spec
 
       - name: Create Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pybar
+          name: pybar-arch
           path: dist/
 
       - name: List files in dist folder
