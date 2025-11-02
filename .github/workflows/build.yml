@@ -12,7 +12,8 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm python python-pip base-devel openssl git
+          pacman -Syu --noconfirm python python-pip base-devel openssl git \
+          libgirepository gtk3 python-gobject cairo python-cairo pkgconf
 
       - name: Checkout
         uses: actions/checkout@v3
