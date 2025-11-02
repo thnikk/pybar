@@ -10,7 +10,7 @@ jobs:
       image: archlinux:latest
     steps:
       - name: Install dependencies
-        run: sudo pacman -Sy --noconfirm python python-pip base-devel openssl git
+        run: pacman -Sy --noconfirm python python-pip base-devel openssl git
 
       - name: Checkout
         uses: actions/checkout@v3
