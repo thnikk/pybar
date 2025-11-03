@@ -58,6 +58,8 @@ def widget(config):
                 data = get_data(
                     config['server'], id, config['bearer_token'])
                 value = data['state']
+                if "." in value:
+                    value = value.split('.')[0]
                 try:
                     value += data['attributes']['unit_of_measurement']
                 except KeyError:
@@ -77,8 +79,12 @@ def widget(config):
                     data = get_data(
                         config['server'], id, config['bearer_token'])
                     values = ["off", "on"]
-                    switch.set_state(values.index(data['state']))
-                    switch.connect('state_set', switch_action, config, id)
+                    try:
+                        switch.set_state(values.index(data['state']))
+                        switch.connect('state_set', switch_action, config, id)
+                    except ValueError:
+                        switch.set_sensitive(False)
+                        pass
 
                     line_box.pack_end(switch_h, 0, 0, 0)
                 except KeyError:
