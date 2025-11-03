@@ -31,6 +31,10 @@ def module(config) -> dict:
     """ Module function """
     icons = []
     devices = []
+    ignore = []
+    if "ignore" in config:
+        ignore = config["ignore"]
+
     for path in glob('/sys/class/power_supply/*'):
         with open(f"{path}/uevent") as file:
             # Read the file
@@ -47,6 +51,13 @@ def module(config) -> dict:
                     "battery")[0].replace('-', ' ').strip().title()
             else:
                 device_name = "Unknown"
+
+            try:
+                for name in ignore:
+                    if name in device_name.lower():
+                        raise ValueError
+            except ValueError:
+                continue
 
             # Set the battery level
             try:
