@@ -18,7 +18,7 @@ window {
 	background: alpha(@black, 0.8);
 	border-top: 1px solid @gray;
 	border-radius: 0px;
-	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid";
+	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid", "Font Awesome 7 Free Solid";
 	font-size: 16px;
 	color: @white;
 }
@@ -33,7 +33,7 @@ window {
 }
 
 .module-fixed {
-	min-width: 70px;
+	min-width: 60px;
 }
 
 /* workspaces */
@@ -135,6 +135,9 @@ switch slider {
 	border: none;
 	min-height: 1px;
 	min-width: 1px;
+}
+switch:disabled {
+	opacity: 0.5;
 }
 
 /* levelbar trough { */
