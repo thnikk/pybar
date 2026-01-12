@@ -6,15 +6,15 @@ attrs==24.3.0
 certifi==2024.12.14
 charset-normalizer==3.4.1
 frozenlist==1.5.0
-genshin==1.7.3
+# genshin==1.7.3
 hid==1.0.6
 idna==3.10
 multidict==6.1.0
 propcache==0.2.1
 pulsectl==24.11.0
 pycairo==1.27.0
-pydantic==2.10.4
-pydantic_core==2.27.2
+# pydantic==2.10.4
+# pydantic_core==2.27.2
 PyGObject==3.50.0
 requests==2.32.3
 transmission-rpc==7.0.11
