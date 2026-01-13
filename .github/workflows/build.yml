@@ -1,7 +1,15 @@
-name: Build pybar binary with Pyinstaller
+name: Build and Release pybar
 
 on:
   push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
 
 jobs:
   build-arch:
@@ -13,10 +21,10 @@ jobs:
         run: |
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm python python-pip base-devel openssl git \
-          libgirepository gtk3 python-gobject cairo python-cairo pkgconf
+          libgirepository gtk3 python-gobject cairo python-cairo pkgconf zip
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Create virtual environment
         run: |
@@ -39,14 +47,16 @@ jobs:
           source venv/bin/activate
           pyinstaller pybar.spec
 
+      - name: Zip Artifact
+        run: |
+          cd dist
+          zip ../pybar-arch.zip *
+
       - name: Create Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pybar-arch
-          path: dist/
-
-      - name: List files in dist folder
-        run: ls -R ./dist/
+          name: pybar-arch-zip
+          path: pybar-arch.zip
 
   build:
     runs-on: ubuntu-24.04
@@ -54,10 +64,10 @@ jobs:
       - name: Install Ubuntu dependencies
         run: |
           sudo apt update
-          sudo apt install -y libgirepository1.0-dev libgtk-3-dev libatk1.0-dev openssl
+          sudo apt install -y libgirepository1.0-dev libgtk-3-dev libatk1.0-dev openssl zip
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -67,23 +77,54 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-        working-directory: ./
 
       - name: Install PyInstaller
         run: |
           pip install pyinstaller
-        working-directory: ./
 
       - name: Build binary
         run: |
           pyinstaller pybar.spec
 
+      - name: Zip Artifact
+        run: |
+          cd dist
+          zip ../pybar-ubuntu.zip *
+
       - name: Create Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pybar
-          path: dist/
+          name: pybar-ubuntu-zip
+          path: pybar-ubuntu.zip
 
-      - name: List files in dist folder
-        run: ls -R ./dist/
+  release:
+    name: Create Release
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build-arch, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Download Arch Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pybar-arch-zip
+
+      - name: Download Ubuntu Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pybar-ubuntu-zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: Release ${{ github.event.inputs.tag_name }}
+          files: |
+            pybar-arch.zip
+            pybar-ubuntu.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
