@@ -32,6 +32,17 @@ window {
 	text-shadow: none;
 }
 
+/* Remove default button styling from MenuButton internal buttons */
+.module button,
+.module button.toggle {
+	background: transparent;
+	border: none;
+	padding: 0;
+	margin: 0;
+	box-shadow: none;
+	transition: none;
+}
+
 .module-fixed {
 	min-width: 60px;
 }
