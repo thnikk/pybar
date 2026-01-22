@@ -104,6 +104,7 @@ class Widget(Gtk.Popover):
     """ Template widget"""
     def __init__(self):
         super().__init__()
+        self.set_autohide(False)
         self.set_position(Gtk.PositionType.TOP)
         self.box = box('v', spacing=20)
 

@@ -185,20 +185,24 @@ switch:disabled {
 .normal:active { background: #d8dee9; color: #2b303b; border: rgba(0,0,0,0.1); }
 
 /* widgets */
-popover,
-.popover {
+popover {
 	font-family: "Nunito", "Font Awesome 6 Free Solid";
 	color: @white;
 	background: none;
 }
 
-popover contents.background,
-.popover contents.background {
+popover contents {
 	background: alpha(@black, 0.8);
 	border: 2px solid @blue;
 	border-radius: 20px;
 	padding: 10px;
 	box-shadow: 0px 0px 3px black;
+}
+
+popover.background arrow {
+	background-color: alpha(@black, 0.8);
+	border-bottom-width: 2px;
+	border-color: @blue;
 }
 
 .music .title {
