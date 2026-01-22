@@ -7,7 +7,7 @@ import common as c
 from subprocess import run, Popen
 import os
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -39,7 +39,7 @@ def widget(path, log):
         button = c.button(label=icon, style='normal')
         # c.add_style(button, 'module')
         button.connect('clicked', event_action, func, path)
-        button_box.pack_start(button, 1, 1, 0)
+        button_box.append(button)
     container.add(button_box)
     return container
 

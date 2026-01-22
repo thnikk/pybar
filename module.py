@@ -25,7 +25,8 @@ from modules import mpc
 from modules import memory
 from modules import docker
 from modules import rocm
-gi.require_version('Gtk', '3.0')
+from modules import nvtop
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -73,6 +74,7 @@ def module(bar, name, config):
         'memory': memory.module,
         'docker': docker.module,
         'rocm': rocm.module,
+        'nvtop': nvtop.module,
         'mpc': mpc.module
     }
 
@@ -109,7 +111,7 @@ def module(bar, name, config):
     module = c.Module(0, 1)
     module.set_position(bar.position)
     module.set_visible(False)
-    module.set_no_show_all(True)
+    module.set_visible(False)
 
     def get_output():
         """ Create module using cache """

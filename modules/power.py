@@ -32,11 +32,11 @@ def module(bar, config=None):
     for icon, command in buttons.items():
         button = c.button(label=icon, ha='end', style='power-item')
         button.connect('clicked', power_action, command, widget)
-        power_box.add(button)
+        power_box.append(button)
         if icon != list(buttons)[-1]:
-            power_box.add(c.sep('h'))
+            power_box.append(c.sep('h'))
 
-    widget.box.add(power_box)
+    widget.box.append(power_box)
     widget.draw()
     module.set_popover(widget)
 

@@ -11,7 +11,7 @@ import os
 import signal
 import gi
 import time
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 
@@ -24,7 +24,7 @@ class Privacy(c.Module):
         c.add_style(self.indicator, 'green')
         self.text.show()
         self.box.show()
-        self.set_no_show_all(True)
+        self.set_visible(False)
         self.webcams = []
         self.devices = {}
 

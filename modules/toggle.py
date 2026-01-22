@@ -6,7 +6,7 @@ Author: thnikkk
 import common as c
 from subprocess import Popen, DEVNULL
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -23,7 +23,7 @@ class switch(Gtk.Box):
         switch_box = c.box('v')
         self.switch = Gtk.Switch.new()
         c.add_style(self.switch, 'switch')
-        switch_box.pack_start(self.switch, 1, 0, 0)
+        switch_box.append(self.switch)
         self.add(switch_box)
         self.switch.connect('state_set', self.click_action)
 

@@ -9,7 +9,7 @@ import calendar
 import os
 import json
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -96,8 +96,8 @@ def draw_calendar(combined_month):
                 if style:
                     day_label.get_style_context().add_class(style)
             day_label.get_style_context().add_class('day')
-            line.add(day_label)
-        lines.add(line)
+            line.append(day_label)
+        lines.append(line)
     return lines
 
 
@@ -116,7 +116,7 @@ def draw_events(now, events, combined_calendar):
         if month_events:
             event_section = c.box('v', spacing=10)
             event_line = c.box('h')
-            event_line.add(c.label(f'{month} month'))
+            event_line.append(c.label(f'{month} month'))
 
             events_box = c.box('v', style='box')
             shown_events = []
@@ -134,19 +134,17 @@ def draw_events(now, events, combined_calendar):
                 event_dot = c.label('', style='event-dot')
                 event_style = event_lookup(event)
                 event_dot.get_style_context().add_class(event_style)
-                event_box.pack_start(event_dot, False, True, 0)
-                event_box.pack_start(
-                    c.label(date, style='event-day'), False, True, 0)
-                event_box.pack_start(
-                    c.label(event, wrap=20), False, True, 0)
-                events_box.add(event_box)
+                event_box.append(event_dot)
+                event_box.append(c.label(date, style='event-day'))
+                event_box.append(c.label(event, wrap=20))
+                events_box.append(event_box)
 
                 if date != list(month_events)[-1]:
-                    events_box.add(c.sep('h'))
+                    events_box.append(c.sep('h'))
             if shown_events:
-                event_section.add(event_line)
-                event_section.add(events_box)
-                events_section.add(event_section)
+                event_section.append(event_line)
+                event_section.append(events_box)
+                events_section.append(event_section)
     return events_section
 
 
@@ -157,7 +155,7 @@ def widget():
     now = datetime.now()
 
     month_label = c.label(now.strftime('%B'), style='heading')
-    widget.add(month_label)
+    widget.append(month_label)
 
     cal_section = c.box('v')
 
@@ -166,9 +164,9 @@ def widget():
     for dow in ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]:
         dow_label = c.label(dow, style='day')
         c.add_style(dow_label, 'dow')
-        row.add(dow_label)
+        row.append(dow_label)
     cal_box = c.box('v')
-    cal_box.add(row)
+    cal_box.append(row)
 
     last_month = cal_list(*diff_month(now.year, now.month, -1), 'old')[-2:]
     current_month = cal_list(now.year, now.month)
@@ -183,7 +181,7 @@ def widget():
     except FileNotFoundError:
         events = {}
         alert = c.box('v', style='box')
-        alert.add(c.label(
+        alert.append(c.label(
             'Set up events in ~/.config/calendar-events.json',
             style='event-box', wrap=20))
 
@@ -191,16 +189,16 @@ def widget():
 
     combined_calendar = combine_calendar(last_month, current_month, next_month)
 
-    cal_box.add(draw_calendar(combined_calendar))
-    cal_section.add(cal_box)
-    widget.add(cal_section)
+    cal_box.append(draw_calendar(combined_calendar))
+    cal_section.append(cal_box)
+    widget.append(cal_section)
 
     events_section = draw_events(now, events, combined_calendar)
     if events_section:
-        widget.add(events_section)
+        widget.append(events_section)
 
     try:
-        widget.add(alert)
+        widget.append(alert)
     except UnboundLocalError:
         pass
 

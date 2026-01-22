@@ -11,9 +11,9 @@ import os
 import signal
 import common as c
 import gi
-gi.require_version('Gtk', '3.0')
-gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject, GLib  # noqa
+gi.require_version('Gtk', '4.0')
+gi.require_version('Gtk4LayerShell', '1.0')
+from gi.repository import Gtk, Gdk, Gtk4LayerShell, Pango, GObject, GLib  # noqa
 
 
 class Workspaces(Gtk.Box):
@@ -35,7 +35,7 @@ class Workspaces(Gtk.Box):
         self.buttons = []
         for n in range(1, 11):
             button = c.button(style='workspace')
-            button.set_no_show_all(True)
+            button.set_visible(False)
             try:
                 button.set_label(config['icons'][str(n)])
             except KeyError:
@@ -45,7 +45,7 @@ class Workspaces(Gtk.Box):
                     button.set_label(str(n))
             button.connect('clicked', self.switch, n)
             self.buttons.append(button)
-            self.add(button)
+            self.append(button)
 
         # Initial update before waiting for listener updates
         self.update()

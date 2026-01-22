@@ -7,7 +7,7 @@ import common as c
 import requests
 import traceback
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -42,17 +42,16 @@ def switch_action(switch, state, config, id) -> None:
 def widget(config):
     """ Backlight widget """
     main_box = c.box('v', spacing=20)
-    main_box.add(c.label('Home Assistant', style='heading-small'))
+    main_box.append(c.label('Home Assistant', style='heading-small'))
 
     for section, devices in config['devices'].items():
         section_box = c.box('v', spacing=10)
-        section_box.add(c.label(section, style='title', ha='start'))
+        section_box.append(c.label(section, style='title', ha='start'))
         lines_box = c.box('v', style='box')
 
         for name, id in devices.items():
             line_box = c.box('h', spacing=20, style='inner-box')
-            line_box.pack_start(
-                c.label(name, ha="start"), 1, 1, 0)
+            line_box.append(c.label(name, ha="start"))
 
             if id.split('.')[0] == 'sensor':
                 data = get_data(
@@ -64,8 +63,7 @@ def widget(config):
                     value += data['attributes']['unit_of_measurement']
                 except KeyError:
                     pass
-                line_box.pack_start(
-                    c.label(value, ha="end"), 1, 1, 0)
+                line_box.append(c.label(value, ha="end"))
 
             if id.split('.')[0] == 'switch' or id.split('.')[0] == 'light':
                 try:
@@ -73,8 +71,8 @@ def widget(config):
                     c.add_style(switch, 'switch')
                     switch_v = c.box('v')
                     switch_h = c.box('h')
-                    switch_v.pack_start(switch, 1, 0, 0)
-                    switch_h.pack_start(switch_v, 1, 0, 0)
+                    switch_v.append(switch)
+                    switch_h.append(switch_v)
 
                     data = get_data(
                         config['server'], id, config['bearer_token'])
@@ -86,17 +84,17 @@ def widget(config):
                         switch.set_sensitive(False)
                         pass
 
-                    line_box.pack_end(switch_h, 0, 0, 0)
+                    line_box.append(switch_h)
                 except KeyError:
                     # continue
-                    line_box.pack_end(c.label('???'), 0, 0, 0)
+                    line_box.append(c.label('???'))
 
-            lines_box.add(line_box)
+            lines_box.append(line_box)
             if name != list(devices)[-1]:
-                lines_box.add(c.sep('v'))
-        section_box.add(lines_box)
+                lines_box.append(c.sep('v'))
+        section_box.append(lines_box)
 
-        main_box.pack_start(section_box, 1, 1, 0)
+        main_box.append(section_box)
     return main_box
 
 

@@ -11,8 +11,14 @@ import common as c
 import module
 import cache
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
+
+
+def on_activate(app, config):
+    display = Display(config, app)
+    # Draw all bars
+    display.draw_all()
 
 
 def parse_args():
@@ -73,11 +79,9 @@ def main():
             thread.start()
 
     # Create display object
-    display = Display(config)
-    # Draw all bars
-    display.draw_all()
-    # Start main GTK thread
-    Gtk.main()
+    app = Gtk.Application(application_id='org.thnikk.pybar')
+    app.connect('activate', lambda app: on_activate(app, config))
+    app.run()
 
 
 if __name__ == "__main__":

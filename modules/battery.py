@@ -6,7 +6,7 @@ Author: thnikk
 import common as c
 from glob import glob
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -25,11 +25,11 @@ def widget(cache):
         )*100)
         level = Gtk.LevelBar().new_for_interval(0, 100)
         level.set_value(percentage)
-        device_box.pack_start(c.label(device), 0, 0, 0)
+        device_box.append(c.label(device))
         level_box = c.box('v')
-        level_box.pack_start(level, 1, 0, 0)
-        device_box.pack_start(level_box, 1, 1, 0)
-        device_box.pack_end(c.label(f'{percentage}%'), 0, 0, 0)
+        level_box.append(level)
+        device_box.append(level_box)
+        device_box.append(c.label(f'{percentage}%'))
         battery_box.add(device_box)
         if device != list(cache)[-1]:
             battery_box.add(c.sep('h'))

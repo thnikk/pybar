@@ -6,7 +6,7 @@ Author: thnikk
 import common as c
 import os
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
@@ -26,8 +26,8 @@ def widget(cache):
     outer_box.add(c.label('', style='inner-box'))
     level = c.slider(cache['brightness'], 10, cache['max_brightness'])
     level.connect('value-changed', set_backlight)
-    outer_box.pack_start(level, 1, 1, 0)
-    main_box.pack_start(outer_box, 1, 1, 0)
+    outer_box.append(level)
+    main_box.append(outer_box)
     return main_box
 
 

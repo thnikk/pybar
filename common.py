@@ -7,9 +7,9 @@ import inspect
 from datetime import datetime
 import sys
 import gi
-gi.require_version('Gtk', '3.0')
-gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, Gdk, GtkLayerShell, Pango, GObject  # noqa
+gi.require_version('Gtk', '4.0')
+gi.require_version('Gtk4LayerShell', '1.0')
+from gi.repository import Gtk, Gdk, Gtk4LayerShell, Pango, GObject  # noqa
 
 
 align = {
@@ -33,52 +33,50 @@ class Module(Gtk.MenuButton):
         self.cache = ModuleCache()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
-        self.default_styles = self.get_style_context().list_classes()
+        self.added_styles = []
         self.con = box('v')
         self.indicator = box('h', style='indicator')
-        self.indicator_styles = \
-            self.indicator.get_style_context().list_classes()
+        self.indicator_added_styles = []
         self.box = box('h', spacing=5)
-        self.con.pack_start(self.box, 1, 1, 0)
-        self.con.add(self.indicator)
-        self.con.show_all()
+        self.box.set_vexpand(True)
+        self.con.append(self.box)
+        self.con.append(self.indicator)
+        self.con.show()
 
         if icon:
             self.icon = Gtk.Label()
-            self.box.pack_start(self.icon, 0, 0, 0)
+            self.box.prepend(self.icon)
         if text:
             self.text = Gtk.Label()
-            self.box.pack_end(self.text, 1, 1, 0)
-        self.add(self.con)
-        self.add_events(Gdk.EventMask.SCROLL_MASK)
-        self.add_events(Gdk.EventMask.SMOOTH_SCROLL_MASK)
+            self.text.set_hexpand(True)
+            self.box.append(self.text)
+        self.set_child(self.con)
 
     def reset_style(self):
         """ Reset module style back to default """
-        if self.default_styles != self.get_styles():
-            for style in self.get_styles():
-                if style not in self.default_styles:
-                    self.get_style_context().remove_class(style)
+        for style in self.added_styles:
+            self.get_style_context().remove_class(style)
+        self.added_styles = []
 
-        indicator_styles = self.indicator.get_style_context().list_classes()
-        if self.indicator_styles != indicator_styles:
-            for style in indicator_styles:
-                if style not in self.indicator_styles:
-                    self.indicator.get_style_context().remove_class(style)
+        for style in self.indicator_added_styles:
+            self.indicator.get_style_context().remove_class(style)
+        self.indicator_added_styles = []
 
-    def get_styles(self):
-        """ Get styles """
-        return self.get_style_context().list_classes()
+
 
     def add_style(self, style_class):
         """ Set style """
         self.get_style_context().add_class(style_class)
+        if isinstance(style_class, str):
+            self.added_styles.append(style_class)
+        else:
+            self.added_styles.extend(style_class)
         return self
 
     def set_widget(self, box):
         """ Set widget """
         widget = Widget()
-        widget.box.add(box)
+        widget.box.append(box)
         widget.draw()
         self.set_popover(widget)
 
@@ -106,17 +104,15 @@ class Widget(Gtk.Popover):
     """ Template widget"""
     def __init__(self):
         super().__init__()
-        self.set_constrain_to(Gtk.PopoverConstraint.NONE)
         self.set_position(Gtk.PositionType.TOP)
-        self.set_transitions_enabled(False)
         self.box = box('v', spacing=20)
 
     def heading(self, string):
-        self.box.add(label(string, style='heading'))
+        self.box.append(label(string))
 
     def draw(self):
-        self.box.show_all()
-        self.add(self.box)
+        self.box.show()
+        self.set_child(self.box)
 
 
 def print_debug(msg, name=None, color=38) -> None:
@@ -147,7 +143,8 @@ def level(min, max, value):
     bar_box = box('v')
     bar = Gtk.LevelBar().new_for_interval(min, max)
     bar.set_value(value)
-    bar_box.pack_start(bar, 1, 0, 0)
+    bar.set_vexpand(True)
+    bar_box.append(bar)
     return bar_box
 
 

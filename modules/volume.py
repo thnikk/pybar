@@ -8,7 +8,7 @@ import pulsectl
 import threading
 import time
 import gi
-gi.require_version('Gtk', '3.0')
+gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 
 
@@ -34,8 +34,12 @@ class Volume(c.Module):
 
         self.icons = config['icons']
 
-        self.connect('scroll-event', self.scroll)
-        self.connect('button-press-event', self.switch_outputs)
+        scroll_controller = Gtk.EventControllerScroll.new(0)
+        scroll_controller.connect('scroll', self.scroll)
+        self.add_controller(scroll_controller)
+        click_gesture = Gtk.GestureClick.new()
+        click_gesture.connect('pressed', self.switch_outputs)
+        self.add_controller(click_gesture)
 
         volume = round(default.volume.value_flat * 100)
         self.set_icon(default)
@@ -65,7 +69,7 @@ class Volume(c.Module):
         """ Volume widget """
         main_box = c.box('v', style='widget', spacing=20)
         c.add_style(main_box, 'small-widget')
-        main_box.add(c.label('Volume', style='heading'))
+        main_box.append(c.label('Volume', style='heading'))
 
         for name, list_type in {
             "Outputs": self.pulse.sink_list(),
@@ -73,7 +77,7 @@ class Volume(c.Module):
             "Programs": self.pulse.sink_input_list()
         }.items():
             section_box = c.box('v', spacing=10)
-            section_box.add(c.label(name, style='title', ha='start'))
+            section_box.append(c.label(name, style='title', ha='start'))
             sinks_box = c.box('v', style='box')
             sink_list = list_type
             for sink in sink_list:
@@ -95,16 +99,16 @@ class Volume(c.Module):
                         style='minimal', length=25)
                     sink_label.connect(
                         'clicked', self.set_default, sink)
-                sink_box.add(sink_label)
+                sink_box.append(sink_label)
                 level = c.slider(round(sink.volume.value_flat*100))
                 level.connect('value-changed', self.set_volume, sink)
-                sink_box.pack_start(level, 1, 1, 0)
-                sinks_box.add(sink_box)
+                sink_box.append(level)
+                sinks_box.append(sink_box)
                 if sink != sink_list[-1]:
-                    sinks_box.add(c.sep('v'))
-            section_box.add(sinks_box)
+                    sinks_box.append(c.sep('v'))
+            section_box.append(sinks_box)
             if sink_list:
-                main_box.add(section_box)
+                main_box.append(section_box)
 
         return main_box
 
@@ -206,7 +210,7 @@ class Volume(c.Module):
     def make_widget(self):
         """ Make widget for module """
         widget = c.Widget()
-        widget.box.add(self.widget_box())
+        widget.box.append(self.widget_box())
         widget.draw()
         self.set_popover(widget)
 
