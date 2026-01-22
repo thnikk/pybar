@@ -339,22 +339,17 @@ def power_supply(name, module, cache):
     main_box = c.box('v', spacing=20, style='small-widget')
     outer_box = c.box('v', style='box')
     for device in cache:
-        for x, y in device.items():
-            name = x
-            value = y
-        device_box = c.box('h', spacing=10, style="inner-box")
-        device_box.append(
-            c.label(name, ha="start"), 1, 1, 0)
-        device_box.append(c.level(0))
-        if value != -1:
-            device_box.append(
-                c.label(f"{value*25}%", style='percent'), 0, 1, 0)
-        else:
-            device_box.append(
-                c.label("??%", style='percent'), 0, 1, 0)
-        outer_box.append(device_box)
-        if device != list(cache)[-1]:
-            outer_box.append(c.sep('v'))
+            name, value = next(iter(device.items()))
+            device_box = c.box('h', spacing=10, style="inner-box")
+            device_box.append(c.label(name, ha="start"))
+            device_box.append(c.level(0, 100, value * 25 if value != -1 else 0))
+            if value != -1:
+                device_box.append(c.label(f"{value*25}%", style='percent'))
+            else:
+                device_box.append(c.label("??%", style='percent'))
+            outer_box.append(device_box)
+            if device != list(cache)[-1]:
+                outer_box.append(c.sep('v'))
     main_box.append(outer_box)
     return main_box
 
