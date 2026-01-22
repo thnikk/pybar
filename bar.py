@@ -3,6 +3,10 @@
 Description: Main GTK bar class that spawns the bar
 Author: thnikk
 """
+# For GTK4 Layer Shell to get linked before libwayland-client we must explicitly load it before importing with gi
+from ctypes import CDLL
+CDLL('libgtk4-layer-shell.so')
+
 import gi
 import os
 from subprocess import run, CalledProcessError
