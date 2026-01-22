@@ -174,9 +174,15 @@ switch:disabled {
 .normal:active { background: #d8dee9; color: #2b303b; border: rgba(0,0,0,0.1); }
 
 /* widgets */
-popover, .popover {
+popover,
+.popover {
 	font-family: "Nunito", "Font Awesome 6 Free Solid";
 	color: @white;
+	background: none;
+}
+
+popover contents.background,
+.popover contents.background {
 	background: alpha(@black, 0.8);
 	border: 2px solid @blue;
 	border-radius: 20px;
