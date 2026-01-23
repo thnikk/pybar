@@ -5,7 +5,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('style.css', '.'), ('modules_waybar', 'modules_waybar'), ('modules', 'modules')],
-    hiddenimports=[],
+    hiddenimports=['modules_waybar', 'modules'],
     hookspath=[],
     hooksconfig={
         "gi": {
