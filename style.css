@@ -30,6 +30,7 @@ window {
 	border-radius: 5px;
 	color: alpha(@white, 0.8);
 	text-shadow: none;
+	opacity: 0.8;
 }
 
 /* Remove default button styling from MenuButton internal buttons */
@@ -41,6 +42,7 @@ window {
 	margin: 0;
 	box-shadow: none;
 	transition: none;
+	color: @white;
 }
 
 .module-fixed {
@@ -115,10 +117,10 @@ scrollbar {
 scrollbar slider { background: none; border: none; }
 
 .horizontal levelbar trough { border-radius: 6px; min-height: 6px; min-width: 100px; border: none; background: @black; }
-.horizontal levelbar block { border-radius: 3px; border: none; }
+.horizontal levelbar block { border-radius: 3px; border: none; min-width: 3px; }
 .horizontal levelbar block.filled { background-color: @green; }
 
-.module levelbar trough { min-width: 3px; min-height: 3px; border: none; background: none; margin: 3px 0px;}
+.module levelbar trough { min-width: 3px; min-height: 15px; border: none; background: none; margin: 3px 0px;}
 .module levelbar block { border-radius: 3px; border: none; background: @gray; }
 .module levelbar block.filled { background-color: alpha(@white, 0.8); }
 
