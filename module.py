@@ -25,6 +25,7 @@ from modules import mpc
 from modules import memory
 from modules import docker
 from modules import rocm
+from modules import nvtop
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -73,6 +74,7 @@ def module(bar, name, config):
         'memory': memory.module,
         'docker': docker.module,
         'rocm': rocm.module,
+        'nvtop': nvtop.module,
         'mpc': mpc.module
     }
 

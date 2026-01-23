@@ -10,7 +10,7 @@ from datetime import datetime
 def get_output(command) -> list:
     """ Get output of shell command """
     output = run(
-        command, check=True, capture_output=True
+        command, check=False, capture_output=True
     ).stdout.decode('utf-8').strip().splitlines()
     return [line.split()[1] for line in output]
 
