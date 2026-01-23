@@ -20,8 +20,9 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm python python-pip base-devel openssl git \
-          libgirepository gtk3 python-gobject cairo python-cairo pkgconf zip
+          pacman -Syu --noconfirm python python-pip base-devel openssl \
+          git libgirepository gtk3 python-gobject cairo python-cairo \
+          pkgconf zip
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,7 +65,8 @@ jobs:
       - name: Install Ubuntu dependencies
         run: |
           sudo apt update
-          sudo apt install -y libgirepository1.0-dev libgtk-3-dev libatk1.0-dev openssl zip
+          sudo apt install -y libgirepository1.0-dev libgtk-3-dev \
+          libatk1.0-dev openssl zip
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -97,10 +99,85 @@ jobs:
           name: pybar-ubuntu-zip
           path: pybar-ubuntu.zip
 
+  build-appimage:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libgirepository1.0-dev libgtk-3-dev \
+          libatk1.0-dev openssl file wget desktop-file-utils
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.7
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller (onedir)
+        run: |
+          pyinstaller --onedir pybar.spec
+
+      - name: Download appimagetool
+        run: |
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Create AppImage structure
+        run: |
+          mkdir -p pybar.AppDir/usr/bin
+          cp -r dist/pybar/* pybar.AppDir/usr/bin/
+
+      - name: Create AppRun
+        run: |
+          cat > pybar.AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          exec "${HERE}/usr/bin/pybar" "$@"
+          EOF
+          chmod +x pybar.AppDir/AppRun
+
+      - name: Create desktop file
+        run: |
+          cat > pybar.AppDir/pybar.desktop << 'EOF'
+          [Desktop Entry]
+          Name=pybar
+          Exec=pybar
+          Icon=pybar
+          Type=Application
+          Categories=Utility;
+          EOF
+
+      - name: Create placeholder icon
+        run: |
+          cat > pybar.AppDir/pybar.png << 'EOF'
+          iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
+          EOF
+          base64 -d pybar.AppDir/pybar.png > /tmp/icon.png || true
+          convert -size 256x256 xc:gray pybar.AppDir/pybar.png 2>/dev/null || cp /tmp/icon.png pybar.AppDir/pybar.png || touch pybar.AppDir/pybar.png
+
+      - name: Build AppImage
+        run: |
+          ./appimagetool-x86_64.AppImage pybar.AppDir pybar-x86_64.AppImage
+
+      - name: Create Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pybar-appimage
+          path: pybar-x86_64.AppImage
+
   release:
     name: Create Release
     if: github.event_name == 'workflow_dispatch'
-    needs: [build-arch, build]
+    needs: [build-arch, build, build-appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,6 +195,11 @@ jobs:
         with:
           name: pybar-ubuntu-zip
 
+      - name: Download AppImage Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pybar-appimage
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -126,5 +208,6 @@ jobs:
           files: |
             pybar-arch.zip
             pybar-ubuntu.zip
+            pybar-x86_64.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
