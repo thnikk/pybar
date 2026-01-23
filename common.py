@@ -62,8 +62,6 @@ class Module(Gtk.MenuButton):
             self.indicator.get_style_context().remove_class(style)
         self.indicator_added_styles = []
 
-
-
     def add_style(self, style_class):
         """ Set style """
         self.get_style_context().add_class(style_class)
@@ -104,7 +102,7 @@ class Widget(Gtk.Popover):
     """ Template widget"""
     def __init__(self):
         super().__init__()
-        self.set_autohide(False)
+        # self.set_autohide(False)
         self.set_position(Gtk.PositionType.TOP)
         self.box = box('v', spacing=20)
 
