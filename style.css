@@ -24,13 +24,17 @@ window {
 }
 
 .module {
-	padding: 2px 5px;
 	background: #2b303b;
 	border: 1px solid @gray;
 	border-radius: 5px;
 	color: alpha(@white, 0.8);
 	text-shadow: none;
 	opacity: 0.8;
+	transition: opacity 200ms ease;
+}
+
+.module:hover {
+	opacity: 1;
 }
 
 /* Remove default button styling from MenuButton internal buttons */
@@ -38,7 +42,7 @@ window {
 .module button.toggle {
 	background: transparent;
 	border: none;
-	padding: 0;
+	padding: 2px 5px;
 	margin: 0;
 	box-shadow: none;
 	transition: none;

@@ -33,6 +33,7 @@ class Module(Gtk.MenuButton):
         self.cache = ModuleCache()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
+        self.set_cursor_from_name("pointer")
         self.added_styles = []
         self.con = box('v')
         self.indicator = box('h', style='indicator')
