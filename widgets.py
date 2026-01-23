@@ -21,12 +21,13 @@ def generic_widget(name, module, cache):
         if not items:
             continue
         category_box = c.box('v', spacing=10)
-        category_box.append(c.label(category))
+        category_box.append(c.label(
+            category, style='title', ha='start', he=True))
         item_box = c.box('v', style='box')
         if not isinstance(items, list):
             continue
         for item in items:
-            item_box.append(c.label(item))
+            item_box.append(c.label(item, style='box-item'))
             if item != items[-1]:
                 item_box.append(c.sep('h'))
         category_box.append(item_box)

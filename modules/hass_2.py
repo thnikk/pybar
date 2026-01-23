@@ -42,16 +42,17 @@ def switch_action(switch, state, config, id) -> None:
 def widget(config):
     """ Backlight widget """
     main_box = c.box('v', spacing=20)
-    main_box.append(c.label('Home Assistant', style='heading-small'))
+    main_box.append(c.label('Home Assistant', style='heading'))
 
     for section, devices in config['devices'].items():
         section_box = c.box('v', spacing=10)
-        section_box.append(c.label(section, style='title', ha='start'))
+        section_box.append(c.label(
+            section, style='title', ha='start'))
         lines_box = c.box('v', style='box')
 
         for name, id in devices.items():
             line_box = c.box('h', spacing=20, style='inner-box')
-            line_box.append(c.label(name, ha="start"))
+            line_box.append(c.label(name, ha="start", he=True))
 
             if id.split('.')[0] == 'sensor':
                 data = get_data(

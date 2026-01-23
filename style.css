@@ -215,6 +215,10 @@ popover.background arrow {
 	font-size: 20px;
 }
 
+.title-inline {
+	padding: 5px 10px;
+}
+
 separator { background: @gray; padding: 0; margin: 0; }
 
 .heading {
@@ -238,6 +242,10 @@ separator { background: @gray; padding: 0; margin: 0; }
 	background: #2b303b;
 	border: solid 1px @gray;
 	border-radius: 10px;
+}
+
+.box-item {
+	padding: 10px;
 }
 
 .inner-box {
@@ -271,7 +279,7 @@ separator { background: @gray; padding: 0; margin: 0; }
 .large-text { font-size: 64px; margin: -15px 0px; }
 .arrow { font-size: 24px; }
 
-.power-item { font-size: 16px; padding: 10px; }
+button.power-item { font-size: 16px; padding: 10px; }
 
 .temp-label {
 	font-size: 80px;

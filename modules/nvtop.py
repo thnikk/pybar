@@ -57,7 +57,7 @@ class Rocm(c.Module):
         for x in range(0, 2):
             device_box = c.box('v', spacing=0)
             c.add_style(device_box, 'box')
-            label = c.label(f'Device {x}')
+            label = c.label(f'Device {x}', style='title-inline')
             self.device_labels.append(label)
             device_box.append(label)
             info_box = c.box('v', spacing=10, style='inner-box')
