@@ -121,9 +121,9 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build with PyInstaller (onedir)
+      - name: Build with PyInstaller
         run: |
-          pyinstaller --onedir pybar.spec
+          pyinstaller pybar-appimage.spec
 
       - name: Download appimagetool
         run: |
