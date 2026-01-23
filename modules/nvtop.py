@@ -20,7 +20,7 @@ class Rocm(c.Module):
         self.widgets = []
         for x in range(0, 2):
             levels = []
-            levels_box = c.box('h')
+            levels_box = c.box('h', spacing=4)
             for y in range(0, 2):
                 level = Gtk.LevelBar.new()
                 Gtk.Orientable.set_orientation(level, Gtk.Orientation.VERTICAL)
@@ -36,6 +36,7 @@ class Rocm(c.Module):
             for item in ["load", "mem"]:
                 level = Gtk.LevelBar.new()
                 level.set_max_value(100)
+                level.set_hexpand(True)  # Make horizontal levels span full width
                 c.add_style(level, 'level-horizontal')
                 label = Gtk.Label.new('0%')
                 device[item] = {'level': level, 'label': label}
@@ -50,7 +51,7 @@ class Rocm(c.Module):
 
     def widget(self):
         box = c.box('v', spacing=10)
-        box.append(c.label('GPU info'))
+        box.append(c.label('GPU info', style="heading"))
 
         # Make boxes for 2 gpus
         for x in range(0, 2):
