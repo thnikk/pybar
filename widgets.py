@@ -43,12 +43,12 @@ def weather(name, module, cache):
     today_box = c.box('h', spacing=10)
 
     today_left = c.box('v')
-    widget.append(c.label(cache['City']))
+    widget.append(c.label(cache['City'], style="heading"))
     temp = c.label(
         f"{today['temperature']}° {today['icon']}", 'today-weather')
     today_left.append(temp)
 
-    extra = c.box('h')
+    extra = c.box('h', spacing=10)
     for item in [
         f" {today['humidity']}%",
         f" {today['wind']}mph",
@@ -62,7 +62,7 @@ def weather(name, module, cache):
         f"Feels like {today['feels_like']}°",
         f"{today['quality']} air quality"
     ]:
-        today_right.append(c.label(item))
+        today_right.append(c.label(item, he=True, ha="end"))
 
     today_box.append(today_left)
 
@@ -78,7 +78,7 @@ def weather(name, module, cache):
     widget.append(today_box)
 
     hourly_container = c.box('v', spacing=10)
-    hourly_container.append(c.label('Hourly forecast'))
+    hourly_container.append(c.label('Hourly forecast', he=True, ha="start"))
     hourly_box = c.box('h', style='box')
     for hour in cache['Hourly']['info']:
         hour_box = c.box('v', style='inner-box-wide')
