@@ -80,11 +80,12 @@ jobs:
 
       - name: Install PyInstaller
         run: |
-          pip install pyinstaller
+          pip install pyinstaller staticx
 
       - name: Build binary
         run: |
           pyinstaller pybar.spec
+          staticx dist/pybar dist/pybar-static
 
       - name: Zip Artifact
         run: |
