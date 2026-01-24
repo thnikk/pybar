@@ -302,3 +302,20 @@ button.power-item { font-size: 16px; padding: 10px; }
 .percent {
 	min-width: 60px;
 }
+
+/* Scroll indicators for scrollable areas */
+scrolledwindow undershoot.top {
+	background: linear-gradient(to bottom,
+		alpha(@gray, 0.3) 0%,
+		alpha(@gray, 0.1) 50%,
+		transparent 100%);
+	border-top: 1px solid alpha(@gray, 0.2);
+}
+
+scrolledwindow undershoot.bottom {
+	background: linear-gradient(to top,
+		alpha(@gray, 0.3) 0%,
+		alpha(@gray, 0.1) 50%,
+		transparent 100%);
+	border-bottom: 1px solid alpha(@gray, 0.2);
+}
