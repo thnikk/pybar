@@ -24,7 +24,7 @@ def create_widget(bar, config):
 
 def update_ui(module, data):
     """ Power UI doesn't really change """
-    pass
+    module.set_visible(True)
 
 def power_action(btn, command):
     """ Action for power menu buttons """

@@ -291,6 +291,7 @@ class Widget(Gtk.Popover):
         self.box.append(label(string))
 
     def draw(self):
+        self.box.set_visible(True)
         self.set_child(self.box)
 
 

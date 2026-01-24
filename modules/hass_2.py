@@ -57,7 +57,7 @@ def update_ui(module, data):
     if data.get('sections'):
         module.set_visible(True)
     else:
-        module.set_visible(False)
+        module.set_visible(True) # Force visible for now to debug
     if not module.get_active():
         module.set_widget(build_popover(data))
 

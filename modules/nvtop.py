@@ -78,6 +78,7 @@ def update_ui(module, data):
         module.set_visible(True)
     else:
         module.set_visible(False)
+        return
     
     # Update bar icons
     for i, (l1, l2) in enumerate(module.bar_gpu_levels):
@@ -93,24 +94,27 @@ def update_ui(module, data):
             l1.get_parent().set_visible(False)
 
     # Rebuild or update popover
-    if not module.get_active():
-        # Re-create the popover structure with SizeGroups
-        module.set_widget(build_popover(module, data))
-    else:
-        # If active, we try to update existing widgets to avoid flickering
-        for i, device_widgets in enumerate(module.popover_widgets):
-            if i < len(devices):
-                dev = devices[i]
-                load = safe_parse_percent(dev.get('gpu_util'))
-                mem = safe_parse_percent(dev.get('mem_util'))
-                
-                device_widgets['load']['level'].set_value(load)
-                device_widgets['load']['label'].set_text(f"{load}%")
-                device_widgets['mem']['level'].set_value(mem)
-                device_widgets['mem']['label'].set_text(f"{mem}%")
-                
-                if 'device_label' in device_widgets:
-                    device_widgets['device_label'].set_text(dev.get('device_name', f'Device {i}'))
+    try:
+        if not module.get_active():
+            # Re-create the popover structure
+            module.set_widget(build_popover(module, data))
+        else:
+            # If active, we try to update existing widgets to avoid flickering
+            for i, device_widgets in enumerate(module.popover_widgets):
+                if i < len(devices):
+                    dev = devices[i]
+                    load = safe_parse_percent(dev.get('gpu_util'))
+                    mem = safe_parse_percent(dev.get('mem_util'))
+                    
+                    device_widgets['load']['level'].set_value(load)
+                    device_widgets['load']['label'].set_text(f"{load}%")
+                    device_widgets['mem']['level'].set_value(mem)
+                    device_widgets['mem']['label'].set_text(f"{mem}%")
+                    
+                    if 'device_label' in device_widgets:
+                        device_widgets['device_label'].set_text(dev.get('device_name', f'Device {i}'))
+    except Exception as e:
+        c.print_debug(f"NVTop popover update failed: {e}")
 
 def build_popover(module, data):
     """ Build the complex original popover layout """

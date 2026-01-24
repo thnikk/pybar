@@ -124,13 +124,11 @@ def update_ui(module, data):
     default = data.get('default_sink')
     module.set_visible(True)
     if not default:
-        c.print_debug("Volume update: No default sink", color='yellow')
         module.set_label('ERR')
         module.set_icon('')
         return
 
     volume = round(default['volume'] * 100)
-    c.print_debug(f"Volume update: {volume}%", color='green')
     module.set_label(f'{volume}%')
     
     # Set icon

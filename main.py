@@ -41,6 +41,8 @@ def setup_logging():
             logging.StreamHandler(sys.stderr)
         ]
     )
+    # Suppress verbose connection pool logging
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
     return log_file
 
 
