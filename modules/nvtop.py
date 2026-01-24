@@ -11,13 +11,17 @@ from gi.repository import Gtk, Pango, GLib  # noqa
 
 class Rocm(c.Module):
     def __init__(self, bar, config):
-        super().__init__()
+        super().__init__(text=False)
         self.icon.set_text('')
         self.devices = []
 
         self.device_labels = []
         self.levels = []
         self.widgets = []
+        self.bar_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+        self.label_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+        self.cards_box = c.box('h', spacing=10)
+        self.box.append(self.cards_box)
         for x in range(0, 2):
             levels = []
             levels_box = c.box('h', spacing=4)
@@ -29,7 +33,7 @@ class Rocm(c.Module):
                 level.set_inverted(True)
                 levels.append(level)
                 levels_box.append(level)
-            self.box.append(levels_box)
+            self.cards_box.append(levels_box)
             self.levels.append(levels)
 
             device = {}
@@ -38,7 +42,10 @@ class Rocm(c.Module):
                 level.set_max_value(100)
                 level.set_hexpand(True)  # Make horizontal levels span full width
                 c.add_style(level, 'level-horizontal')
+                self.bar_group.add_widget(level)
                 label = Gtk.Label.new('0%')
+                label.set_xalign(1)
+                self.label_group.add_widget(label)
                 device[item] = {'level': level, 'label': label}
             self.widgets.append(device)
 
@@ -53,22 +60,29 @@ class Rocm(c.Module):
         box = c.box('v', spacing=10)
         box.append(c.label('GPU info', style="heading"))
 
+        devices_box = c.box('v', spacing=10)
         # Make boxes for 2 gpus
         for x in range(0, 2):
-            device_box = c.box('v', spacing=0)
-            c.add_style(device_box, 'box')
-            label = c.label(f'Device {x}', style='title-inline')
+            card_box = c.box('v', spacing=4)
+            label = c.label(f'Device {x}', style='title', ha='start', he=True)
             self.device_labels.append(label)
-            device_box.append(label)
-            info_box = c.box('v', spacing=10, style='inner-box')
+            card_box.append(label)
+
+            info_outer_box = c.box('v', spacing=0)
+            c.add_style(info_outer_box, 'box')
+
+            inner_info_box = c.box('v', spacing=10, style='inner-box')
             for line, widgets in self.widgets[x].items():
                 line_box = c.box('h', spacing=10)
                 for name, item in widgets.items():
                     line_box.append(item)
-                info_box.append(line_box)
-            device_box.append(info_box)
-            box.append(device_box)
+                inner_info_box.append(line_box)
 
+            info_outer_box.append(inner_info_box)
+            card_box.append(info_outer_box)
+            devices_box.append(card_box)
+
+        box.append(devices_box)
         return box
 
     def listen(self):
