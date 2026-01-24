@@ -45,7 +45,7 @@ def fetch_data(config):
     }
 
 def create_widget(bar, config):
-    module = c.Module(1, 0)
+    module = c.Module(icon=True, text=False)
     module.set_position(bar.position)
     module.set_icon('')
     module.set_visible(False)
@@ -82,11 +82,12 @@ def build_popover(data):
             elif eid_type in ['switch', 'light']:
                 sw = Gtk.Switch.new()
                 sw.set_active(dev['state'] == 'on')
+                sw.set_valign(Gtk.Align.CENTER)
                 sw.connect('state-set', lambda s, st, d=data, eid=dev['id']: toggle_ha(d, eid, st))
                 row.append(sw)
             
             ibox.append(row)
-            if i < len(devices) - 1: ibox.append(c.sep('v'))
+            if i < len(devices) - 1: ibox.append(c.sep('h'))
             
         sec_box.append(ibox)
         box.append(sec_box)
