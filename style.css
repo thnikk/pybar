@@ -303,6 +303,38 @@ button.power-item { font-size: 16px; padding: 10px; }
 	min-width: 60px;
 }
 
+.cover-art {
+	border-radius: 15px;
+	border: 1px solid @gray;
+	overflow: hidden;
+}
+
+.mpc-controls {
+	background: #2b303b;
+	border: 1px solid @gray;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.mpc-controls button {
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	font-size: 24px;
+	padding: 10px 20px;
+	margin: 0;
+}
+
+.mpc-controls button:hover {
+	background: #3b404b;
+}
+
+.mpc-controls separator {
+	margin: 0;
+	padding: 0;
+	background: @gray;
+}
+
 /* Scroll indicators for scrollable areas */
 scrolledwindow undershoot.top {
 	background: linear-gradient(to bottom,

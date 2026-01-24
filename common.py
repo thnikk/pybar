@@ -263,6 +263,7 @@ class Module(Gtk.MenuButton):
 
     def set_widget(self, box):
         """ Set widget """
+        print_debug("Setting popover widget", color='blue')
         widget = Widget()
         widget.box.append(box)
         widget.draw()
@@ -419,6 +420,22 @@ def level(min=0, max=100, value=0, style=None):
     widget.set_value(value)
     if style:
         widget.get_style_context().add_class(style)
+    return widget
+
+
+def image(file_path=None, style=None, width=None, height=None):
+    """ Create image widget """
+    if file_path:
+        widget = Gtk.Picture.new_for_filename(file_path)
+    else:
+        widget = Gtk.Picture.new()
+    
+    if style:
+        widget.get_style_context().add_class(style)
+    if width:
+        widget.set_content_width(width)
+    if height:
+        widget.set_content_height(height)
     return widget
 
 
