@@ -393,11 +393,24 @@ def slider(value, min=0, max=100, style=None):
     return widget
 
 
-def scroll(width=0, height=0, style=None):
+def level(min=0, max=100, value=0, style=None):
+    """ Create level bar """
+    widget = Gtk.LevelBar.new_with_offsets(min, max)
+    widget.set_value(value)
+    if style:
+        widget.get_style_context().add_class(style)
+    return widget
+
+
+def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     """ Create scrollable window """
-    window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+    window = Gtk.ScrolledWindow(hexpand=hexpand, vexpand=vexpand)
     window.set_min_content_width(width)
     window.set_min_content_height(height)
+    if height > 0:
+        window.set_max_content_height(height)
+    if width > 0:
+        window.set_max_content_width(width)
     window.set_propagate_natural_width(True)
     window.set_propagate_natural_height(True)
     window.set_policy(

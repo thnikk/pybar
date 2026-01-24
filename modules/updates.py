@@ -130,6 +130,8 @@ def build_popover(module, data):
     def click_link(btn, url):
         Popen(['xdg-open', url])
 
+    content_box = c.box('v', spacing=20)
+
     for manager, info in data['managers'].items():
         packages = info['packages']
         if not packages:
@@ -137,7 +139,7 @@ def build_popover(module, data):
         manager_box = c.box('v', spacing=10)
         heading = c.label(f"{manager} ({len(packages)} updates)", style='title', ha='start')
         manager_box.append(heading)
-        packages_box = c.box('v')
+        packages_box = c.box('v', style='box')
         
         for package in packages:
             package_box = c.box('h', style='inner-box', spacing=20)
@@ -150,16 +152,12 @@ def build_popover(module, data):
             if package != packages[-1]:
                 packages_box.append(c.sep('h'))
 
-        if len(packages) > 10:
-            scroll_box = c.scroll(0, 348)
-            scroll_box.get_style_context().add_class('box')
-            scroll_box.set_child(packages_box)
-            manager_box.append(scroll_box)
-        else:
-            packages_box.get_style_context().add_class('box')
-            manager_box.append(packages_box)
+        manager_box.append(packages_box)
+        content_box.append(manager_box)
 
-        main_box.append(manager_box)
+    scroll_box = c.scroll(height=400)
+    scroll_box.set_child(content_box)
+    main_box.append(scroll_box)
 
     if data['total']:
         update_button = c.button(' Update all', style='box')
