@@ -18,6 +18,25 @@ class Volume(c.Module):
         self.set_position(bar.position)
         self.alive = True
 
+        c.add_style(self, 'module-fixed')
+
+        self.icons = config['icons']
+
+        # Storage for persistent widget references
+        self.section_boxes = {}  # {'Outputs': box, 'Inputs': box, 'Programs': box}
+        self.device_widgets = {}  # {(section, index): (row_box, label, slider, mute_btn)}
+        self.widget_instance = None
+
+        scroll_controller = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.BOTH_AXES)
+        scroll_controller.connect('scroll', self.scroll)
+        self.add_controller(scroll_controller)
+
+        # Try a different approach for right-click - connect to the text label
+        button_controller = Gtk.EventControllerLegacy.new()
+        button_controller.connect('event', self.handle_button_event)
+        self.text.add_controller(button_controller)
+
+        # Connect to pulse and get default sink
         while True:
             try:
                 self.pulse = pulsectl.Pulse()
@@ -29,22 +48,6 @@ class Volume(c.Module):
                     color='red', name='modules-volume')
                 time.sleep(1)
                 continue
-
-        c.add_style(self, 'module-fixed')
-
-        self.icons = config['icons']
-
-        # Storage for persistent widget references
-        self.section_boxes = {}  # {'Outputs': box, 'Inputs': box, 'Programs': box}
-        self.device_widgets = {}  # {(section, index): (row_box, label, slider, mute_btn)}
-        self.widget_instance = None
-
-        scroll_controller = Gtk.EventControllerScroll.new(0)
-        scroll_controller.connect('scroll', self.scroll)
-        self.add_controller(scroll_controller)
-        click_gesture = Gtk.GestureClick.new()
-        click_gesture.connect('pressed', self.switch_outputs)
-        self.add_controller(click_gesture)
 
         volume = round(default.volume.value_flat * 100)
         self.set_icon(default)
@@ -358,38 +361,31 @@ class Volume(c.Module):
             GLib.idle_add(self.update)
         c.print_debug('thread killed')
 
-    def switch_outputs(self, module, event):
-        """ Right click action """
-        if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
-            default = self.pulse.server_info().default_sink_name
-            sinks = [sink.name for sink in self.pulse.sink_list()]
-            index = sinks.index(default) + 1
-            if index > len(sinks) - 1:
-                index = 0
-            self.pulse.sink_default_set(sinks[index])
-            self.update()
+    def handle_button_event(self, controller, event):
+        """ Handle button events for mute toggle """
+        if event.type == Gdk.EventType.BUTTON_PRESS and event.button == 3:  # Right-click
+            default = self.pulse.sink_default_get()
+            if default:
+                self.pulse.mute(default, not default.mute)
+                self.update()
+            return True  # Stop event propagation
+        return False  # Allow other handlers
 
-    def scroll(self, module, event):
-        """ Scroll action """
-        smooth, x, y = event.get_scroll_deltas()
-        smooth_dir = x + (y * -1)
+    def scroll(self, controller, dx, dy):
+        """ Scroll action for volume control """
         default = self.pulse.sink_default_get()
 
-        if (
-            event.direction == Gdk.ScrollDirection.UP or
-            event.direction == Gdk.ScrollDirection.RIGHT or
-            (smooth and smooth_dir > 0)
-        ):
+        # Handle vertical scrolling (dy)
+        if dy > 0:  # Scroll down = volume down
+            self.pulse.volume_change_all_chans(default, -0.01)
+        elif dy < 0:  # Scroll up = volume up
             if default.volume.value_flat < 1:
                 self.pulse.volume_change_all_chans(default, 0.01)
             else:
                 self.pulse.volume_set_all_chans(default, 1)
-        elif (
-            event.direction == Gdk.ScrollDirection.DOWN or
-            event.direction == Gdk.ScrollDirection.LEFT or
-            (smooth and smooth_dir < 0)
-        ):
-            self.pulse.volume_change_all_chans(default, -0.01)
+
+        # Handle horizontal scrolling (dx) - could switch outputs or adjust balance
+        # For now, ignore horizontal scrolling
 
     def update(self):
         """ Update """

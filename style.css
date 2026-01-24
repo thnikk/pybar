@@ -49,7 +49,7 @@ window {
 	color: @white;
 }
 
-.module-fixed {
+.module-fixed button {
 	min-width: 60px;
 }
 
