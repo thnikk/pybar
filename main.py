@@ -3,17 +3,45 @@
 Description: Loads the config and spawns the bar
 Author: thnikk
 """
+from ctypes import CDLL
+try:
+    CDLL('libgtk4-layer-shell.so')
+except Exception:
+    pass
+
 import threading
 import argparse
 import traceback
 import sys
+import os
+import logging
 import config as Config
 from bar import Display
 import common as c
 import module
 import gi
 gi.require_version('Gtk', '4.0')
+gi.require_version('Gtk4LayerShell', '1.0')
 from gi.repository import Gtk  # noqa
+
+
+def setup_logging():
+    """ Setup logging to file and stderr """
+    log_dir = os.path.expanduser('~/.cache/pybar')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_file = os.path.join(log_dir, 'pybar.log')
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, mode='w'),
+            logging.StreamHandler(sys.stderr)
+        ]
+    )
+    return log_file
 
 
 def on_activate(app, config):
@@ -22,7 +50,7 @@ def on_activate(app, config):
         # Draw all bars
         display.draw_all()
     except Exception:
-        traceback.print_exc()
+        logging.error("Failed to activate application", exc_info=True)
         sys.exit(1)
 
 
@@ -37,6 +65,9 @@ def parse_args():
 
 def main():
     """ Main function """
+    log_file = setup_logging()
+    logging.info(f"Starting pybar, logging to {log_file}")
+    
     args = parse_args()
     config = Config.load(args.config)
 
