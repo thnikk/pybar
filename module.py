@@ -88,6 +88,7 @@ def module(bar, name, config):
         "ups": widgets.ups,
         "xdrip": widgets.xdrip,
         "network": widgets.network,
+        "hass": widgets.hass,
         "sales": widgets.sales,
         "power_supply": widgets.power_supply,
     }
@@ -142,20 +143,42 @@ def module(bar, name, config):
         if 'widget' in output:
             if (
                 output['widget'] != module.cache.widget
-                and not module.get_active()
             ):
-                if 'type' in module_config:
-                    widget = module_config['type']
-                else:
-                    widget = name
-                if widget in list(all_widgets):
-                    module.set_widget(
-                        all_widgets[widget](
-                            widget, module, output['widget']))
-                else:
-                    module.set_widget(
-                        widgets.generic_widget(
-                            widget, module, output['widget']))
+                if module.get_active():
+                    # Find the hass widget container
+                    popover = module.get_popover()
+                    if popover:
+                        popover_child = popover.get_child()
+                        if popover_child:
+                            # Iterate children to find the one with 'graph'
+                            child = popover_child.get_first_child()
+                            while child:
+                                if hasattr(child, 'graph'):
+                                    child.graph.update_data(
+                                        output['widget'].get('history', []),
+                                        output['widget'].get('state')
+                                    )
+                                    if hasattr(child, 'duration_label'):
+                                        duration = output['widget'].get('duration', 0)
+                                        child.duration_label.set_text(
+                                            f"{widgets.format_duration(duration)} ago"
+                                        )
+                                    break
+                                child = child.get_next_sibling()
+                
+                if not module.get_active():
+                    if 'type' in module_config:
+                        widget = module_config['type']
+                    else:
+                        widget = name
+                    if widget in list(all_widgets):
+                        module.set_widget(
+                            all_widgets[widget](
+                                widget, module, output['widget']))
+                    else:
+                        module.set_widget(
+                            widgets.generic_widget(
+                                widget, module, output['widget']))
                 module.cache.widget = output['widget']
 
         # Override class and set to gray if module is stale

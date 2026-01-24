@@ -4,6 +4,9 @@ Description: Simple Home Assistant module for showing sensor data
 Author: thnikk
 """
 import requests
+import time
+
+HISTORY = {}
 
 
 def get_data(server, sensor, bearer_token):
@@ -26,8 +29,35 @@ def module(config):
     if data['state'] == 'unavailable':
         return {"text": ""}
 
+    sensor = config['sensor']
+    history_len = config.get('history', 100)
+    
+    try:
+        val = float(data['state'])
+        if sensor not in HISTORY:
+            HISTORY[sensor] = []
+        HISTORY[sensor].append({"val": val, "time": time.time()})
+        if len(HISTORY[sensor]) > history_len:
+            HISTORY[sensor].pop(0)
+    except (ValueError, KeyError):
+        pass
+
+    history_data = HISTORY.get(sensor, [])
+    duration = 0
+    if len(history_data) > 1:
+        duration = history_data[-1]['time'] - history_data[0]['time']
+
     output = {
-        "text": config['format'].replace('{}', data['state'].split('.')[0])
+        "text": config['format'].replace('{}', data['state'].split('.')[0]),
+        "widget": {
+            "name": data['attributes'].get('friendly_name', sensor),
+            "state": data['state'],
+            "unit": data['attributes'].get('unit_of_measurement', ''),
+            "history": [i['val'] for i in history_data],
+            "duration": duration,
+            "min": config.get('min'),
+            "max": config.get('max')
+        }
     }
     try:
         tooltip = []

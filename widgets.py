@@ -6,8 +6,180 @@ Author: thnikk
 import common as c
 from subprocess import run, Popen
 import gi
+import math
+import cairo
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
+
+
+def format_duration(seconds):
+    """ Format duration in seconds to human readable string """
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    if seconds < 3600:
+        return f"{int(seconds/60)}m"
+    return f"{int(seconds/3600)}h"
+
+
+class Graph(Gtk.DrawingArea):
+    """ Smooth history graph """
+    def __init__(self, data, state=None, unit=None, min_config=None, max_config=None, height=120, width=300):
+        super().__init__()
+        self.set_content_height(height)
+        self.set_content_width(width)
+        self.set_hexpand(True)
+        self.data = data
+        self.state = state
+        self.unit = unit
+        self.min_config = min_config
+        self.max_config = max_config
+        self.set_draw_func(self.on_draw)
+
+    def update_data(self, data, state):
+        self.data = data
+        self.state = state
+        self.queue_draw()
+
+    def on_draw(self, area, cr, width, height, *args):
+        if not self.data or len(self.data) < 2:
+            return
+
+        # Use full width/height for the fill, but slight padding for line
+        w = width
+        h = height
+
+        min_val = self.min_config if self.min_config is not None else min(self.data)
+        max_val = self.max_config if self.max_config is not None else max(self.data)
+        range_val = max_val - min_val if max_val != min_val else 1
+
+        def get_coords(i):
+            x = (i / (len(self.data) - 1)) * w
+            # Leave 10px padding top/bottom for the line and markers
+            val = self.data[i]
+            # Clip value to min/max
+            val = max(min(val, max_val), min_val)
+            y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
+            return x, y
+
+        # Colors from style.css (blue #8fa1be)
+        color = (0.56, 0.63, 0.75)
+
+        # Draw grid lines (Levels)
+        cr.set_line_width(1)
+        cr.set_source_rgba(color[0], color[1], color[2], 0.1)
+        for level in [0, 0.5, 1]:
+            y = 10 + (h - 20) * level
+            cr.move_to(0, y)
+            cr.line_to(w, y)
+            cr.stroke()
+
+        # Draw smooth curves
+        x0, y0 = get_coords(0)
+        cr.move_to(x0, y0)
+
+        for i in range(len(self.data) - 1):
+            x1, y1 = get_coords(i)
+            x2, y2 = get_coords(i + 1)
+            cr.curve_to(x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
+        
+        cr.set_line_width(2)
+        cr.set_source_rgb(*color)
+        path = cr.copy_path()
+        cr.stroke()
+
+        # Fill the area
+        cr.append_path(path)
+        cr.line_to(w, h)
+        cr.line_to(0, h)
+        cr.close_path()
+
+        linpat = cairo.LinearGradient(0, 0, 0, h)
+        linpat.add_color_stop_rgba(0, color[0], color[1], color[2], 0.3)
+        linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
+        cr.set_source(linpat)
+        cr.fill()
+
+        # Draw Legend (Min/Max values)
+        cr.set_source_rgba(color[0], color[1], color[2], 0.5)
+        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(10)
+        
+        # Max label
+        cr.move_to(5, 15)
+        cr.show_text(f"{max_val:.1f}")
+        # Min label
+        cr.move_to(5, h - 5)
+        cr.show_text(f"{min_val:.1f}")
+
+        # Draw current value overlay (Bottom Right)
+        if self.state:
+            text = f"{self.state}{self.unit}"
+            cr.set_font_size(24)
+            extents = cr.text_extents(text)
+            
+            # Text position
+            tx = w - extents.width - 15
+            ty = h - 15
+            
+            # Subtle background for readability
+            padding = 10
+            radius = 10
+            bg_x = tx - padding
+            bg_y = ty - extents.height - padding
+            bg_w = extents.width + padding * 2
+            bg_h = extents.height + padding * 2
+            
+            cr.set_source_rgba(0, 0, 0, 0.4)
+            # Rounded rectangle
+            cr.new_sub_path()
+            cr.arc(bg_x + radius, bg_y + radius, radius, math.pi, 3 * math.pi / 2)
+            cr.arc(bg_x + bg_w - radius, bg_y + radius, radius, 3 * math.pi / 2, 2 * math.pi)
+            cr.arc(bg_x + bg_w - radius, bg_y + bg_h - radius, radius, 0, math.pi / 2)
+            cr.arc(bg_x + radius, bg_y + bg_h - radius, radius, math.pi / 2, math.pi)
+            cr.close_path()
+            cr.fill()
+            
+            cr.set_source_rgb(1, 1, 1)
+            cr.move_to(tx, ty)
+            cr.show_text(text)
+
+
+def hass(name, module, cache):
+    """ Home Assistant history widget """
+    main_box = c.box('v', spacing=10)
+    c.add_style(main_box, 'small-widget')
+    
+    header = c.box('h')
+    header.append(c.label(cache['name'], style='heading', ha='start', he=True))
+    main_box.append(header)
+    
+    if cache.get('history'):
+        graph_box = c.box('v', style='box')
+        # Ensure the box clips the drawing to keep rounded corners looking clean
+        graph_box.set_overflow(Gtk.Overflow.HIDDEN)
+        graph = Graph(
+            cache['history'], 
+            state=cache['state'], 
+            unit=cache['unit'],
+            min_config=cache.get('min'),
+            max_config=cache.get('max')
+        )
+        graph_box.append(graph)
+        main_box.append(graph_box)
+        
+        # Time legend below graph
+        time_box = c.box('h')
+        duration_str = f"{format_duration(cache.get('duration', 0))} ago"
+        duration_label = c.label(duration_str, style='gray', ha='start', he=True)
+        time_box.append(duration_label)
+        time_box.append(c.label('Now', style='gray', ha='end'))
+        main_box.append(time_box)
+        
+        # Store a reference to the graph and duration label for updates
+        main_box.graph = graph
+        main_box.duration_label = duration_label
+    
+    return main_box
 
 
 def generic_widget(name, module, cache):
