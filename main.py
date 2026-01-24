@@ -9,7 +9,6 @@ import config as Config
 from bar import Display
 import common as c
 import module
-import cache
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
@@ -46,37 +45,17 @@ def main():
     if "cache" not in list(config):
         config["cache"] = '~/.cache/pybar'
 
-    # Start module threads to cache module output
+    # Start module threads
     for name in unique:
         # Load the module config if it exists
-        if name in list(config['modules']):
-            module_config = config['modules'][name]
-        else:
-            module_config = {}
+        module_config = config['modules'].get(name, {})
 
         # Set the interval if it's not specified
-        if 'interval' not in list(module_config):
-            module_config['interval'] = 60
+        if 'interval' not in module_config:
+            module_config['interval'] = 5
 
-        # Load waybar-style modules if a command is given
-        if 'command' in list(module_config):
-            c.print_debug(
-                f'Starting thread for {name}', 'cache-waybar',
-                color='green')
-            thread = threading.Thread(
-                target=module.cache, args=(
-                    name,
-                    module_config,
-                    config['cache']))
-            thread.daemon = True
-            thread.start()
-        # Otherwise, load a built-in module
-        else:
-            thread = threading.Thread(
-                target=cache.cache, args=(
-                    name, module_config, config['cache']))
-            thread.daemon = True
-            thread.start()
+        # Start the worker thread for this module
+        module.start_worker(name, module_config)
 
     # Create display object
     app = Gtk.Application(application_id='org.thnikk.pybar')

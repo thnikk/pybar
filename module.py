@@ -3,6 +3,8 @@
 Description: Load module and popover widgets
 Author: thnikk
 """
+import importlib
+import threading
 from subprocess import run, CalledProcessError
 import json
 import os
@@ -10,196 +12,144 @@ import time
 from datetime import datetime
 import gi
 import common as c
-import widgets
-from modules import workspaces
-from modules import clock
-from modules import battery
-from modules import volume
-from modules import power
-from modules import backlight
-from modules import test
-from modules import toggle
-from modules import privacy
-from modules import hass_2
-from modules import mpc
-from modules import memory
-from modules import docker
-from modules import rocm
-from modules import nvtop
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
+# We will move all modules here eventually
+module_map = {
+    'clock': 'modules.clock',
+    'workspaces': 'modules.workspaces',
+    'volume': 'modules.volume',
+    'backlight': 'modules.backlight',
+    'battery': 'modules.battery',
+    'power': 'modules.power',
+    'test': 'modules.test',
+    'toggle': 'modules.toggle',
+    'privacy': 'modules.privacy',
+    'hass_2': 'modules.hass_2',
+    'memory': 'modules.memory',
+    'docker': 'modules.docker',
+    'nvtop': 'modules.nvtop',
+    'mpc': 'modules.mpc',
+    'weather': 'modules.weather',
+    'updates': 'modules.updates',
+    'git': 'modules.git',
+    'ups': 'modules.ups',
+    'xdrip': 'modules.xdrip',
+    'network': 'modules.network',
+    'hass': 'modules.hass',
+    'sales': 'modules.sales',
+    'power_supply': 'modules.power_supply',
+    'obs': 'modules.obs',
+    'resin': 'modules.resin',
+    'systemd': 'modules.systemd',
+    'transmission': 'modules.transmission',
+    'vm': 'modules.vm',
+}
 
-def cache(name, config, cache_dir='~/.cache/pybar'):
-    """ Save command output to cache file """
+def start_worker(name, config):
+    """Start a background worker for a module"""
+    module_type = config.get('type', name)
+    c.print_debug(f"Starting worker for {name} (type: {module_type})", color='cyan')
+    
+    # Try to load the module
+    try:
+        if module_type in module_map:
+            mod = importlib.import_module(module_map[module_type])
+            if hasattr(mod, 'run_worker'):
+                thread = threading.Thread(
+                    target=mod.run_worker, 
+                    args=(name, config),
+                    daemon=True
+                )
+                thread.start()
+                return
+            elif hasattr(mod, 'fetch_data'):
+                thread = threading.Thread(
+                    target=generic_worker, 
+                    args=(name, config, mod.fetch_data),
+                    daemon=True
+                )
+                thread.start()
+                return
+    except Exception as e:
+        c.print_debug(f"Failed to start worker for {name}: {e}", color='red')
+
+    # Fallback for waybar-style command modules
+    if 'command' in config:
+        thread = threading.Thread(
+            target=command_worker,
+            args=(name, config),
+            daemon=True
+        )
+        thread.start()
+
+def generic_worker(name, config, fetch_func):
+    """Worker that calls a python fetch_data function"""
     while True:
-        # Create cache dir if it doesn't exist
-        cache_dir = os.path.expanduser(cache_dir)
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-        # Expand user for all parts of command
-        command = [os.path.expanduser(arg) for arg in config['command']]
-        # Try to get the output of the command
         try:
-            output = run(
-                command, check=True, capture_output=True
-            ).stdout.decode()
-        # Print a message if it fails to load
-        except CalledProcessError:
-            c.print_debug('Failed to load module.', color='red', name=name)
-            pass
-        # Save the output to a file
-        with open(
-            os.path.expanduser(f'{cache_dir}/{name}.json'),
-            'w', encoding='utf-8'
-        ) as file:
-            file.write(output)
-        # Wait for the interval specified in the module config
-        time.sleep(config['interval'])
+            data = fetch_func(config)
+            if data:
+                data['timestamp'] = datetime.now().timestamp()
+                c.state_manager.update(name, data)
+        except Exception as e:
+            c.print_debug(f"Worker {name} failed: {e}", color='red')
+        
+        time.sleep(config.get('interval', 60))
 
+def command_worker(name, config):
+    """Worker for waybar-style command modules"""
+    while True:
+        command = [os.path.expanduser(arg) for arg in config['command']]
+        try:
+            output = run(command, check=True, capture_output=True).stdout.decode()
+            data = json.loads(output)
+            data['timestamp'] = datetime.now().timestamp()
+            c.state_manager.update(name, data)
+        except Exception as e:
+            c.print_debug(f"Command worker {name} failed: {e}", color='red')
+        
+        time.sleep(config.get('interval', 60))
 
 def module(bar, name, config):
-    """ Waybar module """
-    cacheless = {
-        'clock': clock.module,
-        'workspaces': workspaces.module,
-        'volume': volume.module,
-        'backlight': backlight.module,
-        'battery': battery.module,
-        'power': power.module,
-        'test': test.module,
-        'toggle': toggle.module,
-        'privacy': privacy.module,
-        'hass_2': hass_2.module,
-        'memory': memory.module,
-        'docker': docker.module,
-        'rocm': rocm.module,
-        'nvtop': nvtop.module,
-        'mpc': mpc.module
-    }
+    """Factory to create a module and subscribe it to updates"""
+    module_config = config['modules'].get(name, {})
+    module_type = module_config.get('type', name)
 
-    all_widgets = {
-        "weather": widgets.weather,
-        "genshin": widgets.hoyo,
-        "hsr": widgets.hoyo,
-        "resin": widgets.hoyo,
-        "updates": widgets.updates,
-        "git": widgets.git,
-        "ups": widgets.ups,
-        "xdrip": widgets.xdrip,
-        "network": widgets.network,
-        "hass": widgets.hass,
-        "sales": widgets.sales,
-        "power_supply": widgets.power_supply,
-    }
-
-    if "cache" not in list(config):
-        config['cache'] = '~/.cache/pybar'
-
+    # Some modules might still want to be completely custom (like workspaces)
+    # but for most, we want a standard Module that updates its UI.
+    
     try:
-        module_config = config['modules'][name]
-    except KeyError:
-        module_config = {}
+        if module_type in module_map:
+            mod = importlib.import_module(module_map[module_type])
+            if hasattr(mod, 'create_widget'):
+                # New pattern
+                c.print_debug(f"Creating widget for {name}", color='cyan')
+                m = mod.create_widget(bar, module_config)
+                if hasattr(mod, 'update_ui'):
+                    c.print_debug(f"Subscribing {name} to state updates", color='cyan')
+                    c.state_manager.subscribe(name, lambda data: mod.update_ui(m, data))
+                return m
+            elif hasattr(mod, 'module'):
+                # Old pattern (temporary)
+                return mod.module(bar, module_config)
+    except Exception as e:
+        c.print_debug(f"Failed to create module {name}: {e}", color='red')
 
-    module_type = module_config['type'] if 'type' in module_config else None
-
-    if module_type and module_type in list(cacheless):
-        return cacheless[module_type](bar, module_config)
-
-    if not module_type and name in list(cacheless):
-        return cacheless[name](bar, module_config)
-
-    module = c.Module(0, 1)
-    module.set_position(bar.position)
-    module.set_visible(False)
-    module.set_visible(False)
-
-    def get_output():
-        """ Create module using cache """
-        # Load cache
-        try:
-            with open(
-                os.path.expanduser(f'{config["cache"]}/{name}.json'),
-                'r', encoding='utf-8'
-            ) as file:
-                output = json.loads(file.read())
-        except (json.decoder.JSONDecodeError, FileNotFoundError):
-            return True
-
-        if output['text'] != module.cache.text:
-            if output['text']:
-                module.text.set_label(output['text'])
-                module.text.set_visible(True)
-                module.set_visible(True)
-            else:
-                module.set_visible(False)
-            module.cache.text = output['text']
-
-        if 'tooltip' in output and output['tooltip'] != module.cache.tooltip:
-            if output['tooltip']:
-                module.set_tooltip_text(str(output['tooltip']))
-                module.cache.tooltip = output['tooltip']
-
-        if 'widget' in output:
-            if (
-                output['widget'] != module.cache.widget
-            ):
-                if module.get_active():
-                    # Find the hass widget container
-                    popover = module.get_popover()
-                    if popover:
-                        popover_child = popover.get_child()
-                        if popover_child:
-                            # Iterate children to find the one with 'graph'
-                            child = popover_child.get_first_child()
-                            while child:
-                                if hasattr(child, 'graph'):
-                                    child.graph.update_data(
-                                        output['widget'].get('history', []),
-                                        output['widget'].get('state')
-                                    )
-                                    if hasattr(child, 'duration_label'):
-                                        duration = output['widget'].get('duration', 0)
-                                        child.duration_label.set_text(
-                                            f"{widgets.format_duration(duration)} ago"
-                                        )
-                                    break
-                                child = child.get_next_sibling()
-                
-                if not module.get_active():
-                    if 'type' in module_config:
-                        widget = module_config['type']
-                    else:
-                        widget = name
-                    if widget in list(all_widgets):
-                        module.set_widget(
-                            all_widgets[widget](
-                                widget, module, output['widget']))
-                    else:
-                        module.set_widget(
-                            widgets.generic_widget(
-                                widget, module, output['widget']))
-                module.cache.widget = output['widget']
-
-        # Override class and set to gray if module is stale
-        module.reset_style()
-        if 'interval' in module_config and 'timestamp' in output:
-            if (
-                datetime.now() -
-                datetime.fromtimestamp(output['timestamp'])
-            ).seconds > module_config['interval'] * 2:
-                c.add_style(module, 'gray')
-
-        # Set class
-        if 'indicator' in config and config['indicator']:
-            if 'class' in list(output):
-                c.add_style(module.indicator, output['class'])
-        else:
-            if 'class' in list(output):
-                c.add_style(module, output['class'])
-
-        return True
-    if get_output():
-        # Timeout of less than 1 second breaks tooltips
-        GLib.timeout_add(1000, get_output)
-        return module
+    # Generic fallback for command modules or unknown types
+    m = c.Module()
+    m.set_position(bar.position)
+    
+    def generic_update(data):
+        if 'text' in data:
+            m.text.set_label(data['text'])
+            m.set_visible(bool(data['text']))
+        if 'tooltip' in data:
+            m.set_tooltip_text(str(data['tooltip']))
+        # Handle classes
+        m.reset_style()
+        if 'class' in data:
+            c.add_style(m, data['class'])
+            
+    c.state_manager.subscribe(name, generic_update)
+    return m

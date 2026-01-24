@@ -7,9 +7,166 @@ import inspect
 from datetime import datetime
 import sys
 import gi
+import math
+import cairo
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
-from gi.repository import Gtk, Gdk, Gtk4LayerShell, Pango, GObject  # noqa
+from gi.repository import Gtk, Gdk, Gtk4LayerShell, Pango, GObject, GLib  # noqa
+
+
+align = {
+    "fill": Gtk.Align.FILL, "start": Gtk.Align.START,
+    "end": Gtk.Align.END, "center": Gtk.Align.CENTER
+}
+
+
+class Graph(Gtk.DrawingArea):
+    """ Smooth history graph """
+    def __init__(self, data, state=None, unit=None, min_config=None, max_config=None, height=120, width=300):
+        super().__init__()
+        self.set_content_height(height)
+        self.set_content_width(width)
+        self.set_hexpand(True)
+        self.data = data
+        self.state = state
+        self.unit = unit
+        self.min_config = min_config
+        self.max_config = max_config
+        self.set_draw_func(self.on_draw)
+
+    def update_data(self, data, state):
+        self.data = data
+        self.state = state
+        self.queue_draw()
+
+    def on_draw(self, area, cr, width, height, *args):
+        if not self.data or len(self.data) < 2:
+            return
+
+        # Use full width/height for the fill, but slight padding for line
+        w = width
+        h = height
+
+        min_val = self.min_config if self.min_config is not None else min(self.data)
+        max_val = self.max_config if self.max_config is not None else max(self.data)
+        range_val = max_val - min_val if max_val != min_val else 1
+
+        def get_coords(i):
+            x = (i / (len(self.data) - 1)) * w
+            # Leave 10px padding top/bottom for the line and markers
+            val = self.data[i]
+            # Clip value to min/max
+            val = max(min(val, max_val), min_val)
+            y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
+            return x, y
+
+        # Colors from style.css (blue #8fa1be)
+        color = (0.56, 0.63, 0.75)
+
+        # Draw grid lines (Levels)
+        cr.set_line_width(1)
+        cr.set_source_rgba(color[0], color[1], color[2], 0.1)
+        for level in [0, 0.5, 1]:
+            y = 10 + (h - 20) * level
+            cr.move_to(0, y)
+            cr.line_to(w, y)
+            cr.stroke()
+
+        # Draw smooth curves
+        x0, y0 = get_coords(0)
+        cr.move_to(x0, y0)
+
+        for i in range(len(self.data) - 1):
+            x1, y1 = get_coords(i)
+            x2, y2 = get_coords(i + 1)
+            cr.curve_to(x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
+        
+        cr.set_line_width(2)
+        cr.set_source_rgb(*color)
+        path = cr.copy_path()
+        cr.stroke()
+
+        # Fill the area
+        cr.append_path(path)
+        cr.line_to(w, h)
+        cr.line_to(0, h)
+        cr.close_path()
+
+        linpat = cairo.LinearGradient(0, 0, 0, h)
+        linpat.add_color_stop_rgba(0, color[0], color[1], color[2], 0.3)
+        linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
+        cr.set_source(linpat)
+        cr.fill()
+
+        # Draw Legend (Min/Max values)
+        cr.set_source_rgba(color[0], color[1], color[2], 0.5)
+        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(10)
+        
+        # Max label
+        cr.move_to(5, 15)
+        cr.show_text(f"{max_val:.1f}")
+        # Min label
+        cr.move_to(5, h - 5)
+        cr.show_text(f"{min_val:.1f}")
+
+        # Draw current value overlay (Bottom Right)
+        if self.state:
+            text = f"{self.state}{self.unit}"
+            cr.set_font_size(24)
+            extents = cr.text_extents(text)
+            
+            # Text position
+            tx = w - extents.width - 15
+            ty = h - 15
+            
+            # Subtle background for readability
+            padding = 10
+            radius = 10
+            bg_x = tx - padding
+            bg_y = ty - extents.height - padding
+            bg_w = extents.width + padding * 2
+            bg_h = extents.height + padding * 2
+            
+            cr.set_source_rgba(0, 0, 0, 0.4)
+            # Rounded rectangle
+            cr.new_sub_path()
+            cr.arc(bg_x + radius, bg_y + radius, radius, math.pi, 3 * math.pi / 2)
+            cr.arc(bg_x + bg_w - radius, bg_y + radius, radius, 3 * math.pi / 2, 2 * math.pi)
+            cr.arc(bg_x + bg_w - radius, bg_y + bg_h - radius, radius, 0, math.pi / 2)
+            cr.arc(bg_x + radius, bg_y + bg_h - radius, radius, math.pi / 2, math.pi)
+            cr.close_path()
+            cr.fill()
+            
+            cr.set_source_rgb(1, 1, 1)
+            cr.move_to(tx, ty)
+            cr.show_text(text)
+
+
+class StateManager:
+    def __init__(self):
+        self.data = {}
+        self.subscribers = {}  # {name: [callback, ...]}
+
+    def update(self, name, new_data):
+        self.data[name] = new_data
+        if name in self.subscribers:
+            for callback in self.subscribers[name]:
+                GLib.idle_add(callback, new_data)
+
+    def subscribe(self, name, callback):
+        if name not in self.subscribers:
+            self.subscribers[name] = []
+        self.subscribers[name].append(callback)
+        # Immediately provide current data if available
+        if name in self.data:
+            GLib.idle_add(callback, self.data[name])
+
+    def get(self, name):
+        return self.data.get(name)
+
+
+state_manager = StateManager()
 
 
 align = {

@@ -1,195 +1,124 @@
 #!/usr/bin/python3 -u
 """
-Description: Privacy module
+Description: Privacy module refactored for unified state
 Author: thnikk
 """
 import common as c
 import threading
-from subprocess import run, Popen, PIPE, STDOUT, DEVNULL, CalledProcessError
+from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 from glob import glob
 import os
 import signal
 import gi
 import time
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
+from gi.repository import Gtk  # noqa
 
+def run_worker(name, config):
+    """ Background worker for privacy """
+    state = {"devices": {}, "webcams": []}
+    
+    def update():
+        c.state_manager.update(name, state)
 
-class Privacy(c.Module):
-    def __init__(self, bar, config):
-        super().__init__()
-        self.set_position(bar.position)
-        self.alive = True
-        self.pid = None
-        c.add_style(self.indicator, 'green')
-        self.text.show()
-        self.box.show()
-        self.set_visible(False)
-        self.webcams = []
-        self.devices = {}
-
-        thread = threading.Thread(target=self.listen_wrapper)
-        thread.daemon = True
-        thread.start()
-
-        webcam_thread = threading.Thread(target=self.get_webcams)
-        webcam_thread.daemon = True
-        webcam_thread.start()
-
-        self.connect('destroy', self.destroy)
-
-    def destroy(self, _):
-        """ Clean up thread """
-        os.kill(self.pid, signal.SIGTERM)
-        self.alive = False
-        c.print_debug('thread killed')
-
-    def listen_wrapper(self):
-        """ Wrapper to auto-reconnect to listen function """
-        while self.alive:
-            try:
-                self.listen()
-            except CalledProcessError:
-                time.sleep(1)
-                continue
-
-    def get_webcams(self):
-        """ Check device status directly from v4l2 """
+    def get_webcams():
         while True:
             devices = []
             for path in glob('/sys/class/video4linux/video*'):
                 try:
                     with open(f'{path}/state', 'r') as file:
-                        state = file.read().strip()
-                    with open(f'{path}/name', 'r') as file:
-                        name = file.read().strip()
-                    if "capture" in state:
-                        devices.append(name)
+                        if "capture" in file.read().strip():
+                            with open(f'{path}/name', 'r') as name_file:
+                                devices.append(name_file.read().strip())
                 except FileNotFoundError:
                     pass
-            if devices != self.webcams:
-                self.webcams = devices
-                GLib.idle_add(self.update)
+            if devices != state["webcams"]:
+                state["webcams"] = devices
+                update()
             time.sleep(1)
 
-    def listen(self):
-        """ Listen for new event """
-        devices = {}
-        device = {}
-        with Popen(['pw-mon', '-a'],
-                   stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
-            self.pid = p.pid
-            for line in p.stdout:
-                line = line.decode('utf-8').rstrip()
+    t = threading.Thread(target=get_webcams, daemon=True)
+    t.start()
 
-                # Save last device
-                if 'added' in line or 'changed' in line:
-                    try:
-                        if (
-                                'Stream/Input' in
-                                device['properties']['media.class']
-                        ):
-                            devices[device['id']] = device
-                            self.devices = devices
-                            GLib.idle_add(self.update)
-                    except KeyError:
-                        pass
-                    device = {}
+    while True:
+        try:
+            with Popen(['pw-mon', '-a'], stdin=PIPE, stdout=PIPE, stderr=STDOUT) as p:
+                device = {}
+                for line in p.stdout:
+                    line = line.decode('utf-8').rstrip()
+                    if 'added' in line or 'changed' in line:
+                        try:
+                            if 'Stream/Input' in device['properties']['media.class']:
+                                state["devices"][device['id']] = device
+                                update()
+                        except KeyError: pass
+                        device = {}
+                    if 'removed' in line:
+                        try:
+                            state["devices"].pop(device['id'])
+                            update()
+                        except KeyError: pass
+                        device = {}
+                    if ':' in line:
+                        parts = [p.strip().strip('"') for p in line.split(':')]
+                        if len(parts) > 1: device[parts[0]] = ":".join(parts[1:])
+                    if '=' in line:
+                        parts = [p.strip().strip('"') for p in line.split('=')]
+                        if 'properties' not in device: device['properties'] = {}
+                        device['properties'][parts[0]] = parts[1]
+        except Exception:
+            time.sleep(1)
 
-                # Remove device by ID
-                if 'removed' in line:
-                    try:
-                        devices.pop(device['id'])
-                        self.devices = devices
-                        GLib.idle_add(self.update)
-                    except KeyError:
-                        pass
-                    device = {}
-
-                # Add info to device dict
-                try:
-                    if line.split(':')[1]:
-                        parts = [
-                            part.strip().strip('"')
-                            for part in line.split(':')]
-                        device[parts[0]] = ":".join(parts[1:])
-                except IndexError:
-                    pass
-
-                # Add info to properties
-                if '=' in line:
-                    parts = [
-                        part.strip().strip('"')
-                        for part in line.split('=')]
-                    if 'properties' not in list(device):
-                        device['properties'] = {}
-                    device['properties'][parts[0]] = parts[1]
-
-    def get_widget(self, devices):
-        """ Draw widget """
-        box = c.box('v', spacing=20)
-        box.add(c.label('Privacy', style='heading'))
-        c.add_style(box, 'small-widget')
-
-        # Seperate devices by type
-        categories = {}
-        for id, device in devices.items():
-            category = device['properties']['media.class'].split('/')[-1]
-            if category not in list(categories):
-                categories[category] = set()
-            try:
-                name = device['properties'][
-                    'application.process.binary'].title()
-            except KeyError:
-                try:
-                    name = device['properties']['node.name'].title()
-                except KeyError:
-                    name = device['properties']['media.name'].title()
-            categories[category].add(name)
-
-        for category, programs in categories.items():
-            category_box = c.box('v', spacing=10)
-            category_box.add(c.label(category, style='title', ha='start'))
-            program_box = c.box('v', style='box')
-            for program in programs:
-                program_box.add(c.label(program, style='inner-box'))
-                if program != list(programs)[-1]:
-                    program_box.add(c.sep('v'))
-            category_box.add(program_box)
-            box.add(category_box)
-
-        return box
-
-    def update(self):
-        """ Update module """
-        icons = {'Audio': '', 'Video': ''}
-
-        # Get unique media types
-        types = []
-        for id, device in self.devices.items():
-            types.append(device['properties']['media.class'].split('/')[-1])
-        types = set(types)
-
-        # Get icons
-        text = [icons[item] for item in types]
-        if self.webcams:
-            text += [""]
-
-        # Set widget
-        self.set_widget(self.get_widget(self.devices))
-
-        # Set label
-        if text:
-            self.text.set_label("  ".join(text))
-            self.show()
-        else:
-            self.text.set_label('')
-            self.hide()
-
-
-def module(bar, config=None):
-    """ PulseAudio module """
-
-    module = Privacy(bar, config)
-
+def create_widget(bar, config):
+    """ Create privacy module widget """
+    module = c.Module()
+    module.set_position(bar.position)
+    c.add_style(module.indicator, 'green')
+    module.set_visible(False)
     return module
+
+def update_ui(module, data):
+    """ Update privacy UI """
+    icons = {'Audio': '', 'Video': ''}
+    types = set(d['properties']['media.class'].split('/')[-1] for d in data['devices'].values())
+    
+    text = [icons[t] for t in types if t in icons]
+    if data['webcams']:
+        text += [""]
+
+    if text:
+        module.text.set_label("  ".join(text))
+        module.set_visible(True)
+    else:
+        module.set_visible(False)
+    
+    if not module.get_active():
+        module.set_widget(build_popover(data))
+
+def build_popover(data):
+    """ Build privacy popover """
+    box = c.box('v', spacing=20, style='small-widget')
+    box.append(c.label('Privacy', style='heading'))
+    
+    categories = {}
+    for d in data['devices'].values():
+        cat = d['properties']['media.class'].split('/')[-1]
+        if cat not in categories: categories[cat] = set()
+        name = d['properties'].get('application.process.binary', 
+                d['properties'].get('node.name', d['properties'].get('media.name', 'Unknown'))).title()
+        categories[cat].add(name)
+    
+    if data['webcams']:
+        categories['Camera'] = set(data['webcams'])
+
+    for cat, progs in categories.items():
+        cat_box = c.box('v', spacing=10)
+        cat_box.append(c.label(cat, style='title', ha='start'))
+        p_box = c.box('v', style='box')
+        for i, p in enumerate(progs):
+            p_box.append(c.label(p, style='inner-box'))
+            if i != len(progs) - 1: p_box.append(c.sep('h'))
+        cat_box.append(p_box)
+        box.append(cat_box)
+        
+    return box

@@ -1,128 +1,165 @@
 #!/usr/bin/python3 -u
-from subprocess import run, CalledProcessError
-import time
+"""
+Description: NVTop module restored to original customized layout
+Author: thnikk
+"""
 import json
-import threading
+from subprocess import run
 import common as c
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Pango, GLib  # noqa
+from gi.repository import Gtk  # noqa
 
+def fetch_data(config):
+    """ Get GPU data from nvtop """
+    try:
+        res = run(['nvtop', '-s'], capture_output=True, check=True).stdout.decode('utf-8')
+        devices = json.loads(res)
+        return {"devices": devices}
+    except Exception:
+        return None
 
-class Rocm(c.Module):
-    def __init__(self, bar, config):
-        super().__init__(text=False)
-        self.icon.set_text('')
-        self.devices = []
-
-        self.device_labels = []
-        self.levels = []
-        self.widgets = []
-        self.bar_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
-        self.label_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
-        self.cards_box = c.box('h', spacing=10)
-        self.box.append(self.cards_box)
-        for x in range(0, 2):
-            levels = []
-            levels_box = c.box('h', spacing=4)
-            for y in range(0, 2):
-                level = Gtk.LevelBar.new()
-                Gtk.Orientable.set_orientation(level, Gtk.Orientation.VERTICAL)
-                level.set_value(50)
-                level.set_max_value(100)
-                level.set_inverted(True)
-                levels.append(level)
-                levels_box.append(level)
-            self.cards_box.append(levels_box)
-            self.levels.append(levels)
-
-            device = {}
-            for item in ["load", "mem"]:
-                level = Gtk.LevelBar.new()
-                level.set_max_value(100)
-                level.set_hexpand(True)  # Make horizontal levels span full width
-                c.add_style(level, 'level-horizontal')
-                self.bar_group.add_widget(level)
-                label = Gtk.Label.new('0%')
-                label.set_xalign(1)
-                self.label_group.add_widget(label)
-                device[item] = {'level': level, 'label': label}
-            self.widgets.append(device)
-
-        # c.print_debug(self.widgets)
-        self.set_widget(self.widget())
-
-        thread = threading.Thread(target=self.listen)
-        thread.daemon = True
-        thread.start()
-
-    def widget(self):
-        box = c.box('v', spacing=10)
-        box.append(c.label('GPU info', style="heading"))
-
-        devices_box = c.box('v', spacing=10)
-        # Make boxes for 2 gpus
-        for x in range(0, 2):
-            card_box = c.box('v', spacing=4)
-            label = c.label(f'Device {x}', style='title', ha='start', he=True)
-            self.device_labels.append(label)
-            card_box.append(label)
-
-            info_outer_box = c.box('v', spacing=0)
-            c.add_style(info_outer_box, 'box')
-
-            inner_info_box = c.box('v', spacing=10, style='inner-box')
-            for line, widgets in self.widgets[x].items():
-                line_box = c.box('h', spacing=10)
-                for name, item in widgets.items():
-                    line_box.append(item)
-                inner_info_box.append(line_box)
-
-            info_outer_box.append(inner_info_box)
-            card_box.append(info_outer_box)
-            devices_box.append(card_box)
-
-        box.append(devices_box)
-        return box
-
-    def listen(self):
-        while True:
-            try:
-                self.devices = self.get_devices()
-                GLib.idle_add(self.update)
-            except CalledProcessError:
-                pass
-            time.sleep(1)
-
-    def update(self):
-        loads = []
-        for num, info in enumerate(self.devices):
-            self.device_labels[num].set_text(info["device_name"])
-            loads.append(info['gpu_util'])
-
-            if info['gpu_util']:
-                load = int(info['gpu_util'].strip('%'))
-            else:
-                load = 0
-
-            self.widgets[num]['load']['level'].set_value(load)
-            self.widgets[num]['load']['label'].set_text(f"{load}%")
-            self.levels[num][0].set_value(load)
-
-            mem = int(info['mem_util'].strip('%'))
-            self.widgets[num]['mem']['level'].set_value(mem)
-            self.widgets[num]['mem']['label'].set_text(f"{mem}%")
-            self.levels[num][1].set_value(mem)
-
-    def get_devices(self):
-        return json.loads(
-                run(
-                    ['nvtop', '-s'],
-                    capture_output=True, check=True
-                    ).stdout.decode('utf-8')
-                )
-
-
-def module(bar, config):
-    module = Rocm(bar, config)
+def create_widget(bar, config):
+    """ Create GPU module widget with original layout """
+    module = c.Module(text=False)
+    module.icon.set_text('')
+    
+    # Store UI elements for updating
+    module.bar_gpu_levels = [] # List of (load_bar, mem_bar) pairs
+    module.popover_widgets = [] # List of dicts with levelbars and labels per device
+    
+    # Bar icon structure: cards_box contains levels_box per GPU
+    module.cards_box = c.box('h', spacing=10)
+    module.box.append(module.cards_box)
+    
+    for _ in range(2):
+        levels_box = c.box('h', spacing=4)
+        l1 = Gtk.LevelBar.new_for_interval(0, 100)
+        l1.set_min_value(0)
+        l1.set_max_value(100)
+        Gtk.Orientable.set_orientation(l1, Gtk.Orientation.VERTICAL)
+        l1.set_inverted(True)
+        
+        l2 = Gtk.LevelBar.new_for_interval(0, 100)
+        l2.set_min_value(0)
+        l2.set_max_value(100)
+        Gtk.Orientable.set_orientation(l2, Gtk.Orientation.VERTICAL)
+        l2.set_inverted(True)
+        
+        levels_box.append(l1)
+        levels_box.append(l2)
+        module.bar_gpu_levels.append((l1, l2))
+        module.cards_box.append(levels_box)
+        
     return module
+
+def safe_parse_percent(val):
+    """ Safely parse percentage string to int """
+    if val is None:
+        return 0
+    if isinstance(val, int):
+        return val
+    try:
+        return int(str(val).strip('%'))
+    except (ValueError, TypeError):
+        return 0
+
+def update_ui(module, data):
+    """ Update GPU UI including bar and popover """
+    devices = data.get('devices', [])
+    
+    # Update bar icons
+    for i, (l1, l2) in enumerate(module.bar_gpu_levels):
+        if i < len(devices):
+            dev = devices[i]
+            load = safe_parse_percent(dev.get('gpu_util'))
+            mem = safe_parse_percent(dev.get('mem_util'))
+            l1.set_value(load)
+            l2.set_value(mem)
+            l1.get_parent().set_visible(True)
+        else:
+            l1.get_parent().set_visible(False)
+
+    # Rebuild or update popover
+    if not module.get_active():
+        # Re-create the popover structure with SizeGroups
+        module.set_widget(build_popover(module, data))
+    else:
+        # If active, we try to update existing widgets to avoid flickering
+        for i, device_widgets in enumerate(module.popover_widgets):
+            if i < len(devices):
+                dev = devices[i]
+                load = safe_parse_percent(dev.get('gpu_util'))
+                mem = safe_parse_percent(dev.get('mem_util'))
+                
+                device_widgets['load']['level'].set_value(load)
+                device_widgets['load']['label'].set_text(f"{load}%")
+                device_widgets['mem']['level'].set_value(mem)
+                device_widgets['mem']['label'].set_text(f"{mem}%")
+                
+                if 'device_label' in device_widgets:
+                    device_widgets['device_label'].set_text(dev.get('device_name', f'Device {i}'))
+
+def build_popover(module, data):
+    """ Build the complex original popover layout """
+    devices = data.get('devices', [])
+    module.popover_widgets = []
+    
+    main_box = c.box('v', spacing=10)
+    main_box.append(c.label('GPU info', style="heading"))
+    
+    devices_box = c.box('v', spacing=10)
+    
+    # Groups for alignment
+    bar_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+    label_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+    
+    for i in range(2):
+        card_box = c.box('v', spacing=4)
+        
+        # Device title
+        dev_name = devices[i].get('device_name', f'Device {i}') if i < len(devices) else f'Device {i}'
+        device_label = c.label(dev_name, style='title', ha='start', he=True)
+        card_box.append(device_label)
+        
+        info_outer_box = c.box('v', spacing=0, style='box')
+        inner_info_box = c.box('v', spacing=10, style='inner-box')
+        
+        device_widgets = {'device_label': device_label}
+        
+        # Rows for Load and Memory
+        for item_key, label_text in [('gpu_util', 'Load'), ('mem_util', 'Memory')]:
+            line_box = c.box('h', spacing=10)
+            line_box.append(c.label(label_text))
+            
+            lvl = Gtk.LevelBar.new_for_interval(0, 100)
+            lvl.set_min_value(0)
+            lvl.set_max_value(100)
+            lvl.set_hexpand(True)
+            c.add_style(lvl, 'level-horizontal')
+            bar_group.add_widget(lvl)
+            
+            val = safe_parse_percent(devices[i].get(item_key)) if i < len(devices) else 0
+            lvl.set_value(val)
+            
+            pct_label = Gtk.Label.new(f'{val}%')
+            pct_label.set_xalign(1)
+            label_group.add_widget(pct_label)
+            
+            line_box.append(lvl)
+            line_box.append(pct_label)
+            inner_info_box.append(line_box)
+            
+            short_key = 'load' if 'gpu' in item_key else 'mem'
+            device_widgets[short_key] = {'level': lvl, 'label': pct_label}
+            
+        info_outer_box.append(inner_info_box)
+        card_box.append(info_outer_box)
+        devices_box.append(card_box)
+        module.popover_widgets.append(device_widgets)
+        
+        if i >= len(devices):
+            card_box.set_visible(False)
+            
+    main_box.append(devices_box)
+    return main_box

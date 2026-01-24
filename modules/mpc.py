@@ -1,57 +1,66 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
+"""
+Description: MPC module refactored for unified state
+Author: thnikk
+"""
 from subprocess import run, DEVNULL, CalledProcessError
 import common as c
-import threading
 import time
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Pango, GLib  # noqa
+from gi.repository import Gtk, Pango  # noqa
 
+def get_mpc_status():
+    try:
+        output = run(['mpc', 'status'], capture_output=True, check=True).stdout.decode('utf-8').splitlines()
+        if len(output) < 2:
+            return {"status": "stopped", "song": "Stopped", "artist": ""}
+            
+        song_line = output[0]
+        status_line = output[1]
+        
+        artist = song_line.split(' - ')[0].strip() if ' - ' in song_line else ""
+        song = song_line.split(' - ')[-1].strip()
+        status = status_line.split(']')[0].lstrip('[')
+        
+        return {
+            "status": status,
+            "song": song,
+            "artist": artist,
+            "text": song
+        }
+    except Exception:
+        return None
 
-class Mpc(c.Module):
-    def __init__(self, bar, config):
-        super().__init__()
-        self.icon.set_text('')
-        self.text.set_max_width_chars(20)
-        self.text.set_ellipsize(Pango.EllipsizeMode.END)
+def run_worker(name, config):
+    """ Background worker for mpc """
+    def update():
+        data = get_mpc_status()
+        if data:
+            c.state_manager.update(name, data)
 
+    update()
+    while True:
         try:
-            run(['mpc', 'version'], check=True, stdout=DEVNULL, stderr=DEVNULL)
-        except CalledProcessError:
-            self.text.set_text('mpd not running')
-        self.update()
+            run(['mpc', 'idle'], stdout=DEVNULL, stderr=DEVNULL)
+            update()
+        except Exception:
+            time.sleep(5)
+            update()
 
-        thread = threading.Thread(target=self.listen)
-        thread.daemon = True
-        thread.start()
-
-    def listen(self):
-        while True:
-            try:
-                run(['mpc', 'idle'], stdout=DEVNULL, stderr=DEVNULL)
-                GLib.idle_add(self.update)
-            except CalledProcessError:
-                time.sleep(5)
-
-    def update(self):
-        try:
-            output = run(
-                ['mpc', 'status'], capture_output=True, check=True
-            ).stdout.decode('utf-8').splitlines()
-        except CalledProcessError:
-            return
-        artist = output[0].split(' - ')[0].strip()
-        song = output[0].split(' - ')[-1]
-        status = output[1].split(']')[0].lstrip('[')
-        if status == 'playing':
-            self.icon.set_text('')
-        elif status == 'paused':
-            self.icon.set_text('')
-        else:
-            self.icon.set_text('')
-        self.text.set_text(song)
-
-
-def module(bar, config):
-    module = Mpc(bar, config)
+def create_widget(bar, config):
+    module = c.Module()
+    module.set_position(bar.position)
+    module.text.set_max_width_chars(20)
+    module.text.set_ellipsize(Pango.EllipsizeMode.END)
     return module
+
+def update_ui(module, data):
+    status = data['status']
+    if status == 'playing':
+        module.icon.set_text('')
+    elif status == 'paused':
+        module.icon.set_text('')
+    else:
+        module.icon.set_text('')
+    module.text.set_text(data['song'])

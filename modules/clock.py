@@ -13,6 +13,23 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
+def fetch_data(config):
+    """ Get current time """
+    now = datetime.now()
+    try:
+        datestring = config.get('format', '%I:%M %m/%d')
+    except (TypeError, KeyError):
+        datestring = '%I:%M %m/%d'
+    
+    return {
+        "text": now.strftime(datestring),
+        "day": now.day,
+        "month": now.month,
+        "year": now.year,
+        "month_name": now.strftime('%B')
+    }
+
+
 def diff_month(year, month, diff):
     """ Find year and month difference """
     if diff < 0 and month == 1:
@@ -148,7 +165,7 @@ def draw_events(now, events, combined_calendar):
     return events_section
 
 
-def widget():
+def widget_content():
     """ Draw calendar """
     widget = c.box('v', style='widget', spacing=20)
 
@@ -205,28 +222,21 @@ def widget():
     return widget
 
 
-def module(bar, config=None):
-    """ Clock module """
+def create_widget(bar, config):
+    """ Clock module widget """
     module = c.Module()
     module.set_position(bar.position)
     module.icon.set_label('')
+    module.set_widget(widget_content())
+    return module
 
-    module.set_widget(widget())
 
-    def get_time():
-        try:
-            datestring = config['format']
-        except (TypeError, KeyError):
-            datestring = '%I:%M %m/%d'
-        new = datetime.now().strftime(f'{datestring}')
-        last = module.text.get_label()
-        if new != last:
-            module.text.set_label(new)
-            # Redraw calendar on new day
-            if new[-2:] != last[-2:]:
-                module.set_widget(widget())
-        return True
-
-    if get_time():
-        GLib.timeout_add(1000, get_time)
-        return module
+def update_ui(module, data):
+    """ Update clock UI """
+    last = module.text.get_label()
+    new = data['text']
+    if new != last:
+        module.text.set_label(new)
+        # Redraw calendar on new day
+        if last and new[-2:] != last[-2:]:
+            module.set_widget(widget_content())

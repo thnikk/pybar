@@ -1,62 +1,64 @@
 #!/usr/bin/python3 -u
 """
-Description: Toggle module
+Description: Toggle module refactored for unified state
 Author: thnikkk
 """
 import common as c
 from subprocess import Popen, DEVNULL
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gdk, GLib  # noqa
+from gi.repository import Gtk  # noqa
 
+# Toggle module state is mostly local to each instance but we follow the pattern
+# Actually, if we want shared toggle state, we should use a worker to track the process.
 
-class switch(Gtk.Box):
-    def __init__(self, icon, command):
-        super().__init__()
-        self.proc = None
-        self.icon = icon
-        self.command = command
-        self.set_spacing(5)
-        c.add_style(self, 'module')
-        self.add(c.label(icon))
+procs = {} # Global procs map {name: proc}
 
-        switch_box = c.box('v')
-        self.switch = Gtk.Switch.new()
-        c.add_style(self.switch, 'switch')
-        switch_box.append(self.switch)
-        self.add(switch_box)
-        self.switch.connect('state_set', self.click_action)
-
-    def click_action(self, switch, state):
-        """ Launch or kill program """
-        if state:
-            self.proc = Popen(self.command, stdout=DEVNULL, stderr=DEVNULL)
+def fetch_data(config):
+    """ Fetch toggle data (is the process alive?) """
+    name = config.get('name', 'default')
+    proc = procs.get(name)
+    alive = False
+    if proc:
+        if proc.poll() is None:
+            alive = True
         else:
-            self.proc.terminate()
+            del procs[name]
+    
+    return {
+        "alive": alive,
+        "icon": config.get('icon', '')
+    }
 
+def create_widget(bar, config):
+    """ Create toggle widget """
+    name = config.get('name', 'default')
+    icon = config.get('icon', '')
+    command = config.get('program', ['tail', '-f', '/dev/null'])
+    
+    box = c.box('h', style='module', spacing=5)
+    box.append(c.label(icon))
+    
+    switch_box = c.box('v')
+    sw = Gtk.Switch.new()
+    c.add_style(sw, 'switch')
+    switch_box.append(sw)
+    box.append(switch_box)
+    
+    def on_state_set(s, state):
+        if state:
+            if name not in procs or procs[name].poll() is not None:
+                procs[name] = Popen(command, stdout=DEVNULL, stderr=DEVNULL)
+        else:
+            if name in procs:
+                procs[name].terminate()
+        return False # Don't inhibit signal
+        
+    sw.connect('state-set', on_state_set)
+    box.sw = sw
+    return box
 
-def module(bar, config=None):
-    if not config:
-        config = {}
-    if 'icon' in list(config):
-        icon = config['icon']
-    else:
-        icon = ''
-    if 'program' in list(config):
-        command = config['program']
-    else:
-        command = ['tail', '-f', '/dev/null']
-    module = switch(icon, command)
-
-    def update():
-        try:
-            if module.proc.poll() is not None:
-                module.switch.set_state(False)
-                module.proc = None
-        except AttributeError:
-            pass
-        return True
-
-    if update():
-        GLib.timeout_add(500, update)
-        return module
+def update_ui(box, data):
+    """ Update toggle UI """
+    # Block signals during update to avoid loops
+    box.sw.set_state(data['alive'])
