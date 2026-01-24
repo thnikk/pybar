@@ -263,7 +263,6 @@ class Module(Gtk.MenuButton):
 
     def set_widget(self, box):
         """ Set widget """
-        print_debug("Setting popover widget", color='blue')
         widget = Widget()
         widget.box.append(box)
         widget.draw()

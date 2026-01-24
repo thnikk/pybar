@@ -132,78 +132,118 @@ def update_ui(module, data):
     module.set_label(song)
     module.set_visible(True)
     
-    # Check if we need to rebuild the popover
-    current_song = getattr(module, 'current_song', None)
-    current_status = getattr(module, 'current_status', None)
+    # Update popover content
+    if not hasattr(module, 'popover_built'):
+        module.set_widget(build_popover(module, data))
+        module.popover_built = True
+    else:
+        try:
+            update_popover(module, data)
+        except Exception as e:
+            c.print_debug(f"Failed to update mpc popover: {e}", color='red')
+
+def update_popover(module, data):
+    """ Update existing popover widgets """
+    # Update Art
+    art_path = data.get('art')
+    last_art = getattr(module, 'last_art_path', None)
     
-    # If the popover is active (open), we DON'T want to call set_widget
-    # because that would replace the popover while the user is using it.
-    # We only rebuild it if it's NOT active and something changed.
-    # HOWEVER, if the song changed, we MUST rebuild it or it shows old info.
-    if not module.get_active() or song != current_song:
-        if song != current_song or status != current_status:
+    if hasattr(module, 'pop_art') and art_path != last_art:
+        module.last_art_path = art_path
+        if art_path and os.path.exists(art_path):
             try:
-                popover_content = build_popover(module, data)
-                module.set_widget(popover_content)
-                module.current_song = song
-                module.current_status = status
-            except Exception as e:
-                c.print_debug(f"MPC popover build failed: {e}", color='red')
+                art_size = 300
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(art_path, art_size, art_size, True)
+                texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+                module.pop_art.set_from_paintable(texture)
+                module.pop_art.set_visible(True)
+                if hasattr(module, 'pop_art_placeholder'):
+                    module.pop_art_placeholder.set_visible(False)
+            except Exception:
+                pass
+        else:
+            module.pop_art.set_visible(False)
+            if hasattr(module, 'pop_art_placeholder'):
+                module.pop_art_placeholder.set_visible(True)
+
+    # Update labels
+    song = data.get('song', 'Unknown Song')
+    artist = data.get('artist', '')
+    
+    if hasattr(module, 'pop_song') and module.pop_song.get_text() != song:
+        module.pop_song.set_text(song)
+    if hasattr(module, 'pop_artist'):
+        if module.pop_artist.get_text() != artist:
+            module.pop_artist.set_text(artist)
+        module.pop_artist.set_visible(bool(artist))
+
+    # Update seekbar
+    if hasattr(module, 'pop_seekbar'):
+        # Block signals to avoid feedback loop while updating value
+        module.pop_seekbar.handler_block(module.pop_seekbar_handler)
+        module.pop_seekbar.set_value(data.get('percent', 0))
+        module.pop_seekbar.handler_unblock(module.pop_seekbar_handler)
+
+    # Update play/pause button
+    if hasattr(module, 'pop_play_btn'):
+        label = '' if data.get('status') == 'playing' else ''
+        if module.pop_play_btn.get_label() != label:
+            module.pop_play_btn.set_label(label)
 
 def build_popover(module, data):
     """ Build mpc popover """
     main_box = c.box('v', spacing=20, style='small-widget')
     
-    # Album Art - Reduced size
     art_size = 300
     art_path = data.get('art')
+    
+    # Album Art Container
+    art_container = c.box('v', style='cover-art')
+    art_container.set_size_request(art_size, art_size)
+    art_container.set_overflow(Gtk.Overflow.HIDDEN)
+    art_container.set_halign(Gtk.Align.CENTER)
+    art_container.set_valign(Gtk.Align.CENTER)
+    art_container.set_hexpand(False)
+    art_container.set_vexpand(False)
+
+    # Art Image
+    module.pop_art = Gtk.Image()
+    module.pop_art.set_pixel_size(art_size)
+    
+    # Placeholder
+    module.pop_art_placeholder = c.label('', style='large-text', va='center', ha='center', he=True)
+    module.pop_art_placeholder.set_size_request(art_size, art_size)
+    
+    art_container.append(module.pop_art)
+    art_container.append(module.pop_art_placeholder)
+    main_box.append(art_container)
+
+    # Initial art load
     if art_path and os.path.exists(art_path):
-        # Use a box to contain the image and handle rounding/clipping
-        art_container = c.box('v', style='cover-art')
-        art_container.set_size_request(art_size, art_size)
-        art_container.set_overflow(Gtk.Overflow.HIDDEN)
-        art_container.set_halign(Gtk.Align.CENTER)
-        art_container.set_valign(Gtk.Align.CENTER)
-        art_container.set_hexpand(False)
-        art_container.set_vexpand(False)
-        
         try:
-            # Use GdkPixbuf and Gdk.Texture for absolute size control in GTK4
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(art_path, art_size, art_size, True)
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
-            art = Gtk.Image.new_from_paintable(texture)
-            art.set_pixel_size(art_size)
-            art.set_hexpand(False)
-            art.set_vexpand(False)
-            art.set_halign(Gtk.Align.CENTER)
-            art.set_valign(Gtk.Align.CENTER)
-            
-            art_container.append(art)
-            main_box.append(art_container)
-        except Exception as e:
-            c.print_debug(f"Failed to load art image with Gtk.Image: {e}", color='yellow')
+            module.pop_art.set_from_paintable(texture)
+            module.pop_art_placeholder.set_visible(False)
+        except Exception:
+            module.pop_art.set_visible(False)
     else:
-        placeholder = c.box('v', style='cover-art box')
-        placeholder.set_size_request(art_size, art_size)
-        placeholder.set_hexpand(False)
-        placeholder.set_vexpand(False)
-        placeholder.append(c.label('', style='large-text', va='center', ha='center', he=True))
-        placeholder.set_halign(Gtk.Align.CENTER)
-        placeholder.set_valign(Gtk.Align.CENTER)
-        main_box.append(placeholder)
-
+        module.pop_art.set_visible(False)
 
     # Track info
     info_box = c.box('v', spacing=5)
-    info_box.append(c.label(data.get('song', 'Unknown Song'), style='heading', length=20))
-    if data.get('artist'):
-        info_box.append(c.label(data['artist'], style='title', wrap=20))
+    module.pop_song = c.label(data.get('song', 'Unknown Song'), style='heading', length=20)
+    module.pop_artist = c.label(data.get('artist', ''), style='title', wrap=20)
+    module.pop_artist.set_visible(bool(data.get('artist')))
+    
+    info_box.append(module.pop_song)
+    info_box.append(module.pop_artist)
     main_box.append(info_box)
 
     # Seekbar
-    seekbar = c.slider(data.get('percent', 0), scrollable=False)
-    seekbar.connect('value-changed', lambda s: run(['mpc', 'seek', f"{int(s.get_value())}%"]))
-    main_box.append(seekbar)
+    module.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
+    module.pop_seekbar_handler = module.pop_seekbar.connect('value-changed', lambda s: run(['mpc', 'seek', f"{int(s.get_value())}%"]))
+    main_box.append(module.pop_seekbar)
 
     # Controls
     ctrl_box = c.box('h', style='mpc-controls')
@@ -216,9 +256,9 @@ def build_popover(module, data):
     prev_btn.set_valign(Gtk.Align.FILL)
     prev_btn.connect('clicked', mpc_cmd, 'prev')
     
-    play_btn = c.button('' if data.get('status') == 'playing' else '')
-    play_btn.set_valign(Gtk.Align.FILL)
-    play_btn.connect('clicked', mpc_cmd, 'toggle')
+    module.pop_play_btn = c.button('' if data.get('status') == 'playing' else '')
+    module.pop_play_btn.set_valign(Gtk.Align.FILL)
+    module.pop_play_btn.connect('clicked', mpc_cmd, 'toggle')
     
     next_btn = c.button('')
     next_btn.set_valign(Gtk.Align.FILL)
@@ -231,7 +271,7 @@ def build_popover(module, data):
     
     ctrl_box.append(prev_btn)
     ctrl_box.append(s1)
-    ctrl_box.append(play_btn)
+    ctrl_box.append(module.pop_play_btn)
     ctrl_box.append(s2)
     ctrl_box.append(next_btn)
         
