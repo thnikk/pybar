@@ -65,8 +65,8 @@ def main():
                 color='green')
             thread = threading.Thread(
                 target=module.cache, args=(
-                    module_config['command'],
-                    module_config['interval'],
+                    name,
+                    module_config,
                     config['cache']))
             thread.daemon = True
             thread.start()
