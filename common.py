@@ -383,13 +383,33 @@ def label(input_text, style=None, va=None, ha=None, he=False, wrap=None, length=
     return text
 
 
-def slider(value, min=0, max=100, style=None):
+def slider(value, min=0, max=100, style=None, scrollable=True):
     """ Create a slider """
     widget = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, min, max, 1)
     widget.set_value(value)
     widget.set_draw_value(False)
     if style:
         widget.get_style_context().add_class(style)
+
+    if not scrollable:
+        scroll_controller = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+
+        def on_scroll(controller, dx, dy):
+            # Find the parent ScrolledWindow
+            parent = widget.get_parent()
+            while parent and not isinstance(parent, Gtk.ScrolledWindow):
+                parent = parent.get_parent()
+
+            if parent:
+                adj = parent.get_vadjustment()
+                if adj:
+                    adj.set_value(adj.get_value() + (dy * 30))
+            return True
+
+        scroll_controller.connect("scroll", on_scroll)
+        widget.add_controller(scroll_controller)
+
     return widget
 
 

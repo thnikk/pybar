@@ -202,7 +202,7 @@ def build_device_row(section, device):
     
     # Label
     label_text = device.get('proplist', {}).get('application.process.binary', device.get('description', 'Unknown'))
-    btn = c.button(label_text, ha='start', style='minimal')
+    btn = c.button(label_text, ha='start', style='minimal', length=25)
     if section != 'Programs':
         btn.connect('clicked', lambda b: set_default(section, device['name']))
     btn.set_hexpand(True)
@@ -210,8 +210,8 @@ def build_device_row(section, device):
     
     row.append(top)
     
-    # Volume slider
-    slider = c.slider(round(device.get('volume', 0) * 100))
+    # Volume slider - disable scroll to allow container to scroll
+    slider = c.slider(round(device.get('volume', 0) * 100), scrollable=False)
     slider.connect('value-changed', lambda s: set_dev_volume(section, device['index'], s.get_value()))
     if device.get('mute'):
         c.add_style(slider, 'muted')
