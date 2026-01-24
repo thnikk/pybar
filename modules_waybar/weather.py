@@ -279,7 +279,7 @@ class Pollution():
         return self.__aqi_to_desc__(self.aqi[index])
 
 
-def widget(om, index, hours, night) -> dict:
+def widget(om, index, hours, night, min_val=None, max_val=None) -> dict:
     """ Generate tooltip """
 
     hourly = om.weather.hourly
@@ -301,7 +301,11 @@ def widget(om, index, hours, night) -> dict:
             }]
         },
         "Hourly": {
-            "icon-class": "icon-small"
+            "icon-class": "icon-small",
+            "temperatures": [hourly.temp(int((datetime.now() + timedelta(hours=h)).strftime('%H'))) for h in range((hours or 5) + 1)],
+            "hours": hours or 5,
+            "min": min_val,
+            "max": max_val
         },
         "Daily": {
             "icon-class": "icon-medium"
@@ -370,7 +374,8 @@ def module(config):
             "text": f"{om.weather.hourly.icon(hour_now, night)} "
             f"{om.weather.hourly.temp(hour_now)}°F",
             "widget": widget(
-                om, hour_now, config['hours'], config['night_icons'])
+                om, hour_now, config['hours'], config['night_icons'],
+                config.get('min'), config.get('max'))
         }
 
 

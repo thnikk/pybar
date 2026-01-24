@@ -252,6 +252,26 @@ def weather(name, module, cache):
 
     hourly_container = c.box('v', spacing=10)
     hourly_container.append(c.label('Hourly forecast', he=True, ha="start"))
+    
+    # Add temperature graph
+    if 'temperatures' in cache['Hourly']:
+        graph_box = c.box('v', style='box')
+        graph_box.set_overflow(Gtk.Overflow.HIDDEN)
+        graph = Graph(
+            cache['Hourly']['temperatures'], 
+            height=80,
+            min_config=cache['Hourly'].get('min'),
+            max_config=cache['Hourly'].get('max')
+        )
+        graph_box.append(graph)
+        hourly_container.append(graph_box)
+        
+        # Time legend for forecast
+        time_box = c.box('h')
+        time_box.append(c.label('Now', style='gray', ha='start', he=True))
+        time_box.append(c.label(f"+{cache['Hourly'].get('hours', 5)}h", style='gray', ha='end'))
+        hourly_container.append(time_box)
+
     hourly_box = c.box('h', style='box')
     for hour in cache['Hourly']['info']:
         hour_box = c.box('v', style='inner-box-wide')
