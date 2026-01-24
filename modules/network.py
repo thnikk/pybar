@@ -100,7 +100,7 @@ def create_widget(bar, config):
 
 def update_ui(module, data):
     """ Update network UI """
-    module.text.set_label(data['text'] if data['text'] else "NET")
+    module.set_label(data['text'] if data['text'] else "NET")
     module.set_tooltip_text(data['tooltip'])
     
     if not module.get_active():

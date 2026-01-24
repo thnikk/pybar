@@ -84,8 +84,8 @@ def create_widget(bar, config):
     module.set_position(bar.position)
     c.add_style(module, 'module-fixed')
     module.icons = config.get('icons', {})
-    module.text.set_label('...')
-    module.icon.set_label('')
+    module.set_label('...')
+    module.set_icon('')
     
     # Add scroll controller
     scroll_controller = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.BOTH_AXES)
@@ -125,26 +125,26 @@ def update_ui(module, data):
     module.set_visible(True)
     if not default:
         c.print_debug("Volume update: No default sink", color='yellow')
-        module.text.set_label('ERR')
-        module.icon.set_label('')
+        module.set_label('ERR')
+        module.set_icon('')
         return
 
     volume = round(default['volume'] * 100)
     c.print_debug(f"Volume update: {volume}%", color='green')
-    module.text.set_label(f'{volume}%')
+    module.set_label(f'{volume}%')
     
     # Set icon
     if default['mute']:
-        module.icon.set_label('')
+        module.set_icon('')
     else:
         found = False
         for name, icon in module.icons.items():
             if name.lower() in default['name'].lower():
-                module.icon.set_label(icon)
+                module.set_icon(icon)
                 found = True
                 break
         if not found:
-            module.icon.set_label('')
+            module.set_icon('')
 
     # Update popover content
     if not module.get_active():

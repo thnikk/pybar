@@ -5,6 +5,8 @@ Author: thnikk
 """
 import threading
 import argparse
+import traceback
+import sys
 import config as Config
 from bar import Display
 import common as c
@@ -15,9 +17,13 @@ from gi.repository import Gtk  # noqa
 
 
 def on_activate(app, config):
-    display = Display(config, app)
-    # Draw all bars
-    display.draw_all()
+    try:
+        display = Display(config, app)
+        # Draw all bars
+        display.draw_all()
+    except Exception:
+        traceback.print_exc()
+        sys.exit(1)
 
 
 def parse_args():

@@ -34,12 +34,13 @@ def create_widget(bar, config):
     """ Create memory module widget """
     module = c.Module()
     module.set_position(bar.position)
-    module.icon.set_label('')
+    module.set_icon('')
     return module
 
 def update_ui(module, data):
     """ Update memory UI """
-    module.text.set_label(data['text'])
+    module.set_label(data['text'])
+    module.set_visible(True)
     
     if not module.get_active():
         module.set_widget(build_popover(module, data))

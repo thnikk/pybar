@@ -96,8 +96,11 @@ def create_widget(bar, config):
 
 def update_ui(module, data):
     """ Update updates UI """
+    if not data:
+        module.set_visible(False)
+        return
     total = data['total']
-    module.text.set_label(data['text'])
+    module.set_label(data['text'])
     module.set_visible(bool(total))
     
     if not module.get_active():
@@ -138,11 +141,11 @@ def build_popover(module, data):
         
         for package in packages:
             package_box = c.box('h', style='inner-box', spacing=20)
-            package_label = c.button(package[0], style='minimal')
+            package_label = c.button(package[0], style='minimal', length=25)
             if manager in urls:
                 package_label.connect('clicked', click_link, f'{urls[manager]}{package[0]}')
             package_box.append(package_label)
-            package_box.append(c.label(package[1], style='green-fg'))
+            package_box.append(c.label(package[1], style='green-fg', ha='end', he=True, length=15))
             packages_box.append(package_box)
             if package != packages[-1]:
                 packages_box.append(c.sep('h'))

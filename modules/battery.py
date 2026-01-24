@@ -95,7 +95,7 @@ def create_widget(bar, config):
     module = c.Module()
     module.set_position(bar.position)
     c.add_style(module, 'module-fixed')
-    module.icon.set_text('')
+    module.set_icon('')
     module.popover_widgets = []
     return module
 
@@ -108,11 +108,11 @@ def update_ui(module, data):
     icon_index = min(icon_index, len(icons) - 1)
 
     if data['ac_online']:
-        module.icon.set_label('')
+        module.set_icon('')
     else:
-        module.icon.set_label(icons[icon_index])
+        module.set_icon(icons[icon_index])
     
-    module.text.set_label(f'{percentage}%')
+    module.set_label(f'{percentage}%')
     
     if not module.get_active():
         module.set_widget(widget(module, data))

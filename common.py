@@ -195,20 +195,53 @@ class Module(Gtk.MenuButton):
         self.con = box('v')
         self.indicator = box('h', style='indicator')
         self.indicator_added_styles = []
-        self.box = box('h', spacing=5)
+        self.box = box('h', spacing=0)
         self.box.set_vexpand(True)
+        self.box.set_halign(Gtk.Align.CENTER)
         self.con.append(self.box)
         self.con.append(self.indicator)
-        self.con.show()
+        self.con.set_visible(True)
+
+        self.icon = None
+        self.text = None
 
         if icon:
             self.icon = Gtk.Label()
+            self.icon.set_visible(False)
+            self.icon.set_valign(Gtk.Align.CENTER)
             self.box.prepend(self.icon)
         if text:
             self.text = Gtk.Label()
-            self.text.set_hexpand(True)
+            self.text.set_visible(False)
+            self.text.set_valign(Gtk.Align.CENTER)
             self.box.append(self.text)
         self.set_child(self.con)
+
+    def set_label(self, text):
+        """ Set text and toggle visibility """
+        if self.text:
+            self.text.set_label(str(text))
+            self.text.set_visible(bool(text))
+            self._update_spacing()
+        return self
+
+    def set_icon(self, icon):
+        """ Set icon and toggle visibility """
+        if self.icon:
+            self.icon.set_label(str(icon))
+            self.icon.set_visible(bool(icon))
+            self._update_spacing()
+        return self
+
+    def _update_spacing(self):
+        """ Update spacing based on visible children """
+        count = 0
+        child = self.box.get_first_child()
+        while child:
+            if child.get_visible():
+                count += 1
+            child = child.get_next_sibling()
+        self.box.set_spacing(5 if count > 1 else 0)
 
     def reset_style(self):
         """ Reset module style back to default """
@@ -268,7 +301,7 @@ class Widget(Gtk.Popover):
         self.box.append(label(string))
 
     def draw(self):
-        self.box.show()
+        self.box.set_visible(True)
         self.set_child(self.box)
 
 

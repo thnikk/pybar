@@ -105,12 +105,12 @@ def fetch_data(config):
             "feels_like": round(w['hourly']['apparent_temperature'][hour_now]),
             "humidity": w['hourly']['relativehumidity_2m'][hour_now],
             "wind": round(w['hourly']['windspeed_10m'][hour_now]),
-            "quality": aqi_to_desc(p['hourly']['us_aqi'][hour_now])
+            "quality": aqi_to_desc(p['hourly']['us_aqi'][hour_now]),
+            "sunrise": sunrise_dt.strftime("%l %p").strip(),
+            "sunset": sunset_dt.strftime("%l %p").strip()
         }
-        if sunset > hour_now > sunrise:
-            today_data["sunset"] = f"{sunset - 12}:00"
-        else:
-            today_data["sunrise"] = f"{sunrise}:00"
+        today_data["sun_icon"] = "" if sunset > hour_now > sunrise else ""
+        today_data["sun_time"] = today_data["sunset"] if sunset > hour_now > sunrise else today_data["sunrise"]
 
         # Process Hourly data
         hourly_info = []
@@ -163,7 +163,11 @@ def create_widget(bar, config):
 
 def update_ui(module, data):
     """ Update weather UI """
-    module.text.set_label(data['text'])
+    if not data:
+        module.set_visible(False)
+        return
+    module.set_label(data['text'])
+    module.set_visible(True)
     if not module.get_active():
         module.set_widget(build_popover(data))
 
@@ -199,10 +203,7 @@ def build_popover(cache):
     today_box.append(today_left)
 
     sun_box = c.box('v')
-    if "sunset" in today:
-        sun_box.append(c.label(f' {time_to_text(today["sunset"])}pm'))
-    elif "sunrise" in today:
-        sun_box.append(c.label(f' {time_to_text(today["sunrise"])}am'))
+    sun_box.append(c.label(f'{today["sun_icon"]} {today["sun_time"]}'))
     today_box.append(sun_box)
 
     today_box.append(today_right)
@@ -231,8 +232,10 @@ def build_popover(cache):
         hourly_container.append(time_box)
 
     hourly_box = c.box('h', style='box')
+    hour_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
     for hour in cache['Hourly']['info']:
         hour_box = c.box('v', style='inner-box-wide')
+        hour_group.add_widget(hour_box)
         hour_box.append(c.label(f"{hour['temperature']}°"))
         hour_box.append(c.label(f"{hour['humidity']}%"))
         icon = c.label(hour['icon'], style='icon-small')

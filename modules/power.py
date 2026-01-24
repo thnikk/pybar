@@ -17,7 +17,8 @@ def create_widget(bar, config):
     """ Create power module widget """
     module = c.Module(1, 0)
     module.set_position(bar.position)
-    module.icon.set_label('')
+    module.set_icon('')
+    module.set_visible(True)
     module.set_widget(build_popover())
     return module
 

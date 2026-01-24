@@ -22,15 +22,19 @@ def fetch_data(config):
 def create_widget(bar, config):
     """ Create GPU module widget with original layout """
     module = c.Module(text=False)
-    module.icon.set_text('')
     
     # Store UI elements for updating
     module.bar_gpu_levels = [] # List of (load_bar, mem_bar) pairs
     module.popover_widgets = [] # List of dicts with levelbars and labels per device
-    
+
     # Bar icon structure: cards_box contains levels_box per GPU
-    module.cards_box = c.box('h', spacing=10)
+    module.cards_box = c.box('h', spacing=15)
+    module.cards_box.set_margin_start(5)
     module.box.append(module.cards_box)
+
+    module.set_icon('')
+    module.box.set_spacing(5)
+    module.set_visible(True)
     
     for _ in range(2):
         levels_box = c.box('h', spacing=4)
@@ -66,7 +70,14 @@ def safe_parse_percent(val):
 
 def update_ui(module, data):
     """ Update GPU UI including bar and popover """
+    if not data:
+        return
     devices = data.get('devices', [])
+    
+    if devices:
+        module.set_visible(True)
+    else:
+        module.set_visible(False)
     
     # Update bar icons
     for i, (l1, l2) in enumerate(module.bar_gpu_levels):
@@ -77,6 +88,7 @@ def update_ui(module, data):
             l1.set_value(load)
             l2.set_value(mem)
             l1.get_parent().set_visible(True)
+            module._update_spacing() # Ensure spacing if indicators become visible
         else:
             l1.get_parent().set_visible(False)
 
@@ -127,10 +139,10 @@ def build_popover(module, data):
         
         device_widgets = {'device_label': device_label}
         
-        # Rows for Load and Memory
-        for item_key, label_text in [('gpu_util', 'Load'), ('mem_util', 'Memory')]:
+        # Rows for GPU and Memory utilization icons
+        for item_key, label_icon in [('gpu_util', ''), ('mem_util', '')]:
             line_box = c.box('h', spacing=10)
-            line_box.append(c.label(label_text))
+            line_box.append(c.label(label_icon))
             
             lvl = Gtk.LevelBar.new_for_interval(0, 100)
             lvl.set_min_value(0)

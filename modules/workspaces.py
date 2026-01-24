@@ -67,6 +67,7 @@ def run_worker(name, config):
 def create_widget(bar, config):
     """ Create workspaces widget """
     box = c.box('h', style='workspaces')
+    box.set_halign(Gtk.Align.CENTER)
     box.buttons = []
     
     for n in range(1, 11):

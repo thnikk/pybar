@@ -226,17 +226,18 @@ def create_widget(bar, config):
     """ Clock module widget """
     module = c.Module()
     module.set_position(bar.position)
-    module.icon.set_label('')
+    module.set_icon('')
     module.set_widget(widget_content())
     return module
 
 
 def update_ui(module, data):
     """ Update clock UI """
-    last = module.text.get_label()
+    last = module.text.get_text()
     new = data['text']
+    module.set_visible(True)
     if new != last:
-        module.text.set_label(new)
+        module.set_label(new)
         # Redraw calendar on new day
         if last and new[-2:] != last[-2:]:
             module.set_widget(widget_content())

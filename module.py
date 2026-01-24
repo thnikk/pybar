@@ -142,8 +142,10 @@ def module(bar, name, config):
     
     def generic_update(data):
         if 'text' in data:
-            m.text.set_label(data['text'])
+            m.set_label(data['text'])
             m.set_visible(bool(data['text']))
+        if 'icon' in data:
+            m.set_icon(data['icon'])
         if 'tooltip' in data:
             m.set_tooltip_text(str(data['tooltip']))
         # Handle classes

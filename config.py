@@ -33,7 +33,7 @@ def load(path):
 }"""
         with open(f"{config_path}/config.json", 'w', encoding='utf-8') as file:
             file.write(default_config)
-        return default_config
+        return json.loads(re.sub(re.compile(r"//.*?\n"), "", default_config))
     with open(
         os.path.expanduser(f'{config_path}/config.json'),
         'r', encoding='utf=8'

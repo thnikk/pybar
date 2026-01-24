@@ -47,10 +47,17 @@ def fetch_data(config):
 def create_widget(bar, config):
     module = c.Module(1, 0)
     module.set_position(bar.position)
-    module.icon.set_label('')
+    module.set_icon('')
+    module.set_visible(False)
     return module
 
 def update_ui(module, data):
+    if not data:
+        return
+    if data.get('sections'):
+        module.set_visible(True)
+    else:
+        module.set_visible(False)
     if not module.get_active():
         module.set_widget(build_popover(data))
 

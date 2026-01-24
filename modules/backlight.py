@@ -58,7 +58,7 @@ def create_widget(bar, config):
     module = c.Module()
     module.set_position(bar.position)
     c.add_style(module, 'module-fixed')
-    module.icon.set_label('')
+    module.set_icon('')
 
     def scroll_action(button, event):
         """ Scroll action """
@@ -109,5 +109,5 @@ def update_ui(module, data):
         module.set_widget(widget_content(data))
         
     percentage = round((data['brightness']/data['max_brightness'])*100)
-    module.text.set_label(f'{percentage}%')
+    module.set_label(f'{percentage}%')
     module.set_visible(True)
