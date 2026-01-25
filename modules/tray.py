@@ -49,7 +49,8 @@ def get_service_name_and_object_path(service: str) -> typing.Tuple[str, str]:
 
 def debug_print(msg, *args, **kwargs):
     try:
-        if TrayHost.get_instance().debug:
+        # Avoid infinite recursion by checking _instance directly instead of get_instance()
+        if TrayHost._instance and TrayHost._instance.debug:
             c.print_debug(msg, *args, **kwargs)
     except Exception:
         pass
@@ -452,7 +453,8 @@ class TrayHost:
                 self.session_bus.publish_object(WATCHER_OBJECT_PATH, self.watcher_interface)
                 self.session_bus.register_service(WATCHER_SERVICE_NAME)
             except Exception as e:
-                debug_print(f"Failed to start internal SNI watcher: {e}")
+                # Use c.print_debug for errors to ensure they are seen
+                c.print_debug(f"Failed to start internal SNI watcher: {e}", color='red')
 
     def _watcher_available(self, _observer):
         # If we are the watcher, we've already connected signals in _setup_watcher
@@ -473,7 +475,8 @@ class TrayHost:
             debug_print(f"Registering host: {host_object_path}")
             self.watcher_proxy.RegisterStatusNotifierHost(host_object_path)
         except Exception as e:
-            debug_print(f"Failed to register host: {e}", color='red')
+            # Critical error
+            c.print_debug(f"Failed to register host: {e}", color='red')
 
         try:
             items = self.watcher_proxy.RegisteredStatusNotifierItems
@@ -481,7 +484,7 @@ class TrayHost:
             for full_name in items:
                 self._item_registered(full_name)
         except Exception as e:
-            debug_print(f"Failed to get existing items: {e}")
+            c.print_debug(f"Failed to get existing items: {e}")
 
     def _watcher_unavailable(self, _observer):
         self.watcher_proxy = None
@@ -900,6 +903,13 @@ class TrayModule(Gtk.Box):
         
         self.toggle_btn = Gtk.Button()
         self.toggle_btn.get_style_context().add_class("tray-toggle")
+        
+        # Use a label for better control over alignment
+        self.toggle_label = Gtk.Label()
+        self.toggle_label.set_halign(Gtk.Align.CENTER)
+        self.toggle_label.set_valign(Gtk.Align.CENTER)
+        self.toggle_btn.set_child(self.toggle_label)
+        
         self.toggle_btn.connect("clicked", self._on_toggle)
         
         # Order and transition based on direction
@@ -928,12 +938,18 @@ class TrayModule(Gtk.Box):
     def _update_ui_state(self):
         revealed = self.revealer.get_reveal_child()
         
+        # Update spacing to remove gap when collapsed
+        self.set_spacing(5 if revealed else 0)
+        
         # Update arrows based on direction and state
         # Inverting as requested
+        label_text = ""
         if self.direction == "right":
-            self.toggle_btn.set_label("" if revealed else "")
+            label_text = "" if revealed else ""
         else:
-            self.toggle_btn.set_label("" if revealed else "")
+            label_text = "" if revealed else ""
+            
+        self.toggle_label.set_text(label_text)
             
         # Toggle collapsed class for padding
         if revealed:
