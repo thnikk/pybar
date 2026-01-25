@@ -190,6 +190,20 @@ class Module(Gtk.MenuButton):
             self.text.set_margin_start(0)
             self.box.append(self.text)
 
+        # Add right-click controller for detach
+        right_click = Gtk.GestureClick()
+        right_click.set_button(3)
+        right_click.connect("pressed", self._on_right_click)
+        self.add_controller(right_click)
+        
+        self.debug_window = None
+
+        state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
+
+    def _on_debug_state_changed(self, state):
+        if not state and self.debug_window:
+            self.debug_window.close()
+
     def set_label(self, text):
         """ Set text and toggle visibility """
         if self.text:
@@ -279,6 +293,73 @@ class Module(Gtk.MenuButton):
         self.set_direction(directions.get(position, Gtk.ArrowType.UP))
         return self
 
+    def _on_right_click(self, gesture, n_press, x, y):
+        if not state_manager.get("debug_popovers"):
+            return
+
+        popover = self.get_popover()
+        if not popover or not isinstance(popover, Widget):
+            return
+            
+        # Claim sequence to prevent other handlers
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        
+        self.detach_widget(popover)
+
+    def detach_widget(self, popover):
+        if self.debug_window:
+            self.debug_window.present()
+            return
+
+        # Get the content box
+        # popover.box is the VBox from Widget
+        # We want to move its children (content)
+        content = popover.box.get_first_child()
+        if not content:
+            return
+
+        # Hide popover first to avoid state confusion
+        popover.popdown()
+        
+        # Store ref
+        self.detached_content = content
+        
+        # Unparent content (remove from popover.box)
+        content.unparent()
+            
+        # Wrap in styled box to match popover theme
+        wrapper = Gtk.Box()
+        wrapper.get_style_context().add_class("popover-content")
+        wrapper.append(content)
+        
+        # Create window
+        self.debug_window = Gtk.Window(title="Debug Module")
+        self.debug_window.set_default_size(300, 200)
+        self.debug_window.set_child(wrapper)
+        
+        def on_close(win):
+            self.restore_widget(popover)
+            self.debug_window = None
+            self.detached_content = None
+            return False # Destroy window
+            
+        self.debug_window.connect("close-request", on_close)
+        self.debug_window.present()
+
+    def restore_widget(self, popover):
+        """ Restore widget to popover """
+        if not hasattr(self, 'detached_content') or not self.detached_content:
+            return
+
+        content = self.detached_content
+        
+        # Unparent the box from wherever it is (window or wrapper)
+        parent = content.get_parent()
+        if parent:
+            parent.remove(content)
+            
+        # Re-attach to popover.box
+        popover.box.append(content)
 
 class Widget(Gtk.Popover):
     """ Template widget"""

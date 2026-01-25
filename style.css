@@ -38,8 +38,8 @@ window {
 }
 
 /* Remove default button styling from MenuButton internal buttons */
-.module button,
-.module button.toggle {
+.module > button,
+.module > button.toggle {
 	background: transparent;
 	border: none;
 	padding: 2px 5px;
@@ -200,6 +200,11 @@ switch:disabled {
 	border: 1px solid rgba(255,255,255,0.2);
 }
 
+button.normal:checked {
+	background: @green;
+	color: @black;
+}
+
 /* widgets */
 popover {
 	font-family: "Nunito", "Font Awesome 6 Free Solid";
@@ -207,7 +212,7 @@ popover {
 	background: none;
 }
 
-popover contents {
+popover contents, .popover-content {
 	background: alpha(@black, 0.8);
 	border: 2px solid @blue;
 	border-radius: 20px;
