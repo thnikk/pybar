@@ -45,8 +45,16 @@ def build_popover():
 
     power_box = c.box('v', style='box')
     for icon, command in buttons.items():
-        btn = c.button(label=icon, ha='end', style='power-item')
+        btn = c.button(label=icon, ha='fill', style='power-item')
+        btn.get_child().set_halign(Gtk.Align.END)
+        btn.set_cursor_from_name("pointer")
         btn.connect('clicked', power_action, command)
+        
+        if icon == list(buttons)[0]:
+            btn.get_style_context().add_class('rounded-top')
+        if icon == list(buttons)[-1]:
+            btn.get_style_context().add_class('rounded-bottom')
+            
         power_box.append(btn)
         if icon != list(buttons)[-1]:
             power_box.append(c.sep('h'))
