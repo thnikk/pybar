@@ -11,13 +11,27 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 
-def get_volume_data(pulse):
+def get_volume_data(pulse, blacklist=None):
     """ Get current pulse data """
+    if blacklist is None: blacklist = {}
     try:
         default_sink = pulse.sink_default_get()
         sinks = pulse.sink_list()
         sources = pulse.source_list()
         sink_inputs = pulse.sink_input_list()
+
+        # Filter blacklisted devices
+        sink_bl = blacklist.get('sinks', [])
+        source_bl = blacklist.get('sources', [])
+        
+        def is_allowed(device, blocklist):
+            if not blocklist: return True
+            name = getattr(device, 'name', '') or ''
+            desc = getattr(device, 'description', '') or ''
+            return not any(b in name or b in desc for b in blocklist)
+
+        sinks = [s for s in sinks if is_allowed(s, sink_bl)]
+        sources = [s for s in sources if is_allowed(s, source_bl)]
         
         def serialize_device(d):
             # For programs (sink inputs), we often need to look at proplist for a name
@@ -51,12 +65,13 @@ def get_volume_data(pulse):
 
 def run_worker(name, config):
     """ Background worker for volume """
+    blacklist = config.get('blacklist', {})
     while True:
         try:
             with pulsectl.Pulse('pybar-volume-worker') as pulse:
                 def update():
                     try:
-                        data = get_volume_data(pulse)
+                        data = get_volume_data(pulse, blacklist)
                         if data:
                             c.state_manager.update(name, data)
                     except Exception as e:
@@ -97,6 +112,12 @@ def create_widget(bar, config):
     click_controller.set_button(3) # Right click
     click_controller.connect('released', lambda c, n, x, y: toggle_default_mute())
     module.add_controller(click_controller)
+
+    # Add middle-click for cycling outputs
+    middle_click_controller = Gtk.GestureClick.new()
+    middle_click_controller.set_button(2) # Middle click
+    middle_click_controller.connect('released', lambda c, n, x, y: cycle_output_device(config.get('blacklist', {})))
+    module.add_controller(middle_click_controller)
     
     return module
 
@@ -118,6 +139,44 @@ def toggle_default_mute():
         default = pulse.sink_default_get()
         if default:
             pulse.mute(default, not default.mute)
+
+def cycle_output_device(blacklist=None):
+    """ Cycle through output devices """
+    if blacklist is None: blacklist = {}
+    with pulsectl.Pulse('volume-action') as pulse:
+        sinks = pulse.sink_list()
+        if not sinks:
+            return
+            
+        current = pulse.sink_default_get()
+        if not current:
+            return
+
+        # Filter out monitors and blacklisted devices
+        sink_bl = blacklist.get('sinks', [])
+        valid_sinks = []
+        for s in sinks:
+            desc = getattr(s, 'description', '') or ''
+            name = getattr(s, 'name', '') or ''
+            if 'Monitor of' in desc:
+                continue
+            if any(b in desc or b in name for b in sink_bl):
+                continue
+            valid_sinks.append(s)
+        
+        if not valid_sinks:
+            return
+            
+        # Find current index
+        idx = -1
+        for i, s in enumerate(valid_sinks):
+            if s.name == current.name:
+                idx = i
+                break
+        
+        # Set next
+        next_sink = valid_sinks[(idx + 1) % len(valid_sinks)]
+        pulse.default_set(next_sink)
 
 def update_ui(module, data):
     """ Update volume UI """
