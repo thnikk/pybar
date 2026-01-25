@@ -128,13 +128,13 @@ scrollbar slider { background: none; border: none; }
 .module levelbar block { border-radius: 3px; border: none; background: @gray; }
 .module levelbar block.filled { background-color: alpha(@white, 0.8); }
 
-scale contents trough { padding: 3px; min-width: 100px; background: @black; border: none; }
-scale contents trough highlight {
+scale trough { padding: 3px; min-width: 100px; background: @black; border: none; }
+scale trough highlight {
 	border: none;
 	background: alpha(@blue, 1);
 }
 
-scale contents trough slider {
+scale trough slider {
 	background: #4b505b;
 	border: 1px solid @gray;
 	box-shadow: none;
@@ -186,9 +186,19 @@ switch:disabled {
 	transition: none;
 }
 
-.normal { background: #2b303b; border: @gray; }
-.normal:hover { background: #1c1f26; border: rgba(255,255,255,0.2); }
-.normal:active { background: #d8dee9; color: #2b303b; border: rgba(0,0,0,0.1); }
+.normal, button.normal {
+	background: #2b303b;
+	border: 1px solid rgba(255,255,255,0.1);
+}
+.normal:hover, button.normal:hover {
+	background: #1c1f26;
+	border: 1px solid rgba(255,255,255,0.1);
+}
+.normal:active, button.normal:active {
+	background: #d8dee9;
+	color: #2b303b;
+	border: 1px solid rgba(255,255,255,0.2);
+}
 
 /* widgets */
 popover {
@@ -364,6 +374,19 @@ button.power-item { font-size: 16px; padding: 10px; }
 
 .tray-icons image {
 	margin: 0 3px;
+}
+
+popover.tray-popover modelbutton {
+	padding: 0px 10px;
+	border-radius: 10px;
+	min-height: 30px;
+	color: @white;
+	transition: background 0.1s;
+}
+
+popover.tray-popover modelbutton:hover {
+	background-color: alpha(@white, 0.1);
+	color: @white;
 }
 
 /* Scroll indicators for scrollable areas */

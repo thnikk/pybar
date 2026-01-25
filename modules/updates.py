@@ -160,7 +160,7 @@ def build_popover(module, data):
     main_box.append(scroll_box)
 
     if data['total']:
-        update_button = c.button(' Update all', style='box')
+        update_button = c.button(' Update all', style='normal')
         update_button.connect('clicked', update_packages)
         main_box.append(update_button)
 
