@@ -86,30 +86,91 @@ def start_worker(name, config):
 
 def generic_worker(name, config, fetch_func):
     """Worker that calls a python fetch_data function"""
+    interval = config.get('interval', 60)
+    module_type = config.get('type', name)
+    is_hass = module_type.startswith('hass') or name.startswith('hass')
+    cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
+
+    first_run = True
     while True:
-        try:
-            data = fetch_func(config)
-            if data:
-                data['timestamp'] = datetime.now().timestamp()
-                c.state_manager.update(name, data)
-        except Exception as e:
-            c.print_debug(f"Worker {name} failed: {e}", color='red')
+        data = None
         
-        time.sleep(config.get('interval', 60))
+        # Check cache on startup
+        if first_run and not is_hass and os.path.exists(cache_path):
+            mtime = os.path.getmtime(cache_path)
+            if time.time() - mtime < interval:
+                try:
+                    with open(cache_path, 'r') as f:
+                        data = json.load(f)
+                    c.print_debug(f"Loaded {name} from cache", color='green')
+                except Exception as e:
+                    c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+
+        if not data:
+            try:
+                data = fetch_func(config)
+                if data and not is_hass:
+                    try:
+                        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                        with open(cache_path, 'w') as f:
+                            json.dump(data, f)
+                    except Exception as e:
+                        c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
+            except Exception as e:
+                c.print_debug(f"Worker {name} failed: {e}", color='red')
+        
+        if data:
+            if isinstance(data, dict):
+                data['timestamp'] = datetime.now().timestamp()
+            c.state_manager.update(name, data)
+        
+        first_run = False
+        time.sleep(interval)
 
 def command_worker(name, config):
     """Worker for waybar-style command modules"""
+    interval = config.get('interval', 60)
+    module_type = config.get('type', name)
+    is_hass = module_type.startswith('hass') or name.startswith('hass')
+    cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
+
+    first_run = True
     while True:
-        command = [os.path.expanduser(arg) for arg in config['command']]
-        try:
-            output = run(command, check=True, capture_output=True).stdout.decode()
-            data = json.loads(output)
-            data['timestamp'] = datetime.now().timestamp()
-            c.state_manager.update(name, data)
-        except Exception as e:
-            c.print_debug(f"Command worker {name} failed: {e}", color='red')
+        data = None
         
-        time.sleep(config.get('interval', 60))
+        # Check cache on startup
+        if first_run and not is_hass and os.path.exists(cache_path):
+            mtime = os.path.getmtime(cache_path)
+            if time.time() - mtime < interval:
+                try:
+                    with open(cache_path, 'r') as f:
+                        data = json.load(f)
+                    c.print_debug(f"Loaded {name} from cache", color='green')
+                except Exception as e:
+                    c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+
+        if not data:
+            command = [os.path.expanduser(arg) for arg in config['command']]
+            try:
+                output = run(command, check=True, capture_output=True).stdout.decode()
+                data = json.loads(output)
+                if data and not is_hass:
+                    try:
+                        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                        with open(cache_path, 'w') as f:
+                            json.dump(data, f)
+                    except Exception as e:
+                        c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
+            except Exception as e:
+                c.print_debug(f"Command worker {name} failed: {e}", color='red')
+        
+        if data:
+            if isinstance(data, dict):
+                data['timestamp'] = datetime.now().timestamp()
+            c.state_manager.update(name, data)
+        
+        first_run = False
+        time.sleep(interval)
 
 def module(bar, name, config):
     """Factory to create a module and subscribe it to updates"""
