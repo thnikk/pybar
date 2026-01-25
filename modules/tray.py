@@ -18,6 +18,8 @@ import common as c
 from dasbus.connection import SessionMessageBus
 from dasbus.client.observer import DBusObserver
 from dasbus.client.proxy import disconnect_proxy
+from dasbus.client.handler import ClientObjectHandler
+from dasbus.specification import DBusSpecification
 from dasbus.error import DBusError
 from dasbus.server.interface import accepts_additional_arguments
 from dasbus.signal import Signal
@@ -42,6 +44,60 @@ def get_service_name_and_object_path(service: str) -> typing.Tuple[str, str]:
         return service[0:index], service[index:]
     return service, "/StatusNotifierItem"
 
+class StatusNotifierItemInterface:
+    __dbus_xml__ = """
+    <node>
+        <interface name="org.kde.StatusNotifierItem">
+            <method name="ContextMenu">
+                <arg name="x" type="i" direction="in"/>
+                <arg name="y" type="i" direction="in"/>
+            </method>
+            <method name="Activate">
+                <arg name="x" type="i" direction="in"/>
+                <arg name="y" type="i" direction="in"/>
+            </method>
+            <method name="SecondaryAction">
+                <arg name="x" type="i" direction="in"/>
+                <arg name="y" type="i" direction="in"/>
+            </method>
+            <method name="Scroll">
+                <arg name="delta" type="i" direction="in"/>
+                <arg name="orientation" type="s" direction="in"/>
+            </method>
+            <property name="Category" type="s" access="read"/>
+            <property name="Id" type="s" access="read"/>
+            <property name="Title" type="s" access="read"/>
+            <property name="Status" type="s" access="read"/>
+            <property name="WindowId" type="i" access="read"/>
+            <property name="IconThemePath" type="s" access="read"/>
+            <property name="Menu" type="o" access="read"/>
+            <property name="ItemIsMenu" type="b" access="read"/>
+            <property name="IconName" type="s" access="read"/>
+            <property name="IconPixmap" type="a(iiay)" access="read"/>
+            <property name="OverlayIconName" type="s" access="read"/>
+            <property name="OverlayIconPixmap" type="a(iiay)" access="read"/>
+            <property name="AttentionIconName" type="s" access="read"/>
+            <property name="AttentionIconPixmap" type="a(iiay)" access="read"/>
+            <property name="ToolTip" type="(sa(iiay)ss)" access="read"/>
+            <signal name="NewTitle"/>
+            <signal name="NewIcon"/>
+            <signal name="NewAttentionIcon"/>
+            <signal name="NewOverlayIcon"/>
+            <signal name="NewToolTip"/>
+            <signal name="NewStatus">
+                <arg name="status" type="s" direction="out"/>
+            </signal>
+            <signal name="NewIconThemePath">
+                <arg name="icon_theme_path" type="s" direction="out"/>
+            </signal>
+        </interface>
+    </node>
+    """
+
+class SNIClientHandler(ClientObjectHandler):
+    def _get_specification(self):
+        return DBusSpecification.from_xml(StatusNotifierItemInterface.__dbus_xml__)
+
 class StatusNotifierItem:
     def __init__(self, service_name, object_path):
         self.service_name = service_name
@@ -63,7 +119,11 @@ class StatusNotifierItem:
     def item_available_handler(self, _observer):
         try:
             c.print_debug(f"SNI Item available: {self.service_name}{self.object_path}")
-            self.item_proxy = self.session_bus.get_proxy(self.service_name, self.object_path)
+            self.item_proxy = self.session_bus.get_proxy(
+                self.service_name, 
+                self.object_path, 
+                handler_factory=SNIClientHandler
+            )
             
             # Connect signals if they exist
             for signal_name, prop_names in [
@@ -122,10 +182,31 @@ class StatusNotifierItem:
 
     def context_menu(self, x, y):
         if self.item_proxy:
+            # Try ContextMenu method first
             try:
-                self.item_proxy.ContextMenu(x, y)
+                if hasattr(self.item_proxy, 'ContextMenu'):
+                    self.item_proxy.ContextMenu(x, y)
+                    return True
+                # If hasattr failed, maybe try calling it anyway if we suspect it exists?
+                # But for now, let's assume hasattr is correct enough or we fallback to DBusMenu
             except Exception as e:
-                c.print_debug(f"Failed to show context menu: {e}")
+                c.print_debug(f"Failed to call ContextMenu: {e}")
+            
+            # If we are here, ContextMenu failed or didn't exist
+            if "Menu" in self.properties:
+                # Let the caller handle the fallback to DBusMenu
+                return False
+            else:
+                c.print_debug(f"Item {self.service_name} has no context menu support.")
+        return False
+
+    def secondary_action(self, x, y):
+        if self.item_proxy:
+            if hasattr(self.item_proxy, 'SecondaryAction'):
+                try:
+                    self.item_proxy.SecondaryAction(x, y)
+                except Exception as e:
+                    c.print_debug(f"Failed to call SecondaryAction: {e}")
 
 class StatusNotifierWatcherInterface:
     __dbus_xml__ = """
@@ -377,19 +458,17 @@ class DBusMenuClient:
             c.print_debug(f"Failed to send dbusmenu event: {e}")
 
 class TrayIcon(Gtk.Box):
-    def __init__(self, item, icon_size):
+    def __init__(self, item, icon_size, module):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.item = item
         self.icon_size = icon_size
+        self.module = module
         self.image = Gtk.Image()
         self.append(self.image)
         self.set_cursor(Gdk.Cursor.new_from_name("pointer", None))
         
-        self.popover = None
         self.menu_client = None
-        menu_path = item.properties.get("Menu")
-        if menu_path:
-            self.menu_client = DBusMenuClient(item.service_name, menu_path)
+        self.popover_menu = None
         
         click = Gtk.GestureClick()
         click.set_button(0) # Handle all buttons
@@ -397,78 +476,216 @@ class TrayIcon(Gtk.Box):
         self.add_controller(click)
         self.update()
 
+    def _get_global_coordinates(self, x_local, y_local):
+        try:
+            native = self.get_native()
+            if not native:
+                c.print_debug("  No native widget found")
+                return 0, 0
+                
+            surface = native.get_surface()
+            if not surface:
+                c.print_debug("  No surface found")
+                return 0, 0
+                
+            display = Gdk.Display.get_default()
+            monitor = display.get_monitor_at_surface(surface)
+            if not monitor:
+                c.print_debug("  No monitor found")
+                return 0, 0
+                
+            geo = monitor.get_geometry()
+            c.print_debug(f"  Monitor geometry: x={geo.x}, y={geo.y}, w={geo.width}, h={geo.height}")
+            
+            # Translate local widget coordinates to window coordinates
+            # translate_coordinates returns a tuple (x, y) or None in PyGObject for GTK4
+            point = self.translate_coordinates(native, x_local, y_local)
+            if not point:
+                c.print_debug("  Translation to native coords failed")
+                return 0, 0
+            
+            win_x, win_y = point
+            c.print_debug(f"  Window relative coords: {win_x}, {win_y}")
+
+            # Estimate window global position based on layer shell config
+            # We assume the bar is at the edge of the monitor as per config
+            
+            # Get bar position from config
+            bar_pos = self.module.config.get("position", "bottom")
+            margin = self.module.config.get("margin", 0) 
+            
+            # Calculate global coordinates
+            if bar_pos == "bottom":
+                 height = native.get_height()
+                 # For bottom bar, y is at (monitor_y + monitor_height - bar_height - margin)
+                 # We add win_y (local y within window)
+                 global_y = geo.y + geo.height - height + win_y - margin
+                 global_x = geo.x + win_x + margin
+            else:
+                 # For top bar (default), y is at (monitor_y + margin)
+                 global_y = geo.y + win_y + margin
+                 global_x = geo.x + win_x + margin
+
+            c.print_debug(f"  Calculated Global: {int(global_x)}, {int(global_y)}")
+            return int(global_x), int(global_y)
+            
+        except Exception as e:
+            c.print_debug(f"Failed to calculate coords: {e}")
+            return 0, 0
+
     def _on_click(self, gesture, n_press, x, y):
         button = gesture.get_current_button()
+        c.print_debug(f"TrayIcon._on_click: button {button}")
+        
+        # Check if we need to toggle off an existing popover
+        if self.popover_menu and self.popover_menu.get_visible():
+            c.print_debug("  Hiding existing popover")
+            self.popover_menu.popdown()
+            # We don't return immediately if it was a different button, but usually context menu is button 3
+            if button == 3:
+                return
+
+        global_x, global_y = self._get_global_coordinates(x, y)
+        
         if button == 1:
-            self.item.activate(-1, -1)
+            self.item.activate(global_x, global_y)
+        elif button == 2:
+            self.item.secondary_action(global_x, global_y)
         elif button == 3:
-            # First try calling ContextMenu
-            self.item.context_menu(-1, -1)
-            # Then show our own popover
-            self._show_context_menu()
-
-    def _show_context_menu(self):
-        if self.popover:
-            self.popover.set_parent(None)
+            # First try context_menu (returns True if successful)
+            # Note: We use global coords now instead of -1
+            if self.item.context_menu(global_x, global_y):
+                c.print_debug("  Native ContextMenu call successful")
+                return
             
-        popover = Gtk.Popover()
-        self.popover = popover
-        popover.set_parent(self)
-        
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        popover.set_child(vbox)
-        
-        # Add Title
-        title = self.item.properties.get("Title", "Application")
-        lbl = c.label(title, style='title')
-        lbl.set_margin_top(5)
-        lbl.set_margin_bottom(5)
-        lbl.set_margin_start(10)
-        lbl.set_margin_end(10)
-        vbox.append(lbl)
-        vbox.append(c.sep('h'))
-        
-        # If we have a menu client, try to fetch items
-        added_items = False
-        menu_client = self.menu_client
-        if menu_client:
-            layout = menu_client.get_layout(0, 1, ["label", "enabled", "visible"])
-            if layout:
-                # layout is (id, properties, children)
-                children = layout[2]
-                for child in children:
-                    child_id = child[0]
-                    props = child[1]
-                    label = props.get("label")
-                    visible = props.get("visible", True)
-                    enabled = props.get("enabled", True)
-                    
-                    if label and visible:
-                        # Clean label (dbusmenu often uses _ for mnemonics)
-                        label = label.replace("_", "")
-                        btn = c.button(label, style='minimal', ha='start')
-                        btn.set_sensitive(enabled)
-                        
-                        def on_clicked(_, cid=child_id, mc=menu_client, po=popover):
-                            import time
-                            mc.event(cid, "clicked", 0, int(time.time()))
-                            po.popdown()
-                            
-                        btn.connect("clicked", on_clicked)
-                        vbox.append(btn)
-                        added_items = True
+            c.print_debug("  Native ContextMenu failed/missing, trying DBusMenu")
+            # If no ContextMenu or it failed, we show the DBusMenu
+            self._show_dbus_menu()
 
-        if not added_items:
-            btn_activate = c.button("Activate", style='minimal', ha='start')
-            def on_activate(_, po=popover):
-                self.item.activate(-1, -1)
-                po.popdown()
-            btn_activate.connect("clicked", on_activate)
-            vbox.append(btn_activate)
+    def _show_dbus_menu(self):
+        menu_path = self.item.properties.get("Menu")
+        if not menu_path:
+            c.print_debug("  No Menu property found for item")
+            return
+            
+        c.print_debug(f"  Fetching DBusMenu at {menu_path}")
+        if not self.menu_client:
+            self.menu_client = DBusMenuClient(self.item.service_name, menu_path)
+            
+        # Use recursion_depth=-1 to get full tree
+        layout = self.menu_client.get_layout(0, -1, ["label", "enabled", "visible", "type", "toggle-type", "toggle-state"])
+        if not layout:
+            c.print_debug("  DBusMenu layout is empty or failed")
+            return
+            
+        # layout is (id, properties, children)
+        children = layout[2]
+        if not children:
+            c.print_debug("  DBusMenu layout has no children")
+            return
+            
+        c.print_debug(f"  Building menu with {len(children)} top-level items")
         
-        popover.popup()
+        # Use GMenuModel and Gtk.PopoverMenu for "built-in" feel
+        action_group = Gio.SimpleActionGroup.new()
+        menu_model = self._build_menu_model(children, action_group)
+        
+        # Clean up old popover if it exists (though we tried to popdown in _on_click)
+        if self.popover_menu:
+            c.print_debug("  Unparenting old popover")
+            self.popover_menu.unparent()
+            self.popover_menu = None
+            
+        self.popover_menu = Gtk.PopoverMenu.new_from_model(menu_model)
+        self.popover_menu.set_parent(self)
+        self.popover_menu.insert_action_group("menu", action_group)
+        self.popover_menu.set_has_arrow(False)
+        
+        # Position the popover specifically
+        if self.module.config.get("position", "bottom") == "bottom":
+            self.popover_menu.set_position(Gtk.PositionType.TOP)
+        else:
+            self.popover_menu.set_position(Gtk.PositionType.BOTTOM)
+            
+        self.popover_menu.popup()
+        c.print_debug("  Popover popup called")
+
+    def _build_menu_model(self, children, action_group):
+        menu_model = Gio.Menu()
+        
+        for child in children:
+            child_id = child[0]
+            props = child[1]
+            subchildren = child[2]
+            
+            label = props.get("label", "")
+            visible = props.get("visible", True)
+            enabled = props.get("enabled", True)
+            item_type = props.get("type", "standard")
+            toggle_type = props.get("toggle-type", "")
+            toggle_state = props.get("toggle-state", 0)
+            
+            if not visible:
+                continue
+
+            if item_type == "separator":
+                # Create a section without label for separator effect
+                # Or simply skip, but GMenu usually implies separators between sections.
+                # Here we just append a separator item if possible or ignore
+                # Gio.Menu doesn't map directly to separators easily in flat list
+                pass
+                
+            elif subchildren:
+                # Recursively build submenu
+                submenu = self._build_menu_model(subchildren, action_group)
+                if label:
+                    label = label.replace("_", "")
+                item = Gio.MenuItem.new(label, None)
+                item.set_submenu(submenu)
+                menu_model.append_item(item)
+                
+            elif label:
+                label = label.replace("_", "")
+                action_name = f"item_{child_id}"
+                
+                # Handle toggle items
+                if toggle_type in ["checkmark", "radio"]:
+                    state = GLib.Variant.new_boolean(bool(toggle_state))
+                    action = Gio.SimpleAction.new_stateful(action_name, None, state)
+                    
+                    def on_toggle(act, _, cid=child_id, mc=self.menu_client):
+                        # Toggle state locally
+                        new_state = not act.get_state().get_boolean()
+                        act.set_state(GLib.Variant.new_boolean(new_state))
+                        
+                        import time
+                        # data needs to be a variant, usually empty for clicked
+                        data = GLib.Variant("s", "")
+                        mc.event(cid, "clicked", data, int(time.time()))
+                    
+                    action.connect("activate", on_toggle)
+                else:
+                    action = Gio.SimpleAction.new(action_name, None)
+                    action.set_enabled(enabled)
+                    
+                    def on_activated(_, __, cid=child_id, mc=self.menu_client):
+                        import time
+                        # data needs to be a variant
+                        data = GLib.Variant("s", "")
+                        mc.event(cid, "clicked", data, int(time.time()))
+                    
+                    action.connect("activate", on_activated)
+
+                action_group.add_action(action)
+                
+                # Add to menu model
+                menu_item = Gio.MenuItem.new(label, f"menu.{action_name}")
+                menu_model.append_item(menu_item)
+                
+        return menu_model
 
     def update(self, changed=None):
+
         props = self.item.properties
         icon_name = props.get("IconName")
         pixmap = props.get("IconPixmap")
@@ -582,7 +799,7 @@ class TrayModule(Gtk.Box):
         full_name = f"{item.service_name}{item.object_path}"
         c.print_debug(f"TrayModule.add_item: {full_name}")
         if full_name not in self.icons:
-            icon = TrayIcon(item, self.icon_size)
+            icon = TrayIcon(item, self.icon_size, self)
             self.icons[full_name] = icon
             self.icons_box.append(icon)
             c.print_debug(f"  Icon widget created and appended for {full_name}")
