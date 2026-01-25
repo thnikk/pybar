@@ -335,6 +335,33 @@ button.power-item { font-size: 16px; padding: 10px; }
 	background: @gray;
 }
 
+/* tray */
+.tray-module {
+	background: #2b303b;
+	border: 1px solid @gray;
+	border-radius: 5px;
+	padding: 0 5px;
+}
+
+.tray-toggle {
+	background: transparent;
+	border: none;
+	color: alpha(@white, 0.6);
+	padding: 0 5px;
+}
+
+.tray-toggle:hover {
+	color: @white;
+}
+
+.tray-icons {
+	padding-right: 5px;
+}
+
+.tray-icons image {
+	margin: 0 3px;
+}
+
 /* Scroll indicators for scrollable areas */
 scrolledwindow undershoot.top {
 	background: linear-gradient(to bottom,

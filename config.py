@@ -18,7 +18,7 @@ def load(path):
     "modules-left": ["workspaces", "privacy"],
     "modules-center": ["updates"],
     "modules-right": [
-        "weather", "volume", "network", "clock", "power"],
+        "weather", "volume", "network", "tray", "clock", "power"],
     "modules": {
         "weather": {
             "zip_code": "94102"

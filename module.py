@@ -45,6 +45,7 @@ module_map = {
     'systemd': 'modules.systemd',
     'transmission': 'modules.transmission',
     'vm': 'modules.vm',
+    'tray': 'modules.tray',
 }
 
 def start_worker(name, config):
