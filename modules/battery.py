@@ -46,47 +46,40 @@ def fetch_data(config):
     }
 
 
-def widget(module, cache):
-    """ Battery widget content """
-    module.popover_widgets = []
+def build_popover_content(data):
+    """ Build popover for battery """
     main_box = c.box('v', spacing=20, style='small-widget')
-    main_box.add(c.label('Battery', style='heading'))
+    main_box.append(c.label('Battery', style='heading'))
 
     outer_box = c.box('v', spacing=10)
-    outer_box.add(c.label('Devices', style='title', ha='start'))
+    outer_box.append(c.label('Devices', style='title', ha='start'))
     battery_box = c.box('v', style='box')
-    
-    devices = list(cache.get('devices', {}).items())
+
+    devices = list(data.get('devices', {}).items())
     for i, (device, info) in enumerate(devices):
         device_box = c.box('h', style='inner-box', spacing=10)
         percentage = round((
             info['energy_now'] / info['energy_full']
         )*100) if info['energy_full'] > 0 else 0
-        
-        level = Gtk.LevelBar().new_for_interval(0, 100)
+
+        level = Gtk.LevelBar.new_for_interval(0, 100)
         level.set_min_value(0)
         level.set_max_value(100)
         level.set_value(percentage)
-        
+
         device_box.append(c.label(device))
-        level_box = c.box('v')
-        level_box.append(level)
-        device_box.append(level_box)
-        
+        level.set_hexpand(True)
+        level.set_valign(Gtk.Align.CENTER)
+        device_box.append(level)
+
         pct_label = c.label(f'{percentage}%')
         device_box.append(pct_label)
-        battery_box.add(device_box)
-        
-        module.popover_widgets.append({
-            'name': device,
-            'level': level,
-            'label': pct_label
-        })
-        
+        battery_box.append(device_box)
+
         if i != len(devices) - 1:
-            battery_box.add(c.sep('h'))
-    outer_box.add(battery_box)
-    main_box.add(outer_box)
+            battery_box.append(c.sep('h'))
+    outer_box.append(battery_box)
+    main_box.append(outer_box)
     return main_box
 
 
@@ -107,21 +100,15 @@ def update_ui(module, data):
     icon_index = int(percentage // (100 / len(icons)))
     icon_index = min(icon_index, len(icons) - 1)
 
+    module.set_visible(True)
+
     if data['ac_online']:
         module.set_icon('')
     else:
         module.set_icon(icons[icon_index])
-    
+
     module.set_label(f'{percentage}%')
-    
+
+    # Update popover content
     if not module.get_active():
-        module.set_widget(widget(module, data))
-    else:
-        # Live update
-        devices = data.get('devices', {})
-        for w in module.popover_widgets:
-            if w['name'] in devices:
-                info = devices[w['name']]
-                p = round((info['energy_now'] / info['energy_full'])*100) if info['energy_full'] > 0 else 0
-                w['level'].set_value(p)
-                w['label'].set_text(f'{p}%')
+        module.set_widget(build_popover_content(data))
