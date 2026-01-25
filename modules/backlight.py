@@ -3,12 +3,11 @@
 Description: Backlight module
 Author: thnikk
 """
-print("!!! BACKLIGHT MODULE LOADED !!!")
-import common as c
-import os
-import sys
-import time
 import gi
+import time
+import sys
+import os
+import common as c
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
@@ -64,13 +63,9 @@ def fetch_data(config):
 
 def run_worker(name, config):
     """ Background worker for backlight """
-    print("!!! BACKLIGHT MODULE worker starting !!!")
     c.print_debug(f"Starting backlight worker for {name}", color='cyan')
     interval = config.get('interval', 5)
-    
-    # Temporary test crash
-    # raise Exception("Test crash to verify exception handling")
-    
+
     try:
         while True:
             try:
@@ -83,7 +78,7 @@ def run_worker(name, config):
             except Exception as e:
                 c.print_debug(f"Backlight worker failed: {e}", color='red')
                 c.state_manager.update(name, None)
-            
+
             time.sleep(interval)
     except Exception as e:
         import traceback
@@ -101,23 +96,24 @@ def set_backlight(widget, path):
         with open(f'{path}/brightness', 'w', encoding='utf-8') as file:
             file.write(str(round(widget.get_value())))
     except PermissionError:
-        c.print_debug("Permission denied to write to brightness file", color='red')
+        c.print_debug(
+            "Permission denied to write to brightness file", color='red')
 
 
 def widget_content(cache):
     """ Backlight widget content """
     main_box = c.box('v', spacing=20, style='small-widget')
     main_box.append(c.label('Backlight', style='heading'))
-    
+
     outer_box = c.box('h', style='box')
     outer_box.set_hexpand(True)
     outer_box.append(c.label('', style='inner-box'))
-    
+
     level = c.slider(cache['brightness'], 10, cache['max_brightness'])
     level.set_hexpand(True)
     level.set_margin_end(10)
     level.connect('value-changed', set_backlight, cache['path'])
-    
+
     outer_box.append(level)
     main_box.append(outer_box)
     return main_box
@@ -142,9 +138,9 @@ def create_widget(bar, config):
 
         # dy < 0 is scroll up (increase), dy > 0 is scroll down (decrease)
         if dy < 0:
-            b = round(b + (m * 0.05))
+            b = round(b + (m * 0.01))
         elif dy > 0:
-            b = round(b - (m * 0.05))
+            b = round(b - (m * 0.01))
 
         # Max/min values
         b = round(max(min(b, m), m * 0.01))
@@ -154,13 +150,14 @@ def create_widget(bar, config):
                 file.write(f'{b}')
         except PermissionError:
             pass
-        
+
         # Trigger an immediate local update for better responsiveness
         info['brightness'] = b
         update_ui(module, info)
-        
+
     # Add scroll controller
-    scroll_controller = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+    scroll_controller = Gtk.EventControllerScroll.new(
+        Gtk.EventControllerScrollFlags.VERTICAL)
     scroll_controller.connect("scroll", scroll_action)
     module.add_controller(scroll_controller)
 
@@ -174,10 +171,10 @@ def update_ui(module, data):
         module.set_label("No Dev")
         module.set_visible(True)
         return
-    
+
     if not module.get_active():
         module.set_widget(widget_content(data))
-        
+
     percentage = round((data['brightness']/data['max_brightness'])*100)
     module.set_label(f'{percentage}%')
     module.set_visible(True)
