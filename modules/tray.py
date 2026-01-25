@@ -31,6 +31,9 @@ WATCHER_OBJECT_PATH = "/StatusNotifierWatcher"
 HOST_SERVICE_NAME_TEMPLATE = "org.kde.StatusNotifierHost-{}-{}"
 HOST_OBJECT_PATH_TEMPLATE = "/StatusNotifierHost/{}"
 
+# Configure dasbus logging
+logging.getLogger("dasbus.connection").setLevel(logging.WARNING)
+
 PROPERTIES = [
     "Id", "Category", "Title", "Status", "WindowId", "IconName", "IconPixmap",
     "OverlayIconName", "OverlayIconPixmap", "AttentionIconName",
@@ -43,6 +46,13 @@ def get_service_name_and_object_path(service: str) -> typing.Tuple[str, str]:
     if index != -1:
         return service[0:index], service[index:]
     return service, "/StatusNotifierItem"
+
+def debug_print(msg, *args, **kwargs):
+    try:
+        if TrayHost.get_instance().debug:
+            c.print_debug(msg, *args, **kwargs)
+    except Exception:
+        pass
 
 class StatusNotifierItemInterface:
     __dbus_xml__ = """
@@ -120,7 +130,7 @@ class StatusNotifierItem:
 
     def item_available_handler(self, _observer):
         try:
-            c.print_debug(f"SNI Item available: {self.service_name}{self.object_path}")
+            debug_print(f"SNI Item available: {self.service_name}{self.object_path}")
             
             # Resolve PID and Process Name for identification
             try:
@@ -129,9 +139,9 @@ class StatusNotifierItem:
                 if os.path.exists(f"/proc/{self.pid}/cmdline"):
                     with open(f"/proc/{self.pid}/cmdline", "r") as f:
                         self.proc_name = f.read().replace('\0', ' ').lower()
-                c.print_debug(f"  Identified process: PID={self.pid}, Name='{self.proc_name[:50]}...'")
+                debug_print(f"  Identified process: PID={self.pid}, Name='{self.proc_name[:50]}...'")
             except Exception as e:
-                c.print_debug(f"  Failed to resolve process info (non-fatal): {e}")
+                debug_print(f"  Failed to resolve process info (non-fatal): {e}")
             
             self.item_proxy = self.session_bus.get_proxy(
                 self.service_name, 
@@ -168,7 +178,7 @@ class StatusNotifierItem:
             if self.on_loaded_callback:
                 GLib.idle_add(self.on_loaded_callback, self)
         except Exception as e:
-            c.print_debug(f"Error in item_available_handler: {e}", color='red')
+            debug_print(f"Error in item_available_handler: {e}", color='red')
 
     def item_unavailable_handler(self, _observer):
         if self.item_proxy:
@@ -192,7 +202,7 @@ class StatusNotifierItem:
             try:
                 self.item_proxy.Activate(x, y)
             except Exception as e:
-                c.print_debug(f"Failed to activate item: {e}")
+                debug_print(f"Failed to activate item: {e}")
 
     def context_menu(self, x, y):
         if self.item_proxy:
@@ -204,14 +214,14 @@ class StatusNotifierItem:
                 # If hasattr failed, maybe try calling it anyway if we suspect it exists?
                 # But for now, let's assume hasattr is correct enough or we fallback to DBusMenu
             except Exception as e:
-                c.print_debug(f"Failed to call ContextMenu: {e}")
+                debug_print(f"Failed to call ContextMenu: {e}")
             
             # If we are here, ContextMenu failed or didn't exist
             if "Menu" in self.properties:
                 # Let the caller handle the fallback to DBusMenu
                 return False
             else:
-                c.print_debug(f"Item {self.service_name} has no context menu support.")
+                debug_print(f"Item {self.service_name} has no context menu support.")
         return False
 
     def secondary_action(self, x, y):
@@ -220,7 +230,7 @@ class StatusNotifierItem:
                 try:
                     self.item_proxy.SecondaryAction(x, y)
                 except Exception as e:
-                    c.print_debug(f"Failed to call SecondaryAction: {e}")
+                    debug_print(f"Failed to call SecondaryAction: {e}")
 
 class DBusMenuInterface:
     __dbus_xml__ = """
@@ -321,7 +331,7 @@ class StatusNotifierWatcherInterface:
             full_name = f"{sender}/StatusNotifierItem"
 
         if full_name not in self._items:
-            c.print_debug(f"StatusNotifierWatcher: Registering item {full_name}")
+            debug_print(f"StatusNotifierWatcher: Registering item {full_name}")
             self._items.append(full_name)
             self.StatusNotifierItemRegistered.emit(full_name)
             self._emit_properties_changed("RegisteredStatusNotifierItems", 
@@ -336,7 +346,7 @@ class StatusNotifierWatcherInterface:
 
     def _unregister_item(self, full_name):
         if full_name in self._items:
-            c.print_debug(f"StatusNotifierWatcher: Unregistering item {full_name}")
+            debug_print(f"StatusNotifierWatcher: Unregistering item {full_name}")
             self._items.remove(full_name)
             self.StatusNotifierItemUnregistered.emit(full_name)
             self._emit_properties_changed("RegisteredStatusNotifierItems", 
@@ -352,7 +362,7 @@ class StatusNotifierWatcherInterface:
     @accepts_additional_arguments
     def RegisterStatusNotifierHost(self, service, call_info):
         sender = call_info.get("sender", "internal")
-        c.print_debug(f"StatusNotifierWatcher: Registering host {sender} ({service})")
+        debug_print(f"StatusNotifierWatcher: Registering host {sender} ({service})")
         if sender not in self._hosts:
             self._hosts.append(sender)
             self.StatusNotifierHostRegistered.emit()
@@ -397,6 +407,7 @@ class TrayHost:
         self._items = []
         self.session_bus = SessionMessageBus()
         self.host_id = f"pybar-{os.getpid()}"
+        self.debug = False
         
         # Try to register watcher if not present
         self.watcher_proxy = None
@@ -404,6 +415,9 @@ class TrayHost:
 
     def add_module(self, module):
         self.modules.append(module)
+        if module.config.get("debug", False):
+            self.debug = True
+            logging.getLogger("dasbus.connection").setLevel(logging.DEBUG)
         # Add existing items to new module
         for item in self._items:
             module.add_item(item)
@@ -428,7 +442,7 @@ class TrayHost:
         self.watcher_observer.connect_once_available()
         
         if not self.watcher_observer.is_service_available:
-            c.print_debug("SNI Watcher not found, starting internal watcher")
+            debug_print("SNI Watcher not found, starting internal watcher")
             try:
                 self.watcher_interface = StatusNotifierWatcherInterface()
                 # Connect directly to internal interface signals to avoid proxy issues in same process
@@ -438,36 +452,36 @@ class TrayHost:
                 self.session_bus.publish_object(WATCHER_OBJECT_PATH, self.watcher_interface)
                 self.session_bus.register_service(WATCHER_SERVICE_NAME)
             except Exception as e:
-                c.print_debug(f"Failed to start internal SNI watcher: {e}")
+                debug_print(f"Failed to start internal SNI watcher: {e}")
 
     def _watcher_available(self, _observer):
         # If we are the watcher, we've already connected signals in _setup_watcher
         if hasattr(self, 'watcher_interface'):
-            c.print_debug("Using internal SNI watcher")
+            debug_print("Using internal SNI watcher")
             # We still need to register as a host on our own watcher
             host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
             self.watcher_interface.RegisterStatusNotifierHost(host_object_path, call_info={})
             return
 
-        c.print_debug("External SNI Watcher service available, connecting proxy")
+        debug_print("External SNI Watcher service available, connecting proxy")
         self.watcher_proxy = self.session_bus.get_proxy(WATCHER_SERVICE_NAME, WATCHER_OBJECT_PATH)
         self.watcher_proxy.StatusNotifierItemRegistered.connect(self._item_registered)
         self.watcher_proxy.StatusNotifierItemUnregistered.connect(self._item_unregistered)
         
         host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
         try:
-            c.print_debug(f"Registering host: {host_object_path}")
+            debug_print(f"Registering host: {host_object_path}")
             self.watcher_proxy.RegisterStatusNotifierHost(host_object_path)
         except Exception as e:
-            c.print_debug(f"Failed to register host: {e}", color='red')
+            debug_print(f"Failed to register host: {e}", color='red')
 
         try:
             items = self.watcher_proxy.RegisteredStatusNotifierItems
-            c.print_debug(f"Already registered items: {items}")
+            debug_print(f"Already registered items: {items}")
             for full_name in items:
                 self._item_registered(full_name)
         except Exception as e:
-            c.print_debug(f"Failed to get existing items: {e}")
+            debug_print(f"Failed to get existing items: {e}")
 
     def _watcher_unavailable(self, _observer):
         self.watcher_proxy = None
@@ -475,21 +489,21 @@ class TrayHost:
             self._item_unregistered(f"{item.service_name}{item.object_path}")
 
     def _item_registered(self, full_name):
-        c.print_debug(f"TrayHost._item_registered: {full_name}")
+        debug_print(f"TrayHost._item_registered: {full_name}")
         service, path = get_service_name_and_object_path(full_name)
         
         # DEBUG: Check specifically for Telegram or problematic services
         if "telegram" in full_name.lower():
-             c.print_debug(f"  Telegram detected: service={service}, path={path}")
+             debug_print(f"  Telegram detected: service={service}, path={path}")
              
         if not any(i.service_name == service and i.object_path == path for i in self._items):
             item = StatusNotifierItem(service, path)
             item.on_loaded_callback = self._on_item_loaded
             item.on_updated_callback = self._on_item_updated
             self._items.append(item)
-            c.print_debug(f"  Created StatusNotifierItem for {full_name}")
+            debug_print(f"  Created StatusNotifierItem for {full_name}")
         else:
-            c.print_debug(f"  StatusNotifierItem for {full_name} already in self._items")
+            debug_print(f"  StatusNotifierItem for {full_name} already in self._items")
 
     def _on_item_loaded(self, item):
         for module in self.modules:
@@ -511,6 +525,7 @@ class DBusMenuClient:
     def __init__(self, service, path):
         self.service = service
         self.path = path
+        # dasbus logs a lot here if we don't suppress it
         self.bus = SessionMessageBus()
         # Use custom handler to ensure interface is defined correctly
         self.proxy = self.bus.get_proxy(
@@ -526,14 +541,14 @@ class DBusMenuClient:
             revision, layout = self.proxy.GetLayout(parent_id, recursion_depth, property_names)
             return layout
         except Exception as e:
-            c.print_debug(f"Failed to get dbusmenu layout: {e}")
+            debug_print(f"Failed to get dbusmenu layout: {e}")
             return None
 
     def event(self, id, event_id, data, timestamp):
         try:
             self.proxy.Event(id, event_id, data, timestamp)
         except Exception as e:
-            c.print_debug(f"Failed to send dbusmenu event: {e}")
+            debug_print(f"Failed to send dbusmenu event: {e}")
 
 class TrayIcon(Gtk.Box):
     def __init__(self, item, icon_size, module):
@@ -558,32 +573,32 @@ class TrayIcon(Gtk.Box):
         try:
             native = self.get_native()
             if not native:
-                c.print_debug("  No native widget found")
+                debug_print("  No native widget found")
                 return 0, 0
                 
             surface = native.get_surface()
             if not surface:
-                c.print_debug("  No surface found")
+                debug_print("  No surface found")
                 return 0, 0
                 
             display = Gdk.Display.get_default()
             monitor = display.get_monitor_at_surface(surface)
             if not monitor:
-                c.print_debug("  No monitor found")
+                debug_print("  No monitor found")
                 return 0, 0
                 
             geo = monitor.get_geometry()
-            c.print_debug(f"  Monitor geometry: x={geo.x}, y={geo.y}, w={geo.width}, h={geo.height}")
+            debug_print(f"  Monitor geometry: x={geo.x}, y={geo.y}, w={geo.width}, h={geo.height}")
             
             # Translate local widget coordinates to window coordinates
             # translate_coordinates returns a tuple (x, y) or None in PyGObject for GTK4
             point = self.translate_coordinates(native, x_local, y_local)
             if not point:
-                c.print_debug("  Translation to native coords failed")
+                debug_print("  Translation to native coords failed")
                 return 0, 0
             
             win_x, win_y = point
-            c.print_debug(f"  Window relative coords: {win_x}, {win_y}")
+            debug_print(f"  Window relative coords: {win_x}, {win_y}")
 
             # Estimate window global position based on layer shell config
             # We assume the bar is at the edge of the monitor as per config
@@ -604,7 +619,7 @@ class TrayIcon(Gtk.Box):
                  global_y = geo.y + win_y + margin
                  global_x = geo.x + win_x + margin
 
-            c.print_debug(f"  Calculated Global: {int(global_x)}, {int(global_y)}")
+            debug_print(f"  Calculated Global: {int(global_x)}, {int(global_y)}")
             
             # Hack for Discord/XWayland potentially wanting monitor-relative coords?
             # Or maybe it just wants 0,0?
@@ -613,16 +628,16 @@ class TrayIcon(Gtk.Box):
             return int(global_x), int(global_y)
             
         except Exception as e:
-            c.print_debug(f"Failed to calculate coords: {e}")
+            debug_print(f"Failed to calculate coords: {e}")
             return 0, 0
 
     def _on_click(self, gesture, n_press, x, y):
         button = gesture.get_current_button()
-        c.print_debug(f"TrayIcon._on_click: button {button} for {self.item.service_name}")
+        debug_print(f"TrayIcon._on_click: button {button} for {self.item.service_name}")
         
         # Check if we need to toggle off an existing popover
         if self.popover_menu and self.popover_menu.get_visible():
-            c.print_debug("  Hiding existing popover")
+            debug_print("  Hiding existing popover")
             self.popover_menu.popdown()
             # We don't return immediately if it was a different button, but usually context menu is button 3
             if button == 3:
@@ -635,7 +650,7 @@ class TrayIcon(Gtk.Box):
         item_title = self.item.properties.get("Title", "").lower()
         proc_name = getattr(self.item, "proc_name", "")
         
-        c.print_debug(f"  Item ID: '{item_id}', Title: '{item_title}', Proc: '{proc_name[:30]}...'")
+        debug_print(f"  Item ID: '{item_id}', Title: '{item_title}', Proc: '{proc_name[:30]}...'")
         
         # Experimental hack for Discord to test coordinate hypothesis
         # Check ID, Title, Service Name, and Process Name
@@ -647,7 +662,7 @@ class TrayIcon(Gtk.Box):
         )
         
         if is_discord:
-            c.print_debug("  Applying Discord coordinate hack (trying monitor-relative)")
+            debug_print("  Applying Discord coordinate hack (trying monitor-relative)")
             # Re-calculate monitor relative
             try:
                 native = self.get_native()
@@ -657,7 +672,7 @@ class TrayIcon(Gtk.Box):
                 geo = monitor.get_geometry()
                 global_x = global_x - geo.x
                 global_y = global_y - geo.y
-                c.print_debug(f"  Discord adjusted coords: {global_x}, {global_y}")
+                debug_print(f"  Discord adjusted coords: {global_x}, {global_y}")
             except:
                 pass
 
@@ -668,7 +683,7 @@ class TrayIcon(Gtk.Box):
         elif button == 3:
             # Special handling for Telegram which claims to support ContextMenu but often fails silently
             if "telegram" in item_id or "telegram" in item_title:
-                c.print_debug("  Detected Telegram, forcing DBusMenu fallback")
+                debug_print("  Detected Telegram, forcing DBusMenu fallback")
                 self._show_dbus_menu()
                 return
 
@@ -676,47 +691,47 @@ class TrayIcon(Gtk.Box):
             # This ensures consistent styling and placement by the bar
             menu_path = self.item.properties.get("Menu")
             if menu_path and menu_path != "/":
-                c.print_debug(f"  Menu property found ({menu_path}), using DBusMenu")
+                debug_print(f"  Menu property found ({menu_path}), using DBusMenu")
                 self._show_dbus_menu()
                 return
 
             # Fallback to Native ContextMenu
-            c.print_debug(f"  No DBusMenu, trying Native ContextMenu with coords ({global_x}, {global_y})")
+            debug_print(f"  No DBusMenu, trying Native ContextMenu with coords ({global_x}, {global_y})")
             if self.item.context_menu(global_x, global_y):
-                c.print_debug("  Native ContextMenu call successful")
+                debug_print("  Native ContextMenu call successful")
                 return
             
-            c.print_debug("  Native ContextMenu failed/missing, showing DBusMenu (if any)")
+            debug_print("  Native ContextMenu failed/missing, showing DBusMenu (if any)")
             # If no ContextMenu or it failed, we show the DBusMenu (might fail too if empty)
             self._show_dbus_menu()
 
     def _show_dbus_menu(self):
         menu_path = self.item.properties.get("Menu")
-        c.print_debug(f"  _show_dbus_menu: Menu path is {menu_path}")
+        debug_print(f"  _show_dbus_menu: Menu path is {menu_path}")
         
         if not menu_path:
-            c.print_debug("  No Menu property found for item")
+            debug_print("  No Menu property found for item")
             # Fallback: Print all properties to debug why
-            c.print_debug(f"  Item properties: {self.item.properties.keys()}")
+            debug_print(f"  Item properties: {self.item.properties.keys()}")
             return
             
-        c.print_debug(f"  Fetching DBusMenu at {menu_path}")
+        debug_print(f"  Fetching DBusMenu at {menu_path}")
         if not self.menu_client:
             self.menu_client = DBusMenuClient(self.item.service_name, menu_path)
             
         # Use recursion_depth=-1 to get full tree
         layout = self.menu_client.get_layout(0, -1, ["label", "enabled", "visible", "type", "toggle-type", "toggle-state"])
         if not layout:
-            c.print_debug("  DBusMenu layout is empty or failed")
+            debug_print("  DBusMenu layout is empty or failed")
             return
             
         # layout is (id, properties, children)
         children = layout[2]
         if not children:
-            c.print_debug("  DBusMenu layout has no children")
+            debug_print("  DBusMenu layout has no children")
             return
             
-        c.print_debug(f"  Building menu with {len(children)} top-level items")
+        debug_print(f"  Building menu with {len(children)} top-level items")
         
         # Use GMenuModel and Gtk.PopoverMenu for "built-in" feel
         action_group = Gio.SimpleActionGroup.new()
@@ -724,7 +739,7 @@ class TrayIcon(Gtk.Box):
         
         # Clean up old popover if it exists (though we tried to popdown in _on_click)
         if self.popover_menu:
-            c.print_debug("  Unparenting old popover")
+            debug_print("  Unparenting old popover")
             self.popover_menu.unparent()
             self.popover_menu = None
             
@@ -740,7 +755,7 @@ class TrayIcon(Gtk.Box):
             self.popover_menu.set_position(Gtk.PositionType.BOTTOM)
             
         self.popover_menu.popup()
-        c.print_debug("  Popover popup called")
+        debug_print("  Popover popup called")
 
     def _build_menu_model(self, children, action_group):
         menu_model = Gio.Menu()
@@ -929,14 +944,14 @@ class TrayModule(Gtk.Box):
 
     def add_item(self, item):
         full_name = f"{item.service_name}{item.object_path}"
-        c.print_debug(f"TrayModule.add_item: {full_name}")
+        debug_print(f"TrayModule.add_item: {full_name}")
         if full_name not in self.icons:
             icon = TrayIcon(item, self.icon_size, self)
             self.icons[full_name] = icon
             self.icons_box.append(icon)
-            c.print_debug(f"  Icon widget created and appended for {full_name}")
+            debug_print(f"  Icon widget created and appended for {full_name}")
         else:
-            c.print_debug(f"  Icon for {full_name} already exists")
+            debug_print(f"  Icon for {full_name} already exists")
 
     def update_item(self, item, changed):
         full_name = f"{item.service_name}{item.object_path}"
