@@ -48,9 +48,9 @@ def setup_logging():
 
 def on_activate(app, config):
     try:
-        display = Display(config, app)
+        app.display = Display(config, app)
         # Draw all bars
-        display.draw_all()
+        app.display.draw_all()
     except Exception:
         logging.error("Failed to activate application", exc_info=True)
         sys.exit(1)

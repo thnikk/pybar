@@ -46,6 +46,7 @@ module_map = {
     'transmission': 'modules.transmission',
     'vm': 'modules.vm',
     'tray': 'modules.tray',
+    'debug': 'modules.debug',
 }
 
 def start_worker(name, config):
