@@ -353,6 +353,29 @@ class TrayHost:
             for module in self.modules:
                 module.remove_item(item)
 
+class DBusMenuClient:
+    def __init__(self, service, path):
+        self.service = service
+        self.path = path
+        self.bus = SessionMessageBus()
+        self.proxy = self.bus.get_proxy(service, path, interface_name="com.canonical.dbusmenu")
+        
+    def get_layout(self, parent_id=0, recursion_depth=-1, property_names=None):
+        if property_names is None:
+            property_names = []
+        try:
+            revision, layout = self.proxy.GetLayout(parent_id, recursion_depth, property_names)
+            return layout
+        except Exception as e:
+            c.print_debug(f"Failed to get dbusmenu layout: {e}")
+            return None
+
+    def event(self, id, event_id, data, timestamp):
+        try:
+            self.proxy.Event(id, event_id, data, timestamp)
+        except Exception as e:
+            c.print_debug(f"Failed to send dbusmenu event: {e}")
+
 class TrayIcon(Gtk.Box):
     def __init__(self, item, icon_size):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
@@ -362,7 +385,14 @@ class TrayIcon(Gtk.Box):
         self.append(self.image)
         self.set_cursor(Gdk.Cursor.new_from_name("pointer", None))
         
+        self.popover = None
+        self.menu_client = None
+        menu_path = item.properties.get("Menu")
+        if menu_path:
+            self.menu_client = DBusMenuClient(item.service_name, menu_path)
+        
         click = Gtk.GestureClick()
+        click.set_button(0) # Handle all buttons
         click.connect("released", self._on_click)
         self.add_controller(click)
         self.update()
@@ -370,13 +400,73 @@ class TrayIcon(Gtk.Box):
     def _on_click(self, gesture, n_press, x, y):
         button = gesture.get_current_button()
         if button == 1:
-            # -1, -1 is often used to signify "default position" or "don't know"
             self.item.activate(-1, -1)
         elif button == 3:
-            # Try SNI context menu
+            # First try calling ContextMenu
             self.item.context_menu(-1, -1)
-            # Since we don't have dbusmenu yet, if the app doesn't show its own window,
-            # it might feel like nothing happened.
+            # Then show our own popover
+            self._show_context_menu()
+
+    def _show_context_menu(self):
+        if self.popover:
+            self.popover.set_parent(None)
+            
+        popover = Gtk.Popover()
+        self.popover = popover
+        popover.set_parent(self)
+        
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        popover.set_child(vbox)
+        
+        # Add Title
+        title = self.item.properties.get("Title", "Application")
+        lbl = c.label(title, style='title')
+        lbl.set_margin_top(5)
+        lbl.set_margin_bottom(5)
+        lbl.set_margin_start(10)
+        lbl.set_margin_end(10)
+        vbox.append(lbl)
+        vbox.append(c.sep('h'))
+        
+        # If we have a menu client, try to fetch items
+        added_items = False
+        menu_client = self.menu_client
+        if menu_client:
+            layout = menu_client.get_layout(0, 1, ["label", "enabled", "visible"])
+            if layout:
+                # layout is (id, properties, children)
+                children = layout[2]
+                for child in children:
+                    child_id = child[0]
+                    props = child[1]
+                    label = props.get("label")
+                    visible = props.get("visible", True)
+                    enabled = props.get("enabled", True)
+                    
+                    if label and visible:
+                        # Clean label (dbusmenu often uses _ for mnemonics)
+                        label = label.replace("_", "")
+                        btn = c.button(label, style='minimal', ha='start')
+                        btn.set_sensitive(enabled)
+                        
+                        def on_clicked(_, cid=child_id, mc=menu_client, po=popover):
+                            import time
+                            mc.event(cid, "clicked", 0, int(time.time()))
+                            po.popdown()
+                            
+                        btn.connect("clicked", on_clicked)
+                        vbox.append(btn)
+                        added_items = True
+
+        if not added_items:
+            btn_activate = c.button("Activate", style='minimal', ha='start')
+            def on_activate(_, po=popover):
+                self.item.activate(-1, -1)
+                po.popdown()
+            btn_activate.connect("clicked", on_activate)
+            vbox.append(btn_activate)
+        
+        popover.popup()
 
     def update(self, changed=None):
         props = self.item.properties
@@ -475,11 +565,11 @@ class TrayModule(Gtk.Box):
         revealed = self.revealer.get_reveal_child()
         
         # Update arrows based on direction and state
-        # User requested: < to open, > to close (for left expansion)
+        # Inverting as requested
         if self.direction == "left":
-            self.toggle_btn.set_label("" if revealed else "")
-        else:
             self.toggle_btn.set_label("" if revealed else "")
+        else:
+            self.toggle_btn.set_label("" if revealed else "")
             
         # Toggle collapsed class for padding
         if revealed:
