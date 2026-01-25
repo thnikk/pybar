@@ -405,3 +405,12 @@ scrolledwindow undershoot.bottom {
 		transparent 100%);
 	border-bottom: 1px solid alpha(@gray, 0.2);
 }
+
+/* Fix mpc button corners */
+.mpc-controls button:first-child {
+	border-radius: 10px 0 0 10px;
+}
+
+.mpc-controls button:last-child {
+	border-radius: 0 10px 10px 0;
+}
