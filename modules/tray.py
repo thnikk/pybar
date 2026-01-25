@@ -107,6 +107,8 @@ class StatusNotifierItem:
         self.session_bus = SessionMessageBus()
         self.properties = {"ItemIsMenu": True}
         self.item_proxy = None
+        self.pid = 0
+        self.proc_name = ""
 
         self.item_observer = DBusObserver(
             message_bus=self.session_bus,
@@ -119,6 +121,18 @@ class StatusNotifierItem:
     def item_available_handler(self, _observer):
         try:
             c.print_debug(f"SNI Item available: {self.service_name}{self.object_path}")
+            
+            # Resolve PID and Process Name for identification
+            try:
+                # We access the bus proxy directly to call org.freedesktop.DBus methods
+                self.pid = self.session_bus.proxy.GetConnectionUnixProcessID(self.service_name)
+                if os.path.exists(f"/proc/{self.pid}/cmdline"):
+                    with open(f"/proc/{self.pid}/cmdline", "r") as f:
+                        self.proc_name = f.read().replace('\0', ' ').lower()
+                c.print_debug(f"  Identified process: PID={self.pid}, Name='{self.proc_name[:50]}...'")
+            except Exception as e:
+                c.print_debug(f"  Failed to resolve process info (non-fatal): {e}")
+            
             self.item_proxy = self.session_bus.get_proxy(
                 self.service_name, 
                 self.object_path, 
@@ -208,6 +222,59 @@ class StatusNotifierItem:
                 except Exception as e:
                     c.print_debug(f"Failed to call SecondaryAction: {e}")
 
+class DBusMenuInterface:
+    __dbus_xml__ = """
+    <node>
+        <interface name="com.canonical.dbusmenu">
+            <method name="GetLayout">
+                <arg name="parentId" type="i" direction="in"/>
+                <arg name="recursionDepth" type="i" direction="in"/>
+                <arg name="propertyNames" type="as" direction="in"/>
+                <arg name="revision" type="u" direction="out"/>
+                <arg name="layout" type="(ia{sv}av)" direction="out"/>
+            </method>
+            <method name="GetGroupProperties">
+                <arg name="ids" type="ai" direction="in"/>
+                <arg name="propertyNames" type="as" direction="in"/>
+                <arg name="properties" type="a(ia{sv})" direction="out"/>
+            </method>
+            <method name="GetProperty">
+                <arg name="id" type="i" direction="in"/>
+                <arg name="name" type="s" direction="in"/>
+                <arg name="value" type="v" direction="out"/>
+            </method>
+            <method name="Event">
+                <arg name="id" type="i" direction="in"/>
+                <arg name="eventId" type="s" direction="in"/>
+                <arg name="data" type="v" direction="in"/>
+                <arg name="timestamp" type="u" direction="in"/>
+            </method>
+            <method name="AboutToShow">
+                <arg name="id" type="i" direction="in"/>
+                <arg name="needUpdate" type="b" direction="out"/>
+            </method>
+            <signal name="ItemsPropertiesUpdated">
+                <arg name="updatedProps" type="a(ia{sv})" direction="out"/>
+                <arg name="removedProps" type="a(ias)" direction="out"/>
+            </signal>
+            <signal name="LayoutUpdated">
+                <arg name="revision" type="u" direction="out"/>
+                <arg name="parent" type="i" direction="out"/>
+            </signal>
+            <signal name="ItemActivationRequested">
+                <arg name="id" type="i" direction="out"/>
+                <arg name="timestamp" type="u" direction="out"/>
+            </signal>
+            <property name="Version" type="u" access="read"/>
+            <property name="Status" type="s" access="read"/>
+        </interface>
+    </node>
+    """
+
+class DBusMenuClientHandler(ClientObjectHandler):
+    def _get_specification(self):
+        return DBusSpecification.from_xml(DBusMenuInterface.__dbus_xml__)
+
 class StatusNotifierWatcherInterface:
     __dbus_xml__ = """
         <node>
@@ -284,7 +351,7 @@ class StatusNotifierWatcherInterface:
 
     @accepts_additional_arguments
     def RegisterStatusNotifierHost(self, service, call_info):
-        sender = call_info["sender"]
+        sender = call_info.get("sender", "internal")
         c.print_debug(f"StatusNotifierWatcher: Registering host {sender} ({service})")
         if sender not in self._hosts:
             self._hosts.append(sender)
@@ -292,11 +359,12 @@ class StatusNotifierWatcherInterface:
             self._emit_properties_changed("IsStatusNotifierHostRegistered",
                 dasbus.typing.get_variant(bool, True))
             
-            observer = DBusObserver(self.session_bus, sender)
-            observer.service_unavailable.connect(
-                lambda _: self._unregister_host(sender)
-            )
-            observer.connect_once_available()
+            if sender != "internal":
+                observer = DBusObserver(self.session_bus, sender)
+                observer.service_unavailable.connect(
+                    lambda _: self._unregister_host(sender)
+                )
+                observer.connect_once_available()
 
     def _unregister_host(self, sender):
         if sender in self._hosts:
@@ -409,6 +477,11 @@ class TrayHost:
     def _item_registered(self, full_name):
         c.print_debug(f"TrayHost._item_registered: {full_name}")
         service, path = get_service_name_and_object_path(full_name)
+        
+        # DEBUG: Check specifically for Telegram or problematic services
+        if "telegram" in full_name.lower():
+             c.print_debug(f"  Telegram detected: service={service}, path={path}")
+             
         if not any(i.service_name == service and i.object_path == path for i in self._items):
             item = StatusNotifierItem(service, path)
             item.on_loaded_callback = self._on_item_loaded
@@ -439,7 +512,12 @@ class DBusMenuClient:
         self.service = service
         self.path = path
         self.bus = SessionMessageBus()
-        self.proxy = self.bus.get_proxy(service, path, interface_name="com.canonical.dbusmenu")
+        # Use custom handler to ensure interface is defined correctly
+        self.proxy = self.bus.get_proxy(
+            service, 
+            path, 
+            handler_factory=DBusMenuClientHandler
+        )
         
     def get_layout(self, parent_id=0, recursion_depth=-1, property_names=None):
         if property_names is None:
@@ -527,6 +605,11 @@ class TrayIcon(Gtk.Box):
                  global_x = geo.x + win_x + margin
 
             c.print_debug(f"  Calculated Global: {int(global_x)}, {int(global_y)}")
+            
+            # Hack for Discord/XWayland potentially wanting monitor-relative coords?
+            # Or maybe it just wants 0,0?
+            # Let's try passing the global coords.
+            
             return int(global_x), int(global_y)
             
         except Exception as e:
@@ -535,7 +618,7 @@ class TrayIcon(Gtk.Box):
 
     def _on_click(self, gesture, n_press, x, y):
         button = gesture.get_current_button()
-        c.print_debug(f"TrayIcon._on_click: button {button}")
+        c.print_debug(f"TrayIcon._on_click: button {button} for {self.item.service_name}")
         
         # Check if we need to toggle off an existing popover
         if self.popover_menu and self.popover_menu.get_visible():
@@ -547,25 +630,74 @@ class TrayIcon(Gtk.Box):
 
         global_x, global_y = self._get_global_coordinates(x, y)
         
+        # Check properties for app identification
+        item_id = self.item.properties.get("Id", "").lower()
+        item_title = self.item.properties.get("Title", "").lower()
+        proc_name = getattr(self.item, "proc_name", "")
+        
+        c.print_debug(f"  Item ID: '{item_id}', Title: '{item_title}', Proc: '{proc_name[:30]}...'")
+        
+        # Experimental hack for Discord to test coordinate hypothesis
+        # Check ID, Title, Service Name, and Process Name
+        is_discord = (
+            "discord" in item_id or 
+            "discord" in item_title or 
+            "discord" in self.item.service_name.lower() or
+            "discord" in proc_name
+        )
+        
+        if is_discord:
+            c.print_debug("  Applying Discord coordinate hack (trying monitor-relative)")
+            # Re-calculate monitor relative
+            try:
+                native = self.get_native()
+                surface = native.get_surface()
+                display = Gdk.Display.get_default()
+                monitor = display.get_monitor_at_surface(surface)
+                geo = monitor.get_geometry()
+                global_x = global_x - geo.x
+                global_y = global_y - geo.y
+                c.print_debug(f"  Discord adjusted coords: {global_x}, {global_y}")
+            except:
+                pass
+
         if button == 1:
             self.item.activate(global_x, global_y)
         elif button == 2:
             self.item.secondary_action(global_x, global_y)
         elif button == 3:
-            # First try context_menu (returns True if successful)
-            # Note: We use global coords now instead of -1
+            # Special handling for Telegram which claims to support ContextMenu but often fails silently
+            if "telegram" in item_id or "telegram" in item_title:
+                c.print_debug("  Detected Telegram, forcing DBusMenu fallback")
+                self._show_dbus_menu()
+                return
+
+            # Prioritize DBusMenu if available (per SNI spec)
+            # This ensures consistent styling and placement by the bar
+            menu_path = self.item.properties.get("Menu")
+            if menu_path and menu_path != "/":
+                c.print_debug(f"  Menu property found ({menu_path}), using DBusMenu")
+                self._show_dbus_menu()
+                return
+
+            # Fallback to Native ContextMenu
+            c.print_debug(f"  No DBusMenu, trying Native ContextMenu with coords ({global_x}, {global_y})")
             if self.item.context_menu(global_x, global_y):
                 c.print_debug("  Native ContextMenu call successful")
                 return
             
-            c.print_debug("  Native ContextMenu failed/missing, trying DBusMenu")
-            # If no ContextMenu or it failed, we show the DBusMenu
+            c.print_debug("  Native ContextMenu failed/missing, showing DBusMenu (if any)")
+            # If no ContextMenu or it failed, we show the DBusMenu (might fail too if empty)
             self._show_dbus_menu()
 
     def _show_dbus_menu(self):
         menu_path = self.item.properties.get("Menu")
+        c.print_debug(f"  _show_dbus_menu: Menu path is {menu_path}")
+        
         if not menu_path:
             c.print_debug("  No Menu property found for item")
+            # Fallback: Print all properties to debug why
+            c.print_debug(f"  Item properties: {self.item.properties.keys()}")
             return
             
         c.print_debug(f"  Fetching DBusMenu at {menu_path}")
@@ -599,7 +731,7 @@ class TrayIcon(Gtk.Box):
         self.popover_menu = Gtk.PopoverMenu.new_from_model(menu_model)
         self.popover_menu.set_parent(self)
         self.popover_menu.insert_action_group("menu", action_group)
-        self.popover_menu.set_has_arrow(False)
+        self.popover_menu.set_has_arrow(True)
         
         # Position the popover specifically
         if self.module.config.get("position", "bottom") == "bottom":
@@ -783,7 +915,7 @@ class TrayModule(Gtk.Box):
         
         # Update arrows based on direction and state
         # Inverting as requested
-        if self.direction == "left":
+        if self.direction == "right":
             self.toggle_btn.set_label("" if revealed else "")
         else:
             self.toggle_btn.set_label("" if revealed else "")
