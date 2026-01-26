@@ -61,7 +61,7 @@ def fetch_data(config):
     """ Fetch weather data from OpenMeteo """
     zip_code = config.get('zip_code', "94102")
     night_icons = config.get('night_icons', True)
-    hours_to_show = config.get('hours', 5)
+    hours_to_show = 24
     
     try:
         # Geocode
@@ -116,14 +116,15 @@ def fetch_data(config):
         hourly_info = []
         for h in range(1, hours_to_show + 1):
             target_time = now + timedelta(hours=h)
+            idx = hour_now + h
             h_idx = target_time.hour
             h_night = (h_idx < sunrise or h_idx > sunset) and night_icons
             hourly_info.append({
-                "icon": lookup(w['hourly']['weathercode'][h_idx], 0, h_night),
-                "description": lookup(w['hourly']['weathercode'][h_idx], 1),
-                "humidity": w['hourly']['relativehumidity_2m'][h_idx],
+                "icon": lookup(w['hourly']['weathercode'][idx], 0, h_night),
+                "description": lookup(w['hourly']['weathercode'][idx], 1),
+                "humidity": w['hourly']['relativehumidity_2m'][idx],
                 "time": target_time.strftime("%l%P").strip(),
-                "temperature": round(w['hourly']['temperature_2m'][h_idx])
+                "temperature": round(w['hourly']['temperature_2m'][idx])
             })
 
         # Process Daily data
@@ -231,7 +232,21 @@ def build_popover(cache):
         time_box.append(c.label(f"+{cache['Hourly'].get('hours', 5)}h", style='gray', ha='end'))
         hourly_container.append(time_box)
 
-    hourly_box = c.box('h', style='box')
+    hourly_scroll = c.scroll(width=400, style='box')
+
+    # Convert vertical scroll to horizontal scroll
+    scroll_controller = Gtk.EventControllerScroll.new(
+        Gtk.EventControllerScrollFlags.VERTICAL)
+
+    def on_scroll(_, _dx, dy):
+        adj = hourly_scroll.get_hadjustment()
+        adj.set_value(adj.get_value() + (dy * 50))
+        return True
+
+    scroll_controller.connect("scroll", on_scroll)
+    hourly_scroll.add_controller(scroll_controller)
+
+    hourly_box = c.box('h')
     hour_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
     for hour in cache['Hourly']['info']:
         hour_box = c.box('v', style='inner-box-wide')
@@ -245,7 +260,8 @@ def build_popover(cache):
         hourly_box.append(hour_box)
         if hour != cache['Hourly']['info'][-1]:
             hourly_box.append(c.sep('v'))
-    hourly_container.append(hourly_box)
+    hourly_scroll.set_child(hourly_box)
+    hourly_container.append(hourly_scroll)
     widget.append(hourly_container)
 
     daily_container = c.box('v', spacing=10)
