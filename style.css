@@ -428,7 +428,10 @@ scrolledwindow undershoot.bottom {
 	border-bottom: 1px solid alpha(@gray, 0.2);
 }
 
-.custom-tray-icon {
-	font-size: 16px;
-	color: @white;
+.small {
+	font-size: 13px;
+}
+
+.expanded-status {
+	background: rgba(0, 0, 0, 0.2);
 }

@@ -64,8 +64,11 @@ class Graph(Gtk.DrawingArea):
 
         cr.set_line_width(1)
         cr.set_source_rgba(color[0], color[1], color[2], 0.1)
-        for level in [0, 0.5, 1]:
-            y = 10 + (h - 20) * level
+
+        # Draw lines at every 10 units
+        start_line = math.ceil(min_val / 10) * 10
+        for val in range(int(start_line), int(max_val) + 1, 10):
+            y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             cr.move_to(0, y)
             cr.line_to(w, y)
             cr.stroke()
@@ -523,6 +526,7 @@ def image(file_path=None, style=None, width=None, height=None):
 def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     """ Create scrollable window """
     window = Gtk.ScrolledWindow(hexpand=hexpand, vexpand=vexpand)
+    window.set_overflow(Gtk.Overflow.HIDDEN)
     window.set_min_content_width(width)
     window.set_min_content_height(height)
     if height > 0:

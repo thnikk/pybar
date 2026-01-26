@@ -3,26 +3,33 @@
 Description: Systemd module refactored for unified state
 Author: thnikk
 """
+import re
 from subprocess import run
 import common as c
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
+
 def get_failed(user=False):
     cmd = ['systemctl', '--failed', '--legend=no']
-    if user: cmd.insert(1, '--user')
+    if user:
+        cmd.insert(1, '--user')
     try:
-        res = run(cmd, check=True, capture_output=True).stdout.decode('utf-8').strip().splitlines()
+        res = run(cmd, check=True, capture_output=True).stdout.decode(
+            'utf-8').strip().splitlines()
         return [line.split()[1] for line in res if len(line.split()) > 1]
-    except Exception: return []
+    except Exception:
+        return []
+
 
 def fetch_data(config):
     blacklist = config.get('blacklist', [])
-    
+
     failed_sys = [s for s in get_failed() if s.split('.')[0] not in blacklist]
-    failed_user = [s for s in get_failed(user=True) if s.split('.')[0] not in blacklist]
-    
+    failed_user = [s for s in get_failed(user=True) if s.split('.')[
+        0] not in blacklist]
+
     total = len(failed_sys) + len(failed_user)
     return {
         "text": f' {total}' if total else "",
@@ -30,11 +37,13 @@ def fetch_data(config):
         "failed_user": failed_user
     }
 
+
 def create_widget(bar, config):
     module = c.Module()
     module.set_position(bar.position)
     module.set_visible(False)
     return module
+
 
 def update_ui(module, data):
     module.set_label(data['text'])
@@ -42,20 +51,182 @@ def update_ui(module, data):
     if not module.get_active():
         module.set_widget(build_popover(data))
 
+
+def get_status(service, user=False):
+    # Mapping systemd results to human-friendly strings
+    result_map = {
+        "exit-code": "Program quit with an error",
+        "timeout": "Took too long to respond",
+        "resources": "Out of memory or resource limit",
+        "core-dump": "Program crashed",
+        "start-limit-hit": "Failed too often (start limit)",
+        "signal": "Program was killed by a signal",
+        "protocol": "Communication error",
+    }
+
+    show_cmd = ['systemctl', 'show', service, '-p',
+                'Description,Result,StateChangeTimestamp,ExecMainStatus,ExecMainCode']
+    if user:
+        show_cmd.insert(1, '--user')
+
+    try:
+        # Fetch properties
+        res = run(show_cmd, capture_output=True).stdout.decode('utf-8').strip()
+        props = dict(line.split('=', 1)
+                     for line in res.splitlines() if '=' in line)
+
+        desc = props.get('Description', 'No description')
+        result = props.get('Result', 'unknown')
+        reason = result_map.get(result, result)
+        timestamp = props.get('StateChangeTimestamp', 'unknown')
+        exit_code = props.get('ExecMainStatus', '0')
+
+        # Format the summary
+        summary = [
+            f"<b>Description:</b> {desc}",
+            f"<b>Failed at:</b> {timestamp}",
+            f"<b>Reason:</b> {reason} (status={exit_code})"
+        ]
+
+        # Special handling for coredumps to find what process crashed
+        if service.startswith('systemd-coredump@'):
+            log_cmd = ['systemctl', 'status', service, '-l', '--no-pager']
+            if user:
+                log_cmd.insert(1, '--user')
+            status_output = run(
+                log_cmd, capture_output=True).stdout.decode('utf-8')
+            pid_match = re.search(
+                r'Started Process Core Dump \(PID (\d+)', status_output)
+            if pid_match:
+                coredump_pid = pid_match.group(1)
+                journal_cmd = ['journalctl',
+                               f'_PID={coredump_pid}', '--no-pager', '-b']
+                journal_res = run(
+                    journal_cmd, capture_output=True).stdout.decode('utf-8')
+                crash_match = re.search(
+                    r'Process \d+ \(([^)]+)\)', journal_res)
+                if crash_match:
+                    summary.insert(
+                        1, f"<b>Crashed Process:</b> {crash_match.group(1)}")
+
+        # Fetch logs
+        log_cmd = ['systemctl', 'status', service, '-n', '3', '--no-pager']
+        if user:
+            log_cmd.insert(1, '--user')
+        logs = run(log_cmd, capture_output=True).stdout.decode(
+            'utf-8').splitlines()
+
+        # Filter for actual log lines (usually start with a date)
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        actual_logs = [log.strip() for log in logs if any(
+            log.strip().startswith(month) for month in months)]
+
+        if actual_logs:
+            summary.append("\n<b>Recent Logs:</b>")
+            summary.extend(actual_logs[:3])
+
+        return "\n".join(summary)
+    except Exception as e:
+        return f"Failed to fetch details: {e}"
+
+
+def toggle_status(btn, status_box, status_label, indicator, service, is_user):
+    visible = not status_box.get_visible()
+    if visible:
+        status = get_status(service, is_user)
+        status_label.set_markup(status)
+        indicator.set_text('')
+    else:
+        indicator.set_text('')
+    status_box.set_visible(visible)
+
+
+def reset_failed(btn, user=False):
+    cmd = ['systemctl', 'reset-failed']
+    if user:
+        cmd.insert(1, '--user')
+    try:
+        run(cmd, check=True)
+    except Exception:
+        pass
+
+
 def build_popover(data):
-    box = c.box('v', spacing=20, style='small-widget')
-    box.append(c.label('Failed Services', style='heading'))
-    
-    sections = [("System", data['failed_system']), ("User", data['failed_user'])]
-    for name, failed in sections:
-        if not failed: continue
-        sec_box = c.box('v', spacing=10)
-        sec_box.append(c.label(name, style='title', ha='start'))
-        items_box = c.box('v', style='box')
-        for i, s in enumerate(failed):
-            items_box.append(c.label(s, style='inner-box', ha='start'))
-            if i < len(failed) - 1: items_box.append(c.sep('h'))
-        sec_box.append(items_box)
-        box.append(sec_box)
-        
-    return box
+    try:
+        main_box = c.box('v', spacing=20, style='small-widget')
+        main_box.append(c.label('Failed Services', style='heading'))
+
+        # Fixed height container for scrolling
+        scroll_box = c.scroll(height=400, style='scroll')
+        scroll_box.set_hexpand(True)
+        scroll_box.set_vexpand(False)
+
+        content_box = c.box('v', spacing=20)
+
+        sections = [("System", data['failed_system'], False),
+                    ("User", data['failed_user'], True)]
+        for name, failed, is_user in sections:
+            if not failed:
+                continue
+            sec_box = c.box('v', spacing=10)
+
+            header_box = c.box('h', spacing=10)
+            header_box.append(c.label(name, style='title', ha='start'))
+
+            reset_btn = c.button(' Reset', style='orange', ha='end')
+            reset_btn.set_hexpand(True)
+            reset_btn.connect('clicked', reset_failed, is_user)
+            header_box.append(reset_btn)
+
+            sec_box.append(header_box)
+
+            items_box = c.box('v', style='box')
+            for i, s in enumerate(failed):
+                item_con = c.box('v')
+
+                btn = c.button()
+                c.add_style(btn, ['minimal', 'inner-box'])
+
+                btn_content = c.box('h', spacing=10)
+                indicator = c.label('', style='gray')
+                btn_label = c.label(s, ha='start', he=True)
+                btn_content.append(indicator)
+                btn_content.append(btn_label)
+                btn.set_child(btn_content)
+
+                # Container for details
+                status_box = c.box('v')
+                status_box.set_visible(False)
+                c.add_style(status_box, 'expanded-status')
+
+                # Full width separator
+                status_box.append(c.sep('h'))
+
+                # Label with padding and smaller text
+                text_wrapper = c.box('v', style='inner-box')
+                status_label = c.label("", style='small', ha='start', wrap=50)
+                c.add_style(status_label, 'gray')
+                text_wrapper.append(status_label)
+                status_box.append(text_wrapper)
+
+                btn.connect('clicked', toggle_status, status_box,
+                            status_label, indicator, s, is_user)
+
+                item_con.append(btn)
+                item_con.append(status_box)
+
+                items_box.append(item_con)
+                if i < len(failed) - 1:
+                    items_box.append(c.sep('h'))
+
+            sec_box.append(items_box)
+            content_box.append(sec_box)
+
+        scroll_box.set_child(content_box)
+        main_box.append(scroll_box)
+
+        return main_box
+    except Exception as e:
+        c.print_debug(f"Error building systemd popover: {e}", color='red')
+        return c.box('v')
