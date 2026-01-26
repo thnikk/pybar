@@ -27,7 +27,8 @@ class Graph(Gtk.DrawingArea):
     """ Smooth history graph """
     def __init__(
             self, data, state=None, unit=None, min_config=None,
-            max_config=None, height=120, width=300, smooth=True):
+            max_config=None, height=120, width=300, smooth=True,
+            time_markers=None, time_labels=None):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -38,6 +39,8 @@ class Graph(Gtk.DrawingArea):
         self.smooth = smooth
         self.min_config = min_config
         self.max_config = max_config
+        self.time_markers = time_markers or []
+        self.time_labels = time_labels or []
         self.set_draw_func(self.on_draw)
 
     def update_data(self, data, state):
@@ -176,6 +179,8 @@ class Graph(Gtk.DrawingArea):
                 cr.curve_to(
                         x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
 
+        
+
         cr.set_line_width(2)
         cr.set_source_rgb(*color)
         path = cr.copy_path()
@@ -191,6 +196,33 @@ class Graph(Gtk.DrawingArea):
         linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
         cr.set_source(linpat)
         cr.fill()
+
+        # Draw time marker lines (noon/midnight) after the gradient fill
+        if self.time_markers and self.time_labels:
+            cr.set_line_width(1)
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.6)  # Light gray
+            cr.set_dash([2, 2])  # Dashed line pattern
+            
+            for i, (marker_hour, label) in enumerate(zip(self.time_markers, self.time_labels)):
+                if 0 <= marker_hour <= len(self.data) - 1:  # Only draw if within range
+                    x = (marker_hour / (len(self.data) - 1)) * w
+                    cr.move_to(x, 0)
+                    cr.line_to(x, h)
+                    cr.stroke()
+                    
+                    # Draw label above the line
+                    cr.set_dash([])  # Solid line for text
+                    cr.set_source_rgba(0.5, 0.5, 0.5, 0.8)
+                    cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                    cr.set_font_size(9)
+                    text_extents = cr.text_extents(label)
+                    text_x = x - text_extents.width / 2
+                    text_y = 12  # Position near top
+                    cr.move_to(text_x, text_y)
+                    cr.show_text(label)
+                    cr.set_dash([2, 2])  # Restore dashed pattern
+            
+            cr.set_dash([])  # Reset dash pattern
 
         cr.set_source_rgba(color[0], color[1], color[2], 0.5)
         cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)

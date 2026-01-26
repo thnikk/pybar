@@ -259,11 +259,75 @@ def build_popover(cache):
     if 'temperatures' in cache['Hourly']:
         graph_box = c.box('v', style='box')
         graph_box.set_overflow(Gtk.Overflow.HIDDEN)
+        
+        # Calculate time markers for sunrise and sunset
+        now = datetime.now()
+        current_hour = now.hour
+        hours_to_show = cache['Hourly'].get('hours', 24)
+        
+        time_markers_data = []
+        
+        # Get sunrise and sunset times from today's data
+        today = cache['Today']['info'][0]
+        sunrise_time = today['sunrise']  # Format: "6:30 AM"
+        sunset_time = today['sunset']    # Format: "7:45 PM"
+        
+        def time_to_hours(time_str):
+            """Convert time string like '6:30 AM' to hours since midnight"""
+            try:
+                time_part, period = time_str.strip().split()
+                hour_min = time_part.split(':')
+                hour = int(hour_min[0])
+                minute = int(hour_min[1]) if len(hour_min) > 1 else 0
+                
+                if period.upper() == 'PM' and hour != 12:
+                    hour += 12
+                elif period.upper() == 'AM' and hour == 12:
+                    hour = 0
+                    
+                return hour + minute / 60
+            except (ValueError, IndexError):
+                return None
+        
+        sunrise_hours = time_to_hours(sunrise_time)
+        sunset_hours = time_to_hours(sunset_time)
+        
+        # Calculate sunrise position within forecast window
+        if sunrise_hours is not None:
+            sunrise_offset = (sunrise_hours - current_hour) % 24
+            if 0 < sunrise_offset <= hours_to_show:
+                # Determine if this is today's or tomorrow's sunrise
+                if current_hour < sunrise_hours:
+                    sunrise_label = "Sunrise"
+                else:
+                    sunrise_label = "Sunrise"  # Keep simple label for tomorrow's sunrise
+                time_markers_data.append((sunrise_offset, sunrise_label, sunrise_hours))
+        
+        # Calculate sunset position within forecast window
+        if sunset_hours is not None:
+            sunset_offset = (sunset_hours - current_hour) % 24
+            if 0 < sunset_offset <= hours_to_show:
+                # Determine if this is today's or tomorrow's sunset
+                if current_hour < sunset_hours:
+                    sunset_label = "Sunset"
+                else:
+                    sunset_label = "Sunset"  # Keep simple label for tomorrow's sunset
+                time_markers_data.append((sunset_offset, sunset_label, sunset_hours))
+        
+        # Sort by absolute time (hours since midnight) to maintain chronological order
+        time_markers_data.sort(key=lambda x: x[2])
+        
+        # Separate into parallel arrays
+        time_markers = [marker[0] for marker in time_markers_data]
+        time_labels = [marker[1] for marker in time_markers_data]
+        
         graph = c.Graph(
             cache['Hourly']['temperatures'],
             height=80,
             min_config=cache['Hourly'].get('min'),
-            max_config=cache['Hourly'].get('max')
+            max_config=cache['Hourly'].get('max'),
+            time_markers=time_markers,
+            time_labels=time_labels
         )
         graph_box.append(graph)
         hourly_container.append(graph_box)
