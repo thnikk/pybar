@@ -246,55 +246,52 @@ def build_popover(module, data):
     else:
         module.pop_art.set_visible(False)
 
+    # Content box for everything under artwork
+    content_box = c.box('v', spacing=10, style='music-box')
+
     # Track info
-    info_box = c.box('v', spacing=5)
     module.pop_song = c.label(
-        data.get('song', 'Unknown Song'), style='heading', length=20)
-    module.pop_artist = c.label(data.get('artist', ''), style='title', wrap=20)
+        data.get('song', 'Unknown Song'), length=20, style='title')
+    module.pop_artist = c.label(
+            data.get('artist', ''), style='artist', wrap=20)
     module.pop_artist.set_visible(bool(data.get('artist')))
 
-    info_box.append(module.pop_song)
-    info_box.append(module.pop_artist)
-    main_box.append(info_box)
+    content_box.append(module.pop_song)
+    content_box.append(module.pop_artist)
 
     # Seekbar
     module.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
     module.pop_seekbar_handler = module.pop_seekbar.connect(
         'value-changed', lambda s: run(
             ['mpc', 'seek', f"{int(s.get_value())}%"]))
-    main_box.append(module.pop_seekbar)
+    content_box.append(module.pop_seekbar)
 
     # Controls
-    ctrl_box = c.box('h', style='mpc-controls')
+    ctrl_box = c.box('h')
     ctrl_box.set_halign(Gtk.Align.CENTER)
 
     def mpc_cmd(btn, cmd):
         Popen(['mpc', cmd])
 
-    prev_btn = c.button('')
+    prev_btn = c.button('', style='music-button')
     prev_btn.set_valign(Gtk.Align.FILL)
     prev_btn.connect('clicked', mpc_cmd, 'prev')
 
     module.pop_play_btn = c.button(
-        '' if data.get('status') == 'playing' else '')
+        '' if data.get('status') == 'playing' else '', style='music-button')
+    c.add_style(module.pop_play_btn, 'play-button')
     module.pop_play_btn.set_valign(Gtk.Align.FILL)
     module.pop_play_btn.connect('clicked', mpc_cmd, 'toggle')
 
-    next_btn = c.button('')
+    next_btn = c.button('', style='music-button')
     next_btn.set_valign(Gtk.Align.FILL)
     next_btn.connect('clicked', mpc_cmd, 'next')
 
-    s1 = c.sep('v')
-    s1.set_valign(Gtk.Align.FILL)
-    s2 = c.sep('v')
-    s2.set_valign(Gtk.Align.FILL)
-
     ctrl_box.append(prev_btn)
-    ctrl_box.append(s1)
     ctrl_box.append(module.pop_play_btn)
-    ctrl_box.append(s2)
     ctrl_box.append(next_btn)
 
-    main_box.append(ctrl_box)
+    content_box.append(ctrl_box)
+    main_box.append(content_box)
 
     return main_box

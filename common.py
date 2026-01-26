@@ -417,6 +417,7 @@ def del_style(widget, style):
 def button(label=None, style=None, ha=None, length=None):
     """ Button """
     widget = Gtk.Button.new()
+    widget.set_cursor_from_name("pointer")
     if label:
         widget.set_label(label)
     if style:
