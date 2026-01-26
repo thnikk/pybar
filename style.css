@@ -381,8 +381,8 @@ button.power-item:hover {
 .tray-toggle {
 	background: transparent;
 	border: none;
-	color: alpha(@white, 0.6);
-	padding: 0 5px;
+	color: alpha(@white, 0.8);
+	padding: 0px 0px;
 }
 
 .tray-toggle:hover {
