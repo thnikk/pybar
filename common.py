@@ -28,7 +28,7 @@ class Graph(Gtk.DrawingArea):
     def __init__(
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=True,
-            time_markers=None, time_labels=None):
+            time_markers=None, time_labels=None, hover_labels=None):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -41,7 +41,31 @@ class Graph(Gtk.DrawingArea):
         self.max_config = max_config
         self.time_markers = time_markers or []
         self.time_labels = time_labels or []
+        self.hover_labels = hover_labels or []
+        self.hover_index = -1
         self.set_draw_func(self.on_draw)
+
+        # Add motion controller
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("motion", self.on_motion)
+        motion.connect("leave", self.on_leave)
+        self.add_controller(motion)
+
+    def on_motion(self, _controller, x, _y):
+        if not self.data:
+            return
+        width = self.get_width()
+        if width <= 0:
+            return
+        idx = round((x / width) * (len(self.data) - 1))
+        idx = max(0, min(idx, len(self.data) - 1))
+        if idx != self.hover_index:
+            self.hover_index = idx
+            self.queue_draw()
+
+    def on_leave(self, _controller):
+        self.hover_index = -1
+        self.queue_draw()
 
     def update_data(self, data, state):
         self.data = data
@@ -256,6 +280,38 @@ class Graph(Gtk.DrawingArea):
             cr.set_source_rgb(1, 1, 1)
             cr.move_to(tx, ty)
             cr.show_text(text)
+
+        # Draw hover line and label
+        if self.hover_index != -1:
+            x = (self.hover_index / (len(self.data) - 1)) * w
+            cr.set_source_rgba(color[0], color[1], color[2], 0.8)
+            cr.set_line_width(1)
+            cr.move_to(x, 0)
+            cr.line_to(x, h)
+            cr.stroke()
+
+            if self.hover_index < len(self.hover_labels):
+                label_text = f"{self.hover_labels[self.hover_index]}"
+                cr.set_font_size(11)
+                extents = cr.text_extents(label_text)
+
+                lx = x - extents.width / 2
+                ly = 30  # Position below the top a bit
+
+                # Keep label within bounds
+                lx = max(5, min(lx, w - extents.width - 5))
+
+                # Draw background for label
+                pad = 4
+                cr.set_source_rgba(0, 0, 0, 0.7)
+                cr.rectangle(
+                    lx - pad, ly - extents.height - pad,
+                    extents.width + pad * 2, extents.height + pad * 2)
+                cr.fill()
+
+                cr.set_source_rgb(1, 1, 1)
+                cr.move_to(lx, ly)
+                cr.show_text(label_text)
 
 
 class StateManager:

@@ -321,13 +321,21 @@ def build_popover(cache):
         time_markers = [marker[0] for marker in time_markers_data]
         time_labels = [marker[1] for marker in time_markers_data]
         
+        hover_labels = [
+            f"{t}° {l}" for t, l in zip(
+                cache['Hourly']['temperatures'],
+                ["Now"] + [h['time'] for h in cache['Hourly']['info']]
+            )
+        ]
+
         graph = c.Graph(
             cache['Hourly']['temperatures'],
             height=80,
             min_config=cache['Hourly'].get('min'),
             max_config=cache['Hourly'].get('max'),
             time_markers=time_markers,
-            time_labels=time_labels
+            time_labels=time_labels,
+            hover_labels=hover_labels
         )
         graph_box.append(graph)
         hourly_container.append(graph_box)
