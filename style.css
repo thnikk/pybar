@@ -75,6 +75,10 @@ window {
 	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+.scroll {
+	border-radius: 10px;
+}
+
 .scroll-box {
 	padding: 10px;
 	border-radius: 10px;
