@@ -25,7 +25,9 @@ align_map = align
 
 class Graph(Gtk.DrawingArea):
     """ Smooth history graph """
-    def __init__(self, data, state=None, unit=None, min_config=None, max_config=None, height=120, width=300):
+    def __init__(
+            self, data, state=None, unit=None, min_config=None,
+            max_config=None, height=120, width=300, smooth=True):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -33,6 +35,7 @@ class Graph(Gtk.DrawingArea):
         self.data = data
         self.state = state
         self.unit = unit
+        self.smooth = smooth
         self.min_config = min_config
         self.max_config = max_config
         self.set_draw_func(self.on_draw)
@@ -41,6 +44,90 @@ class Graph(Gtk.DrawingArea):
         self.data = data
         self.state = state
         self.queue_draw()
+
+    def _catmull_rom_point(self, p0, p1, p2, p3, t, alpha=0.5):
+        """Calculate Catmull-Rom spline point at parameter t"""
+        def tj(ti, pi, pj):
+            xi, yi = pi
+            xj, yj = pj
+            return ((xj - xi)**2 + (yj - yi)**2)**0.5**alpha + ti
+        
+        t0, t1 = 0, tj(0, p0, p1)
+        t2 = tj(t1, p1, p2)
+        t3 = tj(t2, p2, p3)
+        
+        # Handle edge cases where points are too close
+        if abs(t2 - t1) < 1e-6:
+            return p1
+        if abs(t1 - t0) < 1e-6:
+            t0 = t1 - 0.1  # Small offset to prevent division by zero
+        if abs(t3 - t2) < 1e-6:
+            t3 = t2 + 0.1  # Small offset to prevent division by zero
+        
+        # Normalize t to [t1, t2] range
+        t_norm = t1 + t * (t2 - t1)
+        
+        # Calculate interpolation with safe division
+        def safe_div(num, denom):
+            return num / denom if abs(denom) > 1e-6 else 0
+        
+        A1 = [safe_div(t1 - t_norm, t1 - t0) * p0[i] + safe_div(t_norm - t0, t1 - t0) * p1[i] for i in (0, 1)]
+        A2 = [safe_div(t2 - t_norm, t2 - t1) * p1[i] + safe_div(t_norm - t1, t2 - t1) * p2[i] for i in (0, 1)]
+        A3 = [safe_div(t3 - t_norm, t3 - t2) * p2[i] + safe_div(t_norm - t2, t3 - t2) * p3[i] for i in (0, 1)]
+        
+        B1 = [safe_div(t2 - t_norm, t2 - t0) * A1[i] + safe_div(t_norm - t0, t2 - t0) * A2[i] for i in (0, 1)]
+        B2 = [safe_div(t3 - t_norm, t3 - t1) * A2[i] + safe_div(t_norm - t1, t3 - t1) * A3[i] for i in (0, 1)]
+        
+        C = [safe_div(t2 - t_norm, t2 - t1) * B1[i] + safe_div(t_norm - t1, t2 - t1) * B2[i] for i in (0, 1)]
+        
+        return tuple(C)
+
+    def _draw_catmull_rom_spline(self, cr, points, n_points_per_segment=30):
+        """Draw smooth Catmull-Rom spline through points"""
+        if len(points) < 2:
+            return
+        
+        if len(points) == 2:
+            # Simple line for 2 points
+            cr.move_to(points[0][0], points[0][1])
+            cr.line_to(points[1][0], points[1][1])
+            return
+        
+        # Create extended points with better ghost points for boundaries
+        if len(points) >= 3:
+            # Better ghost points: reflect first/last points
+            p0 = (2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1])
+            p_last = (2 * points[-1][0] - points[-2][0], 2 * points[-1][1] - points[-2][1])
+            
+            extended_points = [
+                p0,          # Ghost point at start (reflected)
+                points[0],   # First actual point
+                *points[1:-1],  # Middle points
+                points[-1],  # Last actual point  
+                p_last       # Ghost point at end (reflected)
+            ]
+        else:
+            # For exactly 2 points, create simple ghost points
+            dx = points[1][0] - points[0][0]
+            dy = points[1][1] - points[0][1]
+            p0 = (points[0][0] - dx, points[0][1] - dy)
+            p3 = (points[1][0] + dx, points[1][1] + dy)
+            extended_points = [p0, points[0], points[1], p3]
+        
+        # Draw the spline
+        first_segment = True
+        for i in range(len(extended_points) - 3):
+            p0, p1, p2, p3 = extended_points[i], extended_points[i+1], extended_points[i+2], extended_points[i+3]
+            
+            for j in range(n_points_per_segment):
+                t = j / (n_points_per_segment - 1) if n_points_per_segment > 1 else 0
+                point = self._catmull_rom_point(p0, p1, p2, p3, t, alpha=0.5)
+                
+                if first_segment and j == 0:
+                    cr.move_to(point[0], point[1])
+                    first_segment = False
+                else:
+                    cr.line_to(point[0], point[1])
 
     def on_draw(self, area, cr, width, height, *args):
         if not self.data or len(self.data) < 2:
@@ -73,14 +160,22 @@ class Graph(Gtk.DrawingArea):
             cr.line_to(w, y)
             cr.stroke()
 
-        x0, y0 = get_coords(0)
-        cr.move_to(x0, y0)
+        if self.smooth:
+            # Generate coordinate points for Catmull-Rom spline
+            points = [get_coords(i) for i in range(len(self.data))]
 
-        for i in range(len(self.data) - 1):
-            x1, y1 = get_coords(i)
-            x2, y2 = get_coords(i + 1)
-            cr.curve_to(x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
-        
+            # Draw smooth Catmull-Rom spline
+            self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
+        else:
+            x0, y0 = get_coords(0)
+            cr.move_to(x0, y0)
+
+            for i in range(len(self.data) - 1):
+                x1, y1 = get_coords(i)
+                x2, y2 = get_coords(i + 1)
+                cr.curve_to(
+                        x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
+
         cr.set_line_width(2)
         cr.set_source_rgb(*color)
         path = cr.copy_path()
