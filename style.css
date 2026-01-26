@@ -387,7 +387,6 @@ button.power-item:hover {
 .cover-art {
 	border-radius: 15px;
 	border: 1px solid @gray;
-	overflow: hidden;
 }
 
 /* tray */
