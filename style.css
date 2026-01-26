@@ -92,7 +92,8 @@ text {
 
 /* colorize modules */
 .green { background: @green; color: @black; }
-.red { background: @red; color: @black; }
+.red, button.red { background: @red; color: @black; }
+.blue, button.blue { background: @blue; color: @black; }
 .orange { background: @orange; color: @black; }
 .yellow { background: @yellow; color: @black; }
 .gray { color: @light_gray; }
@@ -103,12 +104,13 @@ text {
 .red-fg { color: @red; }
 .orange-fg { color: @orange; }
 
+.blue:hover { background: alpha(@blue, 0.8); }
+.blue:active { background: @white; color: @blue; }
 
 .indicator {
 	margin-top: -1px;
 	border-radius: 2px;
 }
-
 
 /* Override default rules */
 tooltip {
@@ -161,25 +163,6 @@ switch:disabled {
 	opacity: 0.5;
 }
 
-/* levelbar trough { */
-/* 	border: 1px solid @gray; */
-/* 	padding: 2px; */
-/* 	border-radius: 10px; */
-/* 	color: black; */
-/* 	background: @gray; */
-/* } */
-/**/
-/* levelbar block { */
-/* 	background: none; */
-/* 	color: @blue; */
-/* 	border-radius: 10px; */
-/* 	border: none; */
-/* } */
-/**/
-/* levelbar block.high, levelbar block:not(.empty) { border: 1px solid @gray; background-color: @blue; } */
-/* levelbar block.low, levelbar block.high, levelbar block.full, levelbar block.empty { background: @blue; border: 1px solid @gray; } */
-
-/* button { color: inherit; } */
 .minimal {
 	background: none;
 	border: 0;
@@ -190,23 +173,65 @@ switch:disabled {
 	transition: none;
 }
 
-.normal, button.normal {
-	background: #2b303b;
+/* Global button and entry styles */
+.normal, button.normal, entry.normal, 
+.red, button.red, 
+.blue, button.blue {
+	border-radius: 10px;
+	padding: 5px 20px;
 	border: 1px solid rgba(255,255,255,0.1);
 }
-.normal:hover, button.normal:hover {
+
+.normal, button.normal, entry.normal {
+	background: #2b303b;
+	color: @white;
+}
+
+entry.normal, entry.normal > text, entry.normal text {
+	background: transparent;
+	color: @white;
+	box-shadow: none;
+}
+
+.normal:hover, button.normal:hover, entry.normal:hover {
 	background: #1c1f26;
 	border: 1px solid rgba(255,255,255,0.1);
 }
-.normal:active, button.normal:active {
+
+.normal:active, button.normal:active, entry.normal:focus {
 	background: #d8dee9;
 	color: #2b303b;
 	border: 1px solid rgba(255,255,255,0.2);
 }
 
+button.red:hover {
+	background: alpha(@red, 0.8);
+}
+
+button.red:active {
+	background: @white;
+	color: @red;
+}
+
 button.normal:checked {
 	background: @green;
 	color: @black;
+}
+
+/* Grouped buttons */
+.group-button {
+	border-radius: 0;
+	border: none;
+	padding: 5px 20px;
+}
+
+.group-button:first-child { 
+	border-radius: 10px 0 0 10px; 
+	border-right: 1px solid alpha(@white, 0.1);
+}
+
+.group-button:last-child { 
+	border-radius: 0 10px 10px 0; 
 }
 
 /* widgets */
@@ -244,7 +269,6 @@ popover.background arrow {
 .music-box > .artist {
 	font-size: 16px;
 }
-
 
 .music-button {
 	background: none;
