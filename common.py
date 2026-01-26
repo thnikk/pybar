@@ -364,12 +364,59 @@ class Module(Gtk.MenuButton):
         # Re-attach to popover.box
         popover.box.append(content)
 
+def handle_popover_edge(popover):
+    """ Check if a popover is close to the screen edge and flatten corners """
+    parent = popover.get_parent()
+    if not parent:
+        return
+
+    toplevel = parent.get_native()
+    if not toplevel:
+        return
+
+    width = toplevel.get_width()
+    point = parent.translate_coordinates(toplevel, 0, 0)
+    if not point:
+        return
+
+    x, _ = point
+
+    # Find the bar position (top/bottom)
+    bar_pos = "bottom"
+    if hasattr(parent, "get_direction"):
+        direction = parent.get_direction()
+        if direction == Gtk.ArrowType.DOWN:
+            bar_pos = "top"
+
+    popover.remove_css_class("edge-left")
+    popover.remove_css_class("edge-right")
+    popover.remove_css_class("pos-top")
+    popover.remove_css_class("pos-bottom")
+    
+    popover.add_css_class(f"pos-{bar_pos}")
+
+    # Threshold: only flatten if the module itself is near the edge
+    # The radius is 20px, so 25px is a safe threshold
+    threshold = 25
+    module_center_x = x + parent.get_width() / 2
+
+    if module_center_x < threshold:
+        popover.add_css_class("edge-left")
+    elif module_center_x > width - threshold:
+        popover.add_css_class("edge-right")
+
+
 class Widget(Gtk.Popover):
     """ Template widget"""
     def __init__(self):
         super().__init__()
         self.set_position(Gtk.PositionType.TOP)
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        self.connect("map", self._on_map)
+
+    def _on_map(self, _):
+        """ Check if we are close to the screen edge and flatten corners """
+        handle_popover_edge(self)
 
     def heading(self, string):
         self.box.append(label(string))

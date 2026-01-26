@@ -842,6 +842,7 @@ class TrayIcon(Gtk.Box):
         self.popover_menu.set_parent(self)
         self.popover_menu.insert_action_group("menu", action_group)
         self.popover_menu.set_has_arrow(True)
+        self.popover_menu.connect("map", lambda p: c.handle_popover_edge(p))
 
         # Position the popover specifically
         if self.module.config.get("position", "bottom") == "bottom":
