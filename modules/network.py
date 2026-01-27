@@ -131,13 +131,13 @@ def fetch_data(config):
     always_show = config.get('always_show', True)
 
     if connection_type:
-        text = icons.get(connection_type, "")
+        text = icons.get(connection_type, "") if always_show else ""
         tooltip = f"{connection_type}\n{connection_ip}"
     elif has_internet:
-        text = ""
+        text = "" if always_show else ""
         tooltip = "Connected (Unknown device)"
     else:
-        text = "" if always_show else ""
+        text = ""
         tooltip = "No connection"
 
     return {
@@ -163,7 +163,8 @@ def create_widget(bar, config):
 
 def update_ui(module, data):
     """ Update network UI """
-    module.set_label(data['text'] if data['text'] else "NET")
+    module.set_label(data['text'])
+    module.set_visible(bool(data['text']))
     module.set_tooltip_text(data['tooltip'])
     module.data = data  # Store data for build_popover
 
