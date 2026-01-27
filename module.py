@@ -93,33 +93,49 @@ def generic_worker(name, config, fetch_func):
     is_hass = module_type.startswith('hass') or name.startswith('hass')
     cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
 
+    last_data = None
     first_run = True
     while True:
         data = None
         
         # Check cache on startup
         if first_run and not is_hass and os.path.exists(cache_path):
-            mtime = os.path.getmtime(cache_path)
-            if time.time() - mtime < interval:
-                try:
-                    with open(cache_path, 'r') as f:
-                        data = json.load(f)
-                    c.print_debug(f"Loaded {name} from cache", color='green')
-                except Exception as e:
-                    c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
-
-        if not data:
             try:
-                data = fetch_func(config)
-                if data and not is_hass:
+                with open(cache_path, 'r') as f:
+                    cached = json.load(f)
+                if cached:
+                    last_data = cached
+                    # Broadcast immediately as stale data while we wait for fresh update
+                    stale_init = cached.copy()
+                    stale_init['stale'] = True
+                    stale_init['timestamp'] = datetime.now().timestamp()
+                    c.state_manager.update(name, stale_init)
+                    c.print_debug(f"Loaded {name} from cache", color='green')
+            except Exception as e:
+                c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+
+        try:
+            new_data = fetch_func(config)
+            if new_data:
+                data = new_data
+                last_data = data
+                if not is_hass:
                     try:
                         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
                         with open(cache_path, 'w') as f:
                             json.dump(data, f)
                     except Exception as e:
                         c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
-            except Exception as e:
-                c.print_debug(f"Worker {name} failed: {e}", color='red')
+            else:
+                # If fetch fails, use last successful data
+                if last_data:
+                    data = last_data.copy()
+                    data['stale'] = True
+        except Exception as e:
+            c.print_debug(f"Worker {name} failed: {e}", color='red')
+            if last_data:
+                data = last_data.copy()
+                data['stale'] = True
         
         if data:
             if isinstance(data, dict):
@@ -136,35 +152,50 @@ def command_worker(name, config):
     is_hass = module_type.startswith('hass') or name.startswith('hass')
     cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
 
+    last_data = None
     first_run = True
     while True:
         data = None
         
         # Check cache on startup
         if first_run and not is_hass and os.path.exists(cache_path):
-            mtime = os.path.getmtime(cache_path)
-            if time.time() - mtime < interval:
-                try:
-                    with open(cache_path, 'r') as f:
-                        data = json.load(f)
-                    c.print_debug(f"Loaded {name} from cache", color='green')
-                except Exception as e:
-                    c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
-
-        if not data:
-            command = [os.path.expanduser(arg) for arg in config['command']]
             try:
-                output = run(command, check=True, capture_output=True).stdout.decode()
-                data = json.loads(output)
-                if data and not is_hass:
+                with open(cache_path, 'r') as f:
+                    cached = json.load(f)
+                if cached:
+                    last_data = cached
+                    # Broadcast immediately as stale data while we wait for fresh update
+                    stale_init = cached.copy()
+                    stale_init['stale'] = True
+                    stale_init['timestamp'] = datetime.now().timestamp()
+                    c.state_manager.update(name, stale_init)
+                    c.print_debug(f"Loaded {name} from cache", color='green')
+            except Exception as e:
+                c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+
+        command = [os.path.expanduser(arg) for arg in config['command']]
+        try:
+            output = run(command, check=True, capture_output=True).stdout.decode()
+            new_data = json.loads(output)
+            if new_data:
+                data = new_data
+                last_data = data
+                if not is_hass:
                     try:
                         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
                         with open(cache_path, 'w') as f:
                             json.dump(data, f)
                     except Exception as e:
                         c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
-            except Exception as e:
-                c.print_debug(f"Command worker {name} failed: {e}", color='red')
+            else:
+                if last_data:
+                    data = last_data.copy()
+                    data['stale'] = True
+        except Exception as e:
+            c.print_debug(f"Command worker {name} failed: {e}", color='red')
+            if last_data:
+                data = last_data.copy()
+                data['stale'] = True
         
         if data:
             if isinstance(data, dict):
@@ -191,7 +222,13 @@ def module(bar, name, config):
                 m = mod.create_widget(bar, module_config)
                 if hasattr(mod, 'update_ui'):
                     c.print_debug(f"Subscribing {name} to state updates", color='cyan')
-                    c.state_manager.subscribe(name, lambda data: mod.update_ui(m, data))
+                    def update_wrapper(data):
+                        mod.update_ui(m, data)
+                        if data.get('stale'):
+                            m.add_style('stale')
+                        else:
+                            m.del_style('stale')
+                    c.state_manager.subscribe(name, update_wrapper)
                 return m
             elif hasattr(mod, 'module'):
                 # Old pattern (temporary)
@@ -215,6 +252,8 @@ def module(bar, name, config):
         m.reset_style()
         if 'class' in data:
             c.add_style(m, data['class'])
+        if data.get('stale'):
+            m.add_style('stale')
             
     c.state_manager.subscribe(name, generic_update)
     return m

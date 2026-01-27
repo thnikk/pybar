@@ -33,6 +33,10 @@ window {
 	transition: opacity 200ms ease;
 }
 
+.stale {
+	opacity: 0.4 !important;
+}
+
 .module:hover {
 	opacity: 1;
 }

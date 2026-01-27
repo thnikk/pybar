@@ -515,12 +515,27 @@ class Module(Gtk.MenuButton):
     def add_style(self, style_class):
         """ Set style """
         if isinstance(style_class, str):
-            self.get_style_context().add_class(style_class)
-            self.added_styles.append(style_class)
+            if style_class not in self.added_styles:
+                self.get_style_context().add_class(style_class)
+                self.added_styles.append(style_class)
         elif isinstance(style_class, list):
             for item in style_class:
-                self.get_style_context().add_class(item)
-                self.added_styles.append(item)
+                if item not in self.added_styles:
+                    self.get_style_context().add_class(item)
+                    self.added_styles.append(item)
+        return self
+
+    def del_style(self, style_class):
+        """ Remove style """
+        if isinstance(style_class, str):
+            if style_class in self.added_styles:
+                self.get_style_context().remove_class(style_class)
+                self.added_styles.remove(style_class)
+        elif isinstance(style_class, list):
+            for item in style_class:
+                if item in self.added_styles:
+                    self.get_style_context().remove_class(item)
+                    self.added_styles.remove(item)
         return self
 
     def set_widget(self, box):
