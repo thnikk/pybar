@@ -28,7 +28,8 @@ class Graph(Gtk.DrawingArea):
     def __init__(
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=True,
-            time_markers=None, time_labels=None, hover_labels=None):
+            time_markers=None, time_labels=None, hover_labels=None,
+            colors=None):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -42,6 +43,7 @@ class Graph(Gtk.DrawingArea):
         self.time_markers = time_markers or []
         self.time_labels = time_labels or []
         self.hover_labels = hover_labels or []
+        self.colors = colors or [(0.56, 0.63, 0.75)]
         self.hover_index = -1
         self.set_draw_func(self.on_draw)
 
@@ -57,8 +59,13 @@ class Graph(Gtk.DrawingArea):
         width = self.get_width()
         if width <= 0:
             return
-        idx = round((x / width) * (len(self.data) - 1))
-        idx = max(0, min(idx, len(self.data) - 1))
+            
+        # Handle multi-series data
+        series = self.data[0] if isinstance(self.data[0], list) else self.data
+        num_points = len(series)
+        
+        idx = round((x / width) * (num_points - 1))
+        idx = max(0, min(idx, num_points - 1))
         if idx != self.hover_index:
             self.hover_index = idx
             self.queue_draw()
@@ -157,29 +164,39 @@ class Graph(Gtk.DrawingArea):
                     cr.line_to(point[0], point[1])
 
     def on_draw(self, area, cr, width, height, *args):
-        if not self.data or len(self.data) < 2:
+        if not self.data:
+            return
+            
+        # Handle both single series and multi-series
+        is_multi = isinstance(self.data[0], list)
+        series_list = self.data if is_multi else [self.data]
+        if not series_list[0] or len(series_list[0]) < 2:
             return
 
         w = width
         h = height
 
-        min_val = self.min_config if self.min_config is not None else min(self.data)
-        max_val = self.max_config if self.max_config is not None else max(self.data)
+        # Calculate global min/max across all series
+        all_vals = []
+        for s in series_list:
+            all_vals.extend(s)
+            
+        min_val = self.min_config if self.min_config is not None else min(all_vals)
+        max_val = self.max_config if self.max_config is not None else max(all_vals)
         range_val = max_val - min_val if max_val != min_val else 1
 
-        def get_coords(i):
-            x = (i / (len(self.data) - 1)) * w
-            val = self.data[i]
+        def get_coords(i, series):
+            x = (i / (len(series) - 1)) * w
+            val = series[i]
             val = max(min(val, max_val), min_val)
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             return x, y
 
-        color = (0.56, 0.63, 0.75)
-
+        # Draw grid lines at every 10 units
+        grid_color = (0.56, 0.63, 0.75)
         cr.set_line_width(1)
-        cr.set_source_rgba(color[0], color[1], color[2], 0.1)
+        cr.set_source_rgba(grid_color[0], grid_color[1], grid_color[2], 0.1)
 
-        # Draw lines at every 10 units
         start_line = math.ceil(min_val / 10) * 10
         for val in range(int(start_line), int(max_val) + 1, 10):
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
@@ -187,76 +204,78 @@ class Graph(Gtk.DrawingArea):
             cr.line_to(w, y)
             cr.stroke()
 
-        if self.smooth:
-            # Generate coordinate points for Catmull-Rom spline
-            points = [get_coords(i) for i in range(len(self.data))]
-
-            # Draw smooth Catmull-Rom spline
-            self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
-        else:
-            x0, y0 = get_coords(0)
-            cr.move_to(x0, y0)
-
-            for i in range(len(self.data) - 1):
-                x1, y1 = get_coords(i)
-                x2, y2 = get_coords(i + 1)
-                cr.curve_to(
+        # Draw each series
+        for s_idx, series in enumerate(series_list):
+            color = self.colors[s_idx % len(self.colors)]
+            
+            cr.new_path()
+            if self.smooth:
+                points = [get_coords(i, series) for i in range(len(series))]
+                self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
+            else:
+                x0, y0 = get_coords(0, series)
+                cr.move_to(x0, y0)
+                for i in range(len(series) - 1):
+                    x1, y1 = get_coords(i, series)
+                    x2, y2 = get_coords(i + 1, series)
+                    cr.curve_to(
                         x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
 
-        
+            cr.set_line_width(2)
+            cr.set_source_rgb(*color)
+            path = cr.copy_path()
+            cr.stroke()
 
-        cr.set_line_width(2)
-        cr.set_source_rgb(*color)
-        path = cr.copy_path()
-        cr.stroke()
+            # Fill the area
+            fill_opacity = 0.3 if len(series_list) == 1 else 0.15
+            cr.append_path(path)
+            cr.line_to(w, h)
+            cr.line_to(0, h)
+            cr.close_path()
 
-        cr.append_path(path)
-        cr.line_to(w, h)
-        cr.line_to(0, h)
-        cr.close_path()
+            linpat = cairo.LinearGradient(0, 0, 0, h)
+            linpat.add_color_stop_rgba(0, color[0], color[1], color[2], fill_opacity)
+            linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
+            cr.set_source(linpat)
+            cr.fill()
 
-        linpat = cairo.LinearGradient(0, 0, 0, h)
-        linpat.add_color_stop_rgba(0, color[0], color[1], color[2], 0.3)
-        linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
-        cr.set_source(linpat)
-        cr.fill()
-
-        # Draw time marker lines (noon/midnight) after the gradient fill
+        # Draw time marker lines
         if self.time_markers and self.time_labels:
             cr.set_line_width(1)
-            cr.set_source_rgba(0.5, 0.5, 0.5, 0.6)  # Light gray
-            cr.set_dash([2, 2])  # Dashed line pattern
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.6)
+            cr.set_dash([2, 2])
             
-            for i, (marker_hour, label) in enumerate(zip(self.time_markers, self.time_labels)):
-                if 0 <= marker_hour <= len(self.data) - 1:  # Only draw if within range
-                    x = (marker_hour / (len(self.data) - 1)) * w
+            num_points = len(series_list[0])
+            for i, (marker_pos, label) in enumerate(zip(self.time_markers, self.time_labels)):
+                if 0 <= marker_pos <= num_points - 1:
+                    x = (marker_pos / (num_points - 1)) * w
                     cr.move_to(x, 0)
                     cr.line_to(x, h)
                     cr.stroke()
                     
-                    # Draw label above the line
-                    cr.set_dash([])  # Solid line for text
+                    cr.set_dash([])
                     cr.set_source_rgba(0.5, 0.5, 0.5, 0.8)
                     cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
                     cr.set_font_size(9)
                     text_extents = cr.text_extents(label)
                     text_x = x - text_extents.width / 2
-                    text_y = 12  # Position near top
+                    text_y = 12
                     cr.move_to(text_x, text_y)
                     cr.show_text(label)
-                    cr.set_dash([2, 2])  # Restore dashed pattern
-            
-            cr.set_dash([])  # Reset dash pattern
+                    cr.set_dash([2, 2])
+            cr.set_dash([])
 
-        cr.set_source_rgba(color[0], color[1], color[2], 0.5)
+        # Draw Legend (Min/Max values)
+        legend_color = (0.56, 0.63, 0.75)
+        cr.set_source_rgba(legend_color[0], legend_color[1], legend_color[2], 0.5)
         cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(10)
-        
         cr.move_to(5, 15)
         cr.show_text(f"{max_val:.1f}")
         cr.move_to(5, h - 5)
         cr.show_text(f"{min_val:.1f}")
 
+        # Current value overlay
         if self.state:
             text = f"{self.state}{self.unit}"
             cr.set_font_size(24)
@@ -283,8 +302,10 @@ class Graph(Gtk.DrawingArea):
 
         # Draw hover line and label
         if self.hover_index != -1:
-            x = (self.hover_index / (len(self.data) - 1)) * w
-            cr.set_source_rgba(color[0], color[1], color[2], 0.8)
+            num_points = len(series_list[0])
+            x = (self.hover_index / (num_points - 1)) * w
+            hover_color = (0.56, 0.63, 0.75)
+            cr.set_source_rgba(hover_color[0], hover_color[1], hover_color[2], 0.8)
             cr.set_line_width(1)
             cr.move_to(x, 0)
             cr.line_to(x, h)
@@ -294,21 +315,15 @@ class Graph(Gtk.DrawingArea):
                 label_text = f"{self.hover_labels[self.hover_index]}"
                 cr.set_font_size(11)
                 extents = cr.text_extents(label_text)
-
                 lx = x - extents.width / 2
-                ly = 30  # Position below the top a bit
-
-                # Keep label within bounds
+                ly = 30
                 lx = max(5, min(lx, w - extents.width - 5))
-
-                # Draw background for label
                 pad = 4
                 cr.set_source_rgba(0, 0, 0, 0.7)
                 cr.rectangle(
                     lx - pad, ly - extents.height - pad,
                     extents.width + pad * 2, extents.height + pad * 2)
                 cr.fill()
-
                 cr.set_source_rgb(1, 1, 1)
                 cr.move_to(lx, ly)
                 cr.show_text(label_text)
