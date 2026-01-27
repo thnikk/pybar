@@ -9,35 +9,51 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
-def fetch_data(config):
-    try:
-        domains = [p.split("/")[-1].rstrip(".xml") for p in glob.glob("/var/run/libvirt/qemu/*.xml")]
-        return {
-            "text": f" {len(domains)}" if domains else "",
-            "domains": domains
-        }
-    except Exception: return None
 
-def create_widget(bar, config):
-    module = c.Module()
-    module.set_position(bar.position)
-    module.set_visible(False)
-    return module
+class VM(c.BaseModule):
+    def fetch_data(self):
+        try:
+            domains = [
+                p.split("/")[-1].rstrip(".xml")
+                for p in glob.glob("/var/run/libvirt/qemu/*.xml")]
+            return {
+                "text": f" {len(domains)}" if domains else "",
+                "domains": domains
+            }
+        except Exception:
+            return {}
 
-def update_ui(module, data):
-    module.set_label(data['text'])
-    module.set_visible(bool(data['text']))
-    if not module.get_active():
-        module.set_widget(build_popover(data))
+    def build_popover(self, data):
+        box = c.box('v', spacing=20, style='small-widget')
+        box.append(c.label('Running VMs', style='heading'))
 
-def build_popover(data):
-    box = c.box('v', spacing=20, style='small-widget')
-    box.append(c.label('Running VMs', style='heading'))
-    
-    ibox = c.box('v', style='box')
-    for i, d in enumerate(data['domains']):
-        ibox.append(c.label(d, style='inner-box', ha='start'))
-        if i < len(data['domains']) - 1: ibox.append(c.sep('h'))
-    
-    box.append(ibox)
-    return box
+        ibox = c.box('v', style='box')
+        for i, d in enumerate(data.get('domains', [])):
+            ibox.append(c.label(d, style='inner-box', ha='start'))
+            if i < len(data['domains']) - 1:
+                ibox.append(c.sep('h'))
+
+        box.append(ibox)
+        return box
+
+    def create_widget(self, bar):
+        m = c.Module()
+        m.set_position(bar.position)
+        m.set_visible(False)
+
+        c.state_manager.subscribe(
+            self.name, lambda data: self.update_ui(m, data))
+        return m
+
+    def update_ui(self, widget, data):
+        if not data:
+            return
+        widget.set_label(data.get('text', ''))
+        widget.set_visible(bool(data.get('text')))
+        if not widget.get_active():
+            widget.set_widget(self.build_popover(data))
+
+
+module_map = {
+    'vm': VM
+}

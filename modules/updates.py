@@ -11,169 +11,184 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
-manager_config = {
-    "Pacman": {
-        "command": ["checkupdates"],
-        "update_command": "sudo pacman -Syu",
-        "seperator": ' ',
-        "empty_error": 2,
-        "values": [0, -1]
-    },
-    "AUR": {
-        "command": ["paru", "-Qum"],
-        "update_command": "paru -Syua",
-        "seperator": ' ',
-        "empty_error": 1,
-        "values": [0, -1]
-    },
-    "Apt": {
-        "command": ["apt", "list", "--upgradable"],
-        "update_command": "sudo apt update && sudo apt upgrade",
-        "seperator": ' ',
-        "empty_error": 1,
-        "values": [0, 1]
-    },
-    "Flatpak": {
-        "command": ["flatpak", "remote-ls", "--updates"],
-        "update_command": "flatpak update",
-        "seperator": '\t',
-        "empty_error": 0,
-        "values": [0, 2]
-    },
-}
 
-
-def get_output(command, seperator, values, empty_error, alerts) -> list:
-    """ Get formatted command output """
-    try:
-        output = subprocess.run(
-            command, check=True, capture_output=True).stdout.decode('utf-8').splitlines()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        output = []
-
-    move = []
-    for alert in alerts:
-        for line in output:
-            if alert in line:
-                move.append(line)
-    for line in move:
-        output.remove(line)
-        output.insert(0, line)
-
-    split_output = [
-        [line.split(seperator)[value].split('/')[0] for value in values]
-        for line in output if len(line.split(seperator)) > 1
-    ]
-    return split_output
-
-
-def fetch_data(config):
-    """ Fetch updates data """
-    alerts = config.get('alerts', ["linux", "discord", "qemu", "libvirt"])
-    terminal = config.get('terminal', 'kitty')
-
-    pool = concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(manager_config))
-    package_managers = {name: {} for name in manager_config}
-
-    for name, info in manager_config.items():
-        thread = pool.submit(
-            get_output, info["command"], info["seperator"], info["values"], info["empty_error"], alerts)
-        package_managers[name]["packages"] = thread.result()
-        package_managers[name]["command"] = info["update_command"]
-    pool.shutdown(wait=True)
-
-    total = sum(len(m['packages']) for m in package_managers.values())
-
-    return {
-        "total": total,
-        "managers": package_managers,
-        "terminal": terminal,
-        "text": f" {total}" if total else ""
+class Updates(c.BaseModule):
+    manager_config = {
+        "Pacman": {
+            "command": ["checkupdates"],
+            "update_command": "sudo pacman -Syu",
+            "seperator": ' ',
+            "empty_error": 2,
+            "values": [0, -1]
+        },
+        "AUR": {
+            "command": ["paru", "-Qum"],
+            "update_command": "paru -Syua",
+            "seperator": ' ',
+            "empty_error": 1,
+            "values": [0, -1]
+        },
+        "Apt": {
+            "command": ["apt", "list", "--upgradable"],
+            "update_command": "sudo apt update && sudo apt upgrade",
+            "seperator": ' ',
+            "empty_error": 1,
+            "values": [0, 1]
+        },
+        "Flatpak": {
+            "command": ["flatpak", "remote-ls", "--updates"],
+            "update_command": "flatpak update",
+            "seperator": '\t',
+            "empty_error": 0,
+            "values": [0, 2]
+        },
     }
 
+    def get_output(
+        self, command, seperator, values, _empty_error, alerts
+    ) -> list:
+        """ Get formatted command output """
+        try:
+            output = subprocess.run(
+                command, check=True,
+                capture_output=True).stdout.decode('utf-8').splitlines()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            output = []
 
-def create_widget(bar, config):
-    """ Create updates widget """
-    module = c.Module()
-    module.set_position(bar.position)
-    module.set_visible(False)
-    return module
+        move = []
+        for alert in alerts:
+            for line in output:
+                if alert in line:
+                    move.append(line)
+        for line in move:
+            output.remove(line)
+            output.insert(0, line)
 
+        split_output = [
+            [line.split(seperator)[value].split('/')[0] for value in values]
+            for line in output if len(line.split(seperator)) > 1
+        ]
+        return split_output
 
-def update_ui(module, data):
-    """ Update updates UI """
-    if not data:
-        module.set_visible(False)
-        return
-    total = data['total']
-    module.set_label(data['text'])
-    module.set_visible(bool(total))
+    def fetch_data(self):
+        """ Fetch updates data """
+        alerts = self.config.get(
+            'alerts', ["linux", "discord", "qemu", "libvirt"])
+        terminal = self.config.get('terminal', 'kitty')
 
-    if not module.get_active():
-        module.set_widget(build_popover(module, data))
+        pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(self.manager_config))
+        package_managers = {name: {} for name in self.manager_config}
 
+        for name, info in self.manager_config.items():
+            thread = pool.submit(
+                self.get_output, info["command"], info["seperator"],
+                info["values"], info["empty_error"], alerts)
+            package_managers[name]["packages"] = thread.result()
+            package_managers[name]["command"] = info["update_command"]
+        pool.shutdown(wait=True)
 
-def build_popover(module, data):
-    """ Build popover for updates """
-    main_box = c.box('v', spacing=20, style='small-widget')
-    main_box.append(c.label('Updates', style='heading'))
+        total = sum(len(m['packages']) for m in package_managers.values())
 
-    urls = {
-        "Pacman": "https://archlinux.org/packages/",
-        "AUR": "https://aur.archlinux.org/packages/",
-        "Flatpak": "https://flathub.org/apps/search?q=",
-    }
+        return {
+            "total": total,
+            "managers": package_managers,
+            "terminal": terminal,
+            "text": f" {total}" if total else ""
+        }
 
-    commands = [
-        info['command']
-        for manager, info in data['managers'].items()
-        if info['packages']
-    ] + ['echo "Packages updated, press enter to close terminal."', 'read x']
-
-    def update_packages(btn):
-        module.get_popover().popdown()
+    def update_packages(self, _btn, data, widget):
+        widget.get_popover().popdown()
+        commands = [
+            info['command']
+            for manager, info in data['managers'].items()
+            if info['packages']
+        ] + [
+            'echo "Packages updated, press enter to close terminal."',
+            'read x']
         Popen([data['terminal'], 'sh', '-c', '; '.join(commands)])
 
-    def click_link(btn, url):
+    def click_link(self, _btn, url):
         Popen(['xdg-open', url])
 
-    content_box = c.box('v', spacing=20)
+    def build_popover(self, widget, data):
+        """ Build popover for updates """
+        main_box = c.box('v', spacing=20, style='small-widget')
+        main_box.append(c.label('Updates', style='heading'))
 
-    for manager, info in data['managers'].items():
-        packages = info['packages']
-        if not packages:
-            continue
-        manager_box = c.box('v', spacing=10)
-        heading = c.label(
-            f"{manager} ({len(packages)} updates)", style='title', ha='start')
-        manager_box.append(heading)
-        packages_box = c.box('v', style='box')
+        urls = {
+            "Pacman": "https://archlinux.org/packages/",
+            "AUR": "https://aur.archlinux.org/packages/",
+            "Flatpak": "https://flathub.org/apps/search?q=",
+        }
 
-        for package in packages:
-            package_box = c.box('h', style='inner-box', spacing=20)
-            package_label = c.button(package[0], style='minimal', length=25)
-            if manager in urls:
-                package_label.connect(
-                    'clicked', click_link, f'{urls[manager]}{package[0]}')
-            package_box.append(package_label)
-            package_box.append(
-                c.label(package[1], style='green-fg', ha='end', he=True, length=15))
-            packages_box.append(package_box)
-            if package != packages[-1]:
-                packages_box.append(c.sep('h'))
+        content_box = c.box('v', spacing=20)
 
-        manager_box.append(packages_box)
-        content_box.append(manager_box)
+        for manager, info in data['managers'].items():
+            packages = info['packages']
+            if not packages:
+                continue
+            manager_box = c.box('v', spacing=10)
+            heading = c.label(
+                f"{manager} ({len(packages)} updates)",
+                style='title', ha='start')
+            manager_box.append(heading)
+            packages_box = c.box('v', style='box')
 
-    scroll_box = c.scroll(height=400, style='scroll')
-    scroll_box.set_overflow(Gtk.Overflow.HIDDEN)
-    scroll_box.set_child(content_box)
-    main_box.append(scroll_box)
+            for package in packages:
+                package_box = c.box('h', style='inner-box', spacing=20)
+                package_label = c.button(
+                    package[0], style='minimal', length=25)
+                if manager in urls:
+                    package_label.connect(
+                        'clicked', self.click_link,
+                        f'{urls[manager]}{package[0]}')
+                package_box.append(package_label)
+                package_box.append(
+                    c.label(
+                        package[1], style='green-fg', ha='end', he=True,
+                        length=15))
+                packages_box.append(package_box)
+                if package != packages[-1]:
+                    packages_box.append(c.sep('h'))
 
-    if data['total']:
-        update_button = c.button(' Update all', style='normal')
-        update_button.connect('clicked', update_packages)
-        main_box.append(update_button)
+            manager_box.append(packages_box)
+            content_box.append(manager_box)
 
-    return main_box
+        scroll_box = c.scroll(height=400, style='scroll')
+        scroll_box.set_overflow(Gtk.Overflow.HIDDEN)
+        scroll_box.set_child(content_box)
+        main_box.append(scroll_box)
+
+        if data['total']:
+            update_button = c.button(' Update all', style='normal')
+            update_button.connect(
+                'clicked', self.update_packages, data, widget)
+            main_box.append(update_button)
+
+        return main_box
+
+    def create_widget(self, bar):
+        m = c.Module()
+        m.set_position(bar.position)
+        m.set_visible(False)
+
+        c.state_manager.subscribe(
+            self.name, lambda data: self.update_ui(m, data))
+        return m
+
+    def update_ui(self, widget, data):
+        if not data:
+            widget.set_visible(False)
+            return
+        total = data.get('total', 0)
+        widget.set_label(data.get('text', ''))
+        widget.set_visible(bool(total))
+
+        if not widget.get_active():
+            widget.set_widget(self.build_popover(widget, data))
+
+
+module_map = {
+    'updates': Updates
+}

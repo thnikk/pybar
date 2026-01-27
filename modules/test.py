@@ -8,27 +8,39 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
-# Global counter for test
-counter = 0
 
-def fetch_data(config):
-    global counter
-    counter += 1
-    return {"text": str(counter), "val": counter}
+class Test(c.BaseModule):
+    def __init__(self, name, config):
+        super().__init__(name, config)
+        self.counter = 0
 
-def create_widget(bar, config):
-    module = c.Module()
-    module.set_position(bar.position)
-    module.set_icon('')
-    return module
+    def fetch_data(self):
+        self.counter += 1
+        return {"text": str(self.counter), "val": self.counter}
 
-def update_ui(module, data):
-    module.set_label(data['text'])
-    if not module.get_active():
-        module.set_widget(build_popover(data))
+    def build_popover(self, data):
+        box = c.box('v', spacing=10, style='small-widget')
+        box.append(c.label('Test Module', style='heading'))
+        box.append(c.label(f"Counter: {data['val']}", style='title'))
+        return box
 
-def build_popover(data):
-    box = c.box('v', spacing=10, style='small-widget')
-    box.append(c.label('Test Module', style='heading'))
-    box.append(c.label(f"Counter: {data['val']}", style='title'))
-    return box
+    def create_widget(self, bar):
+        m = c.Module()
+        m.set_position(bar.position)
+        m.set_icon('')
+
+        c.state_manager.subscribe(
+            self.name, lambda data: self.update_ui(m, data))
+        return m
+
+    def update_ui(self, widget, data):
+        if not data:
+            return
+        widget.set_label(data.get('text', ''))
+        if not widget.get_active():
+            widget.set_widget(self.build_popover(data))
+
+
+module_map = {
+    'test': Test
+}

@@ -4,6 +4,9 @@ Description: Helper functions
 Author: thnikk
 """
 import inspect
+import os
+import json
+import time
 from datetime import datetime
 import sys
 import gi
@@ -25,6 +28,7 @@ align_map = align
 
 class Graph(Gtk.DrawingArea):
     """ Smooth history graph """
+
     def __init__(
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=True,
@@ -60,11 +64,11 @@ class Graph(Gtk.DrawingArea):
         width = self.get_width()
         if width <= 0:
             return
-            
+
         # Handle multi-series data
         series = self.data[0] if isinstance(self.data[0], list) else self.data
         num_points = len(series)
-        
+
         idx = round((x / width) * (num_points - 1))
         idx = max(0, min(idx, num_points - 1))
         if idx != self.hover_index:
@@ -86,11 +90,11 @@ class Graph(Gtk.DrawingArea):
             xi, yi = pi
             xj, yj = pj
             return ((xj - xi)**2 + (yj - yi)**2)**0.5**alpha + ti
-        
+
         t0, t1 = 0, tj(0, p0, p1)
         t2 = tj(t1, p1, p2)
         t3 = tj(t2, p2, p3)
-        
+
         # Handle edge cases where points are too close
         if abs(t2 - t1) < 1e-6:
             return p1
@@ -98,47 +102,55 @@ class Graph(Gtk.DrawingArea):
             t0 = t1 - 0.1  # Small offset to prevent division by zero
         if abs(t3 - t2) < 1e-6:
             t3 = t2 + 0.1  # Small offset to prevent division by zero
-        
+
         # Normalize t to [t1, t2] range
         t_norm = t1 + t * (t2 - t1)
-        
+
         # Calculate interpolation with safe division
         def safe_div(num, denom):
             return num / denom if abs(denom) > 1e-6 else 0
-        
-        A1 = [safe_div(t1 - t_norm, t1 - t0) * p0[i] + safe_div(t_norm - t0, t1 - t0) * p1[i] for i in (0, 1)]
-        A2 = [safe_div(t2 - t_norm, t2 - t1) * p1[i] + safe_div(t_norm - t1, t2 - t1) * p2[i] for i in (0, 1)]
-        A3 = [safe_div(t3 - t_norm, t3 - t2) * p2[i] + safe_div(t_norm - t2, t3 - t2) * p3[i] for i in (0, 1)]
-        
-        B1 = [safe_div(t2 - t_norm, t2 - t0) * A1[i] + safe_div(t_norm - t0, t2 - t0) * A2[i] for i in (0, 1)]
-        B2 = [safe_div(t3 - t_norm, t3 - t1) * A2[i] + safe_div(t_norm - t1, t3 - t1) * A3[i] for i in (0, 1)]
-        
-        C = [safe_div(t2 - t_norm, t2 - t1) * B1[i] + safe_div(t_norm - t1, t2 - t1) * B2[i] for i in (0, 1)]
-        
+
+        A1 = [safe_div(t1 - t_norm, t1 - t0) * p0[i] +
+              safe_div(t_norm - t0, t1 - t0) * p1[i] for i in (0, 1)]
+        A2 = [safe_div(t2 - t_norm, t2 - t1) * p1[i] +
+              safe_div(t_norm - t1, t2 - t1) * p2[i] for i in (0, 1)]
+        A3 = [safe_div(t3 - t_norm, t3 - t2) * p2[i] +
+              safe_div(t_norm - t2, t3 - t2) * p3[i] for i in (0, 1)]
+
+        B1 = [safe_div(t2 - t_norm, t2 - t0) * A1[i] +
+              safe_div(t_norm - t0, t2 - t0) * A2[i] for i in (0, 1)]
+        B2 = [safe_div(t3 - t_norm, t3 - t1) * A2[i] +
+              safe_div(t_norm - t1, t3 - t1) * A3[i] for i in (0, 1)]
+
+        C = [safe_div(t2 - t_norm, t2 - t1) * B1[i] +
+             safe_div(t_norm - t1, t2 - t1) * B2[i] for i in (0, 1)]
+
         return tuple(C)
 
     def _draw_catmull_rom_spline(self, cr, points, n_points_per_segment=30):
         """Draw smooth Catmull-Rom spline through points"""
         if len(points) < 2:
             return
-        
+
         if len(points) == 2:
             # Simple line for 2 points
             cr.move_to(points[0][0], points[0][1])
             cr.line_to(points[1][0], points[1][1])
             return
-        
+
         # Create extended points with better ghost points for boundaries
         if len(points) >= 3:
             # Better ghost points: reflect first/last points
-            p0 = (2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1])
-            p_last = (2 * points[-1][0] - points[-2][0], 2 * points[-1][1] - points[-2][1])
-            
+            p0 = (2 * points[0][0] - points[1][0],
+                  2 * points[0][1] - points[1][1])
+            p_last = (2 * points[-1][0] - points[-2][0],
+                      2 * points[-1][1] - points[-2][1])
+
             extended_points = [
                 p0,          # Ghost point at start (reflected)
                 points[0],   # First actual point
                 *points[1:-1],  # Middle points
-                points[-1],  # Last actual point  
+                points[-1],  # Last actual point
                 p_last       # Ghost point at end (reflected)
             ]
         else:
@@ -148,16 +160,18 @@ class Graph(Gtk.DrawingArea):
             p0 = (points[0][0] - dx, points[0][1] - dy)
             p3 = (points[1][0] + dx, points[1][1] + dy)
             extended_points = [p0, points[0], points[1], p3]
-        
+
         # Draw the spline
         first_segment = True
         for i in range(len(extended_points) - 3):
-            p0, p1, p2, p3 = extended_points[i], extended_points[i+1], extended_points[i+2], extended_points[i+3]
-            
+            p0, p1, p2, p3 = extended_points[i], extended_points[i +
+                                                                 1], extended_points[i+2], extended_points[i+3]
+
             for j in range(n_points_per_segment):
-                t = j / (n_points_per_segment - 1) if n_points_per_segment > 1 else 0
+                t = j / (n_points_per_segment -
+                         1) if n_points_per_segment > 1 else 0
                 point = self._catmull_rom_point(p0, p1, p2, p3, t, alpha=0.5)
-                
+
                 if first_segment and j == 0:
                     cr.move_to(point[0], point[1])
                     first_segment = False
@@ -167,7 +181,7 @@ class Graph(Gtk.DrawingArea):
     def on_draw(self, area, cr, width, height, *args):
         if not self.data:
             return
-            
+
         # Handle both single series and multi-series
         is_multi = isinstance(self.data[0], list)
         series_list = self.data if is_multi else [self.data]
@@ -181,9 +195,11 @@ class Graph(Gtk.DrawingArea):
         all_vals = []
         for s in series_list:
             all_vals.extend(s)
-            
-        min_val = self.min_config if self.min_config is not None else min(all_vals)
-        max_val = self.max_config if self.max_config is not None else max(all_vals)
+
+        min_val = self.min_config if self.min_config is not None else min(
+            all_vals)
+        max_val = self.max_config if self.max_config is not None else max(
+            all_vals)
         range_val = max_val - min_val if max_val != min_val else 1
 
         def get_coords(i, series):
@@ -208,11 +224,12 @@ class Graph(Gtk.DrawingArea):
         # Draw each series
         for s_idx, series in enumerate(series_list):
             color = self.colors[s_idx % len(self.colors)]
-            
+
             cr.new_path()
             if self.smooth:
                 points = [get_coords(i, series) for i in range(len(series))]
-                self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
+                self._draw_catmull_rom_spline(
+                    cr, points, n_points_per_segment=25)
             else:
                 x0, y0 = get_coords(0, series)
                 cr.move_to(x0, y0)
@@ -235,7 +252,8 @@ class Graph(Gtk.DrawingArea):
             cr.close_path()
 
             linpat = cairo.LinearGradient(0, 0, 0, h)
-            linpat.add_color_stop_rgba(0, color[0], color[1], color[2], fill_opacity)
+            linpat.add_color_stop_rgba(
+                0, color[0], color[1], color[2], fill_opacity)
             linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
             cr.set_source(linpat)
             cr.fill()
@@ -245,18 +263,20 @@ class Graph(Gtk.DrawingArea):
             s_series = self.secondary_data
             s_min, s_max = 0, 100
             s_range = 100
-            
+
             def get_s_coords(i):
                 x = (i / (len(s_series) - 1)) * w
                 val = s_series[i]
                 y = 10 + (h - 20) - ((val - s_min) / s_range) * (h - 20)
                 return x, y
-            
-            s_color = self.colors[1] if len(self.colors) > 1 else (0.2, 0.5, 0.8)
+
+            s_color = self.colors[1] if len(
+                self.colors) > 1 else (0.2, 0.5, 0.8)
             cr.new_path()
             if self.smooth:
                 points = [get_s_coords(i) for i in range(len(s_series))]
-                self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
+                self._draw_catmull_rom_spline(
+                    cr, points, n_points_per_segment=25)
             else:
                 x0, y0 = get_s_coords(0)
                 cr.move_to(x0, y0)
@@ -274,18 +294,21 @@ class Graph(Gtk.DrawingArea):
             cr.set_line_width(1)
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.6)
             cr.set_dash([2, 2])
-            
+
             num_points = len(series_list[0])
-            for i, (marker_pos, label) in enumerate(zip(self.time_markers, self.time_labels)):
+            for i, (marker_pos, label) in enumerate(
+                    zip(self.time_markers, self.time_labels)):
                 if 0 <= marker_pos <= num_points - 1:
                     x = (marker_pos / (num_points - 1)) * w
                     cr.move_to(x, 0)
                     cr.line_to(x, h)
                     cr.stroke()
-                    
+
                     cr.set_dash([])
                     cr.set_source_rgba(0.5, 0.5, 0.5, 0.8)
-                    cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                    cr.select_font_face(
+                        "Nunito", cairo.FONT_SLANT_NORMAL,
+                        cairo.FONT_WEIGHT_NORMAL)
                     cr.set_font_size(9)
                     text_extents = cr.text_extents(label)
                     text_x = x - text_extents.width / 2
@@ -297,8 +320,10 @@ class Graph(Gtk.DrawingArea):
 
         # Draw Legend (Min/Max values)
         legend_color = (0.56, 0.63, 0.75)
-        cr.set_source_rgba(legend_color[0], legend_color[1], legend_color[2], 0.5)
-        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_source_rgba(
+            legend_color[0], legend_color[1], legend_color[2], 0.5)
+        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL,
+                            cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(10)
         cr.move_to(5, 15)
         cr.show_text(f"{max_val:.1f}")
@@ -320,10 +345,14 @@ class Graph(Gtk.DrawingArea):
             bg_h = extents.height + padding * 2
             cr.set_source_rgba(0, 0, 0, 0.4)
             cr.new_sub_path()
-            cr.arc(bg_x + radius, bg_y + radius, radius, math.pi, 3 * math.pi / 2)
-            cr.arc(bg_x + bg_w - radius, bg_y + radius, radius, 3 * math.pi / 2, 2 * math.pi)
-            cr.arc(bg_x + bg_w - radius, bg_y + bg_h - radius, radius, 0, math.pi / 2)
-            cr.arc(bg_x + radius, bg_y + bg_h - radius, radius, math.pi / 2, math.pi)
+            cr.arc(bg_x + radius, bg_y + radius,
+                   radius, math.pi, 3 * math.pi / 2)
+            cr.arc(bg_x + bg_w - radius, bg_y + radius,
+                   radius, 3 * math.pi / 2, 2 * math.pi)
+            cr.arc(bg_x + bg_w - radius, bg_y + bg_h -
+                   radius, radius, 0, math.pi / 2)
+            cr.arc(bg_x + radius, bg_y + bg_h - radius,
+                   radius, math.pi / 2, math.pi)
             cr.close_path()
             cr.fill()
             cr.set_source_rgb(1, 1, 1)
@@ -335,7 +364,8 @@ class Graph(Gtk.DrawingArea):
             num_points = len(series_list[0])
             x = (self.hover_index / (num_points - 1)) * w
             hover_color = (0.56, 0.63, 0.75)
-            cr.set_source_rgba(hover_color[0], hover_color[1], hover_color[2], 0.8)
+            cr.set_source_rgba(
+                hover_color[0], hover_color[1], hover_color[2], 0.8)
             cr.set_line_width(1)
             cr.move_to(x, 0)
             cr.line_to(x, h)
@@ -345,7 +375,7 @@ class Graph(Gtk.DrawingArea):
                 label_text = str(self.hover_labels[self.hover_index])
                 lines = label_text.split('\n')
                 cr.set_font_size(11)
-                
+
                 max_w = 0
                 total_h = 0
                 line_extents = []
@@ -354,23 +384,24 @@ class Graph(Gtk.DrawingArea):
                     max_w = max(max_w, ext.width)
                     line_extents.append(ext)
                     total_h += ext.height + 4
-                total_h -= 4 # remove last spacing
-                
+                total_h -= 4  # remove last spacing
+
                 lx = x - max_w / 2
-                ly = 45 # slightly lower to avoid legend
+                ly = 45  # slightly lower to avoid legend
                 lx = max(5, min(lx, w - max_w - 5))
                 pad = 6
-                
+
                 cr.set_source_rgba(0, 0, 0, 0.8)
                 cr.rectangle(
                     lx - pad, ly - total_h - pad,
                     max_w + pad * 2, total_h + pad * 2)
                 cr.fill()
-                
+
                 cr.set_source_rgb(1, 1, 1)
                 current_y = ly - total_h + line_extents[0].height
                 for i, line in enumerate(lines):
-                    cr.move_to(lx + (max_w - line_extents[i].width) / 2, current_y)
+                    cr.move_to(
+                        lx + (max_w - line_extents[i].width) / 2, current_y)
                     cr.show_text(line)
                     if i < len(lines) - 1:
                         current_y += line_extents[i+1].height + 4
@@ -401,24 +432,125 @@ class StateManager:
 state_manager = StateManager()
 
 
+class BaseModule:
+    def __init__(self, name, config):
+        self.name = name
+        self.config = config
+        self.interval = config.get('interval', 60)
+        self.cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
+        self.last_data = None
+        self.is_hass = name.startswith('hass') or \
+            config.get('type', '').startswith('hass')
+
+    def fetch_data(self):
+        """Override this to fetch data for the module"""
+        return {}
+
+    def run_worker(self):
+        """Standard worker loop with caching"""
+        first_run = True
+        while True:
+            data = None
+            if first_run and not self.is_hass and \
+                    os.path.exists(self.cache_path):
+                try:
+                    with open(self.cache_path, 'r') as f:
+                        cached = json.load(f)
+                    if cached:
+                        self.last_data = cached
+                        stale_init = cached.copy()
+                        stale_init['stale'] = True
+                        stale_init['timestamp'] = datetime.now().timestamp()
+                        state_manager.update(self.name, stale_init)
+                        print_debug(
+                            f"Loaded {self.name} from cache", color='green')
+                except Exception as e:
+                    print_debug(
+                        f"Failed to load cache for {self.name}: {e}",
+                        color='red')
+
+            try:
+                new_data = self.fetch_data()
+                if new_data:
+                    data = new_data
+                    self.last_data = data
+                    if not self.is_hass:
+                        try:
+                            os.makedirs(
+                                os.path.dirname(self.cache_path),
+                                exist_ok=True)
+                            with open(self.cache_path, 'w') as f:
+                                json.dump(data, f)
+                        except Exception as e:
+                            print_debug(
+                                f"Failed to save cache for {self.name}: {e}",
+                                color='red')
+                else:
+                    if self.last_data:
+                        data = self.last_data.copy()
+                        data['stale'] = True
+            except Exception as e:
+                print_debug(f"Worker {self.name} failed: {e}", color='red')
+                if self.last_data:
+                    data = self.last_data.copy()
+                    data['stale'] = True
+
+            if data:
+                if isinstance(data, dict):
+                    data['timestamp'] = datetime.now().timestamp()
+                state_manager.update(self.name, data)
+
+            first_run = False
+            if self.interval <= 0:
+                break
+            time.sleep(self.interval)
+
+    def create_widget(self, bar):
+        """Create the GTK widget for the bar"""
+        m = Module()
+        m.set_position(bar.position)
+        state_manager.subscribe(
+            self.name, lambda data: self.update_ui(m, data))
+        return m
+
+    def update_ui(self, widget, data):
+        """Update the UI with new data"""
+        if not data:
+            return
+        if 'text' in data:
+            widget.set_label(data['text'])
+            widget.set_visible(bool(data['text']))
+        if 'icon' in data:
+            widget.set_icon(data['icon'])
+        if 'tooltip' in data:
+            widget.set_tooltip_text(str(data['tooltip']))
+
+        widget.reset_style()
+        if 'class' in data:
+            add_style(widget, data['class'])
+        if data.get('stale'):
+            add_style(widget, 'stale')
+
+
 class Module(Gtk.MenuButton):
     """ Template module """
+
     def __init__(self, icon=True, text=True):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
         self.get_style_context().add_class('module')
         self.set_cursor_from_name("pointer")
         self.added_styles = []
-        
+
         self.con = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.indicator = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         self.indicator.get_style_context().add_class('indicator')
         self.indicator_added_styles = []
-        
+
         self.box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.box.set_vexpand(True)
         self.box.set_halign(Gtk.Align.CENTER)
-        
+
         self.con.append(self.box)
         self.con.append(self.indicator)
         self.set_child(self.con)
@@ -443,7 +575,7 @@ class Module(Gtk.MenuButton):
         right_click.set_button(3)
         right_click.connect("pressed", self._on_right_click)
         self.add_controller(right_click)
-        
+
         self.debug_window = None
 
         state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
@@ -488,7 +620,7 @@ class Module(Gtk.MenuButton):
             if child.get_visible():
                 count += 1
             child = child.get_next_sibling()
-        
+
         # Set spacing if more than one child is visible
         self.box.set_spacing(5 if count > 1 else 0)
 
@@ -563,10 +695,10 @@ class Module(Gtk.MenuButton):
         popover = self.get_popover()
         if not popover or not isinstance(popover, Widget):
             return
-            
+
         # Claim sequence to prevent other handlers
         gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-        
+
         self.detach_widget(popover)
 
     def detach_widget(self, popover):
@@ -583,29 +715,29 @@ class Module(Gtk.MenuButton):
 
         # Hide popover first to avoid state confusion
         popover.popdown()
-        
+
         # Store ref
         self.detached_content = content
-        
+
         # Unparent content (remove from popover.box)
         content.unparent()
-            
+
         # Wrap in styled box to match popover theme
         wrapper = Gtk.Box()
         wrapper.get_style_context().add_class("popover-content")
         wrapper.append(content)
-        
+
         # Create window
         self.debug_window = Gtk.Window(title="Debug Module")
         self.debug_window.set_default_size(300, 200)
         self.debug_window.set_child(wrapper)
-        
+
         def on_close(win):
             self.restore_widget(popover)
             self.debug_window = None
             self.detached_content = None
-            return False # Destroy window
-            
+            return False  # Destroy window
+
         self.debug_window.connect("close-request", on_close)
         self.debug_window.present()
 
@@ -615,14 +747,15 @@ class Module(Gtk.MenuButton):
             return
 
         content = self.detached_content
-        
+
         # Unparent the box from wherever it is (window or wrapper)
         parent = content.get_parent()
         if parent:
             parent.remove(content)
-            
+
         # Re-attach to popover.box
         popover.box.append(content)
+
 
 def handle_popover_edge(popover):
     """ Check if a popover is close to the screen edge and flatten corners """
@@ -652,7 +785,7 @@ def handle_popover_edge(popover):
     popover.remove_css_class("edge-right")
     popover.remove_css_class("pos-top")
     popover.remove_css_class("pos-bottom")
-    
+
     popover.add_css_class(f"pos-{bar_pos}")
 
     # Threshold: only flatten if the module itself is near the edge
@@ -668,6 +801,7 @@ def handle_popover_edge(popover):
 
 class Widget(Gtk.Popover):
     """ Template widget"""
+
     def __init__(self):
         super().__init__()
         self.set_position(Gtk.PositionType.TOP)
@@ -698,7 +832,8 @@ def print_debug(msg, name=None, color=None) -> None:
 def box(orientation, spacing=0, style=None):
     """ Create box """
     obox = Gtk.Box(
-        orientation=Gtk.Orientation.VERTICAL if orientation == 'v' else Gtk.Orientation.HORIZONTAL,
+        orientation=Gtk.Orientation.VERTICAL if orientation == 'v'
+        else Gtk.Orientation.HORIZONTAL,
         spacing=spacing
     )
     if style:
@@ -753,14 +888,17 @@ def button(label=None, style=None, ha=None, length=None):
 def sep(orientation, style=None):
     """ Separator """
     separator = Gtk.Separator(
-        orientation=Gtk.Orientation.VERTICAL if orientation == 'v' else Gtk.Orientation.HORIZONTAL
+        orientation=Gtk.Orientation.VERTICAL
+        if orientation == 'v' else Gtk.Orientation.HORIZONTAL
     )
     if style:
         separator.get_style_context().add_class(style)
     return separator
 
 
-def label(input_text, style=None, va=None, ha=None, he=False, wrap=None, length=None):
+def label(
+        input_text, style=None, va=None, ha=None,
+        he=False, wrap=None, length=None):
     """ Create label """
     text = Gtk.Label(label=str(input_text))
     if style:
@@ -790,7 +928,8 @@ def slider(value, min=0, max=100, style=None, scrollable=True):
         widget.get_style_context().add_class(style)
 
     if not scrollable:
-        scroll_controller = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll_controller = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL)
         scroll_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
 
         def on_scroll(controller, dx, dy):
@@ -826,7 +965,7 @@ def image(file_path=None, style=None, width=None, height=None):
         widget = Gtk.Picture.new_for_filename(file_path)
     else:
         widget = Gtk.Picture.new()
-    
+
     if style:
         widget.get_style_context().add_class(style)
     if width:
