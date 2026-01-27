@@ -25,7 +25,7 @@ def create_widget(bar, config):
     return module
 
 def update_ui(module, data):
-    module.text.set_label(data['text'])
+    module.set_label(data['text'])
     module.set_visible(bool(data['text']))
     if not module.get_active():
         module.set_widget(build_popover(data))

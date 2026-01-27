@@ -43,15 +43,15 @@ def fetch_data(config):
 def create_widget(bar, config):
     module = c.Module()
     module.set_position(bar.position)
-    module.text.set_label(config.get('label', 'Docker'))
+    module.set_label(config.get('label', 'Docker'))
     return module
 
 def update_ui(module, data):
     if data['running']:
-        module.icon.set_label('')
+        module.set_icon('')
         c.add_style(module.indicator, 'green')
     else:
-        module.icon.set_label('')
+        module.set_icon('')
         module.reset_style()
         
     if not module.get_active():

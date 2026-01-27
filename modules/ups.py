@@ -88,7 +88,7 @@ def create_widget(bar, config):
     return module
 
 def update_ui(module, data):
-    module.text.set_label(data['text'])
+    module.set_label(data['text'])
     module.reset_style()
     if data.get('class'):
         c.add_style(module, data['class'])

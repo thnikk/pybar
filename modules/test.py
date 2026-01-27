@@ -19,11 +19,11 @@ def fetch_data(config):
 def create_widget(bar, config):
     module = c.Module()
     module.set_position(bar.position)
-    module.icon.set_label('')
+    module.set_icon('')
     return module
 
 def update_ui(module, data):
-    module.text.set_label(data['text'])
+    module.set_label(data['text'])
     if not module.get_active():
         module.set_widget(build_popover(data))
 

@@ -38,9 +38,7 @@ module_map = {
     'xdrip': 'modules.xdrip',
     'network': 'modules.network',
     'hass': 'modules.hass',
-    'sales': 'modules.sales',
     'power_supply': 'modules.power_supply',
-    'obs': 'modules.obs',
     'resin': 'modules.resin',
     'systemd': 'modules.systemd',
     'transmission': 'modules.transmission',
@@ -49,18 +47,20 @@ module_map = {
     'debug': 'modules.debug',
 }
 
+
 def start_worker(name, config):
     """Start a background worker for a module"""
     module_type = config.get('type', name)
-    c.print_debug(f"Starting worker for {name} (type: {module_type})", color='cyan')
-    
+    c.print_debug(
+        f"Starting worker for {name} (type: {module_type})", color='cyan')
+
     # Try to load the module
     try:
         if module_type in module_map:
             mod = importlib.import_module(module_map[module_type])
             if hasattr(mod, 'run_worker'):
                 thread = threading.Thread(
-                    target=mod.run_worker, 
+                    target=mod.run_worker,
                     args=(name, config),
                     daemon=True
                 )
@@ -68,7 +68,7 @@ def start_worker(name, config):
                 return
             elif hasattr(mod, 'fetch_data'):
                 thread = threading.Thread(
-                    target=generic_worker, 
+                    target=generic_worker,
                     args=(name, config, mod.fetch_data),
                     daemon=True
                 )
@@ -86,6 +86,7 @@ def start_worker(name, config):
         )
         thread.start()
 
+
 def generic_worker(name, config, fetch_func):
     """Worker that calls a python fetch_data function"""
     interval = config.get('interval', 60)
@@ -97,7 +98,7 @@ def generic_worker(name, config, fetch_func):
     first_run = True
     while True:
         data = None
-        
+
         # Check cache on startup
         if first_run and not is_hass and os.path.exists(cache_path):
             try:
@@ -112,7 +113,8 @@ def generic_worker(name, config, fetch_func):
                     c.state_manager.update(name, stale_init)
                     c.print_debug(f"Loaded {name} from cache", color='green')
             except Exception as e:
-                c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+                c.print_debug(
+                    f"Failed to load cache for {name}: {e}", color='red')
 
         try:
             new_data = fetch_func(config)
@@ -125,7 +127,9 @@ def generic_worker(name, config, fetch_func):
                         with open(cache_path, 'w') as f:
                             json.dump(data, f)
                     except Exception as e:
-                        c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
+                        c.print_debug(
+                            f"Failed to save cache for {name}: {e}",
+                            color='red')
             else:
                 # If fetch fails, use last successful data
                 if last_data:
@@ -136,14 +140,15 @@ def generic_worker(name, config, fetch_func):
             if last_data:
                 data = last_data.copy()
                 data['stale'] = True
-        
+
         if data:
             if isinstance(data, dict):
                 data['timestamp'] = datetime.now().timestamp()
             c.state_manager.update(name, data)
-        
+
         first_run = False
         time.sleep(interval)
+
 
 def command_worker(name, config):
     """Worker for waybar-style command modules"""
@@ -156,7 +161,7 @@ def command_worker(name, config):
     first_run = True
     while True:
         data = None
-        
+
         # Check cache on startup
         if first_run and not is_hass and os.path.exists(cache_path):
             try:
@@ -171,11 +176,13 @@ def command_worker(name, config):
                     c.state_manager.update(name, stale_init)
                     c.print_debug(f"Loaded {name} from cache", color='green')
             except Exception as e:
-                c.print_debug(f"Failed to load cache for {name}: {e}", color='red')
+                c.print_debug(
+                    f"Failed to load cache for {name}: {e}", color='red')
 
         command = [os.path.expanduser(arg) for arg in config['command']]
         try:
-            output = run(command, check=True, capture_output=True).stdout.decode()
+            output = run(command, check=True,
+                         capture_output=True).stdout.decode()
             new_data = json.loads(output)
             if new_data:
                 data = new_data
@@ -186,7 +193,9 @@ def command_worker(name, config):
                         with open(cache_path, 'w') as f:
                             json.dump(data, f)
                     except Exception as e:
-                        c.print_debug(f"Failed to save cache for {name}: {e}", color='red')
+                        c.print_debug(
+                            f"Failed to save cache for {name}: {e}",
+                            color='red')
             else:
                 if last_data:
                     data = last_data.copy()
@@ -196,14 +205,15 @@ def command_worker(name, config):
             if last_data:
                 data = last_data.copy()
                 data['stale'] = True
-        
+
         if data:
             if isinstance(data, dict):
                 data['timestamp'] = datetime.now().timestamp()
             c.state_manager.update(name, data)
-        
+
         first_run = False
         time.sleep(interval)
+
 
 def module(bar, name, config):
     """Factory to create a module and subscribe it to updates"""
@@ -212,7 +222,7 @@ def module(bar, name, config):
 
     # Some modules might still want to be completely custom (like workspaces)
     # but for most, we want a standard Module that updates its UI.
-    
+
     try:
         if module_type in module_map:
             mod = importlib.import_module(module_map[module_type])
@@ -221,7 +231,9 @@ def module(bar, name, config):
                 c.print_debug(f"Creating widget for {name}", color='cyan')
                 m = mod.create_widget(bar, module_config)
                 if hasattr(mod, 'update_ui'):
-                    c.print_debug(f"Subscribing {name} to state updates", color='cyan')
+                    c.print_debug(
+                        f"Subscribing {name} to state updates", color='cyan')
+
                     def update_wrapper(data):
                         mod.update_ui(m, data)
                         if data.get('stale'):
@@ -239,7 +251,7 @@ def module(bar, name, config):
     # Generic fallback for command modules or unknown types
     m = c.Module()
     m.set_position(bar.position)
-    
+
     def generic_update(data):
         if 'text' in data:
             m.set_label(data['text'])
@@ -254,6 +266,6 @@ def module(bar, name, config):
             c.add_style(m, data['class'])
         if data.get('stale'):
             c.add_style(m, 'stale')
-            
+
     c.state_manager.subscribe(name, generic_update)
     return m
