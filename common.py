@@ -708,6 +708,9 @@ def box(orientation, spacing=0, style=None):
 
 def add_style(widget, style):
     """ Add style to widget """
+    if hasattr(widget, 'add_style'):
+        widget.add_style(style)
+        return
     if isinstance(style, list):
         for item in style:
             widget.get_style_context().add_class(item)
@@ -717,6 +720,9 @@ def add_style(widget, style):
 
 def del_style(widget, style):
     """ Remove style from widget """
+    if hasattr(widget, 'del_style'):
+        widget.del_style(style)
+        return
     if isinstance(style, list):
         for item in style:
             widget.get_style_context().remove_class(item)

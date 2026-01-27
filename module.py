@@ -225,9 +225,9 @@ def module(bar, name, config):
                     def update_wrapper(data):
                         mod.update_ui(m, data)
                         if data.get('stale'):
-                            m.add_style('stale')
+                            c.add_style(m, 'stale')
                         else:
-                            m.del_style('stale')
+                            c.del_style(m, 'stale')
                     c.state_manager.subscribe(name, update_wrapper)
                 return m
             elif hasattr(mod, 'module'):
@@ -253,7 +253,7 @@ def module(bar, name, config):
         if 'class' in data:
             c.add_style(m, data['class'])
         if data.get('stale'):
-            m.add_style('stale')
+            c.add_style(m, 'stale')
             
     c.state_manager.subscribe(name, generic_update)
     return m
