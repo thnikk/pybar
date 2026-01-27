@@ -29,12 +29,13 @@ class Graph(Gtk.DrawingArea):
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=True,
             time_markers=None, time_labels=None, hover_labels=None,
-            colors=None):
+            colors=None, secondary_data=None):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
         self.set_hexpand(True)
         self.data = data
+        self.secondary_data = secondary_data
         self.state = state
         self.unit = unit
         self.smooth = smooth
@@ -43,7 +44,7 @@ class Graph(Gtk.DrawingArea):
         self.time_markers = time_markers or []
         self.time_labels = time_labels or []
         self.hover_labels = hover_labels or []
-        self.colors = colors or [(0.56, 0.63, 0.75)]
+        self.colors = colors or [(0.56, 0.63, 0.75), (0.2, 0.5, 0.8)]
         self.hover_index = -1
         self.set_draw_func(self.on_draw)
 
@@ -239,6 +240,35 @@ class Graph(Gtk.DrawingArea):
             cr.set_source(linpat)
             cr.fill()
 
+        # Draw secondary data (humidity)
+        if self.secondary_data:
+            s_series = self.secondary_data
+            s_min, s_max = 0, 100
+            s_range = 100
+            
+            def get_s_coords(i):
+                x = (i / (len(s_series) - 1)) * w
+                val = s_series[i]
+                y = 10 + (h - 20) - ((val - s_min) / s_range) * (h - 20)
+                return x, y
+            
+            s_color = self.colors[1] if len(self.colors) > 1 else (0.2, 0.5, 0.8)
+            cr.new_path()
+            if self.smooth:
+                points = [get_s_coords(i) for i in range(len(s_series))]
+                self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
+            else:
+                x0, y0 = get_s_coords(0)
+                cr.move_to(x0, y0)
+                for i in range(len(s_series) - 1):
+                    x1, y1 = get_s_coords(i)
+                    x2, y2 = get_s_coords(i + 1)
+                    cr.line_to(x2, y2)
+
+            cr.set_line_width(1)
+            cr.set_source_rgba(s_color[0], s_color[1], s_color[2], 0.5)
+            cr.stroke()
+
         # Draw time marker lines
         if self.time_markers and self.time_labels:
             cr.set_line_width(1)
@@ -312,21 +342,38 @@ class Graph(Gtk.DrawingArea):
             cr.stroke()
 
             if self.hover_index < len(self.hover_labels):
-                label_text = f"{self.hover_labels[self.hover_index]}"
+                label_text = str(self.hover_labels[self.hover_index])
+                lines = label_text.split('\n')
                 cr.set_font_size(11)
-                extents = cr.text_extents(label_text)
-                lx = x - extents.width / 2
-                ly = 30
-                lx = max(5, min(lx, w - extents.width - 5))
-                pad = 4
-                cr.set_source_rgba(0, 0, 0, 0.7)
+                
+                max_w = 0
+                total_h = 0
+                line_extents = []
+                for line in lines:
+                    ext = cr.text_extents(line)
+                    max_w = max(max_w, ext.width)
+                    line_extents.append(ext)
+                    total_h += ext.height + 4
+                total_h -= 4 # remove last spacing
+                
+                lx = x - max_w / 2
+                ly = 45 # slightly lower to avoid legend
+                lx = max(5, min(lx, w - max_w - 5))
+                pad = 6
+                
+                cr.set_source_rgba(0, 0, 0, 0.8)
                 cr.rectangle(
-                    lx - pad, ly - extents.height - pad,
-                    extents.width + pad * 2, extents.height + pad * 2)
+                    lx - pad, ly - total_h - pad,
+                    max_w + pad * 2, total_h + pad * 2)
                 cr.fill()
+                
                 cr.set_source_rgb(1, 1, 1)
-                cr.move_to(lx, ly)
-                cr.show_text(label_text)
+                current_y = ly - total_h + line_extents[0].height
+                for i, line in enumerate(lines):
+                    cr.move_to(lx + (max_w - line_extents[i].width) / 2, current_y)
+                    cr.show_text(line)
+                    if i < len(lines) - 1:
+                        current_y += line_extents[i+1].height + 4
 
 
 class StateManager:

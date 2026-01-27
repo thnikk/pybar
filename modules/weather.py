@@ -184,6 +184,9 @@ def fetch_data(config):
                 "temperatures": [
                     round(w['hourly']['temperature_2m'][now.hour + h])
                     for h in range(hours_to_show + 1)],
+                "humidities": [
+                    round(w['hourly']['relativehumidity_2m'][now.hour + h])
+                    for h in range(hours_to_show + 1)],
                 "hours": hours_to_show,
                 "min": config.get('min'),
                 "max": config.get('max')
@@ -322,8 +325,9 @@ def build_popover(cache):
         time_labels = [marker[1] for marker in time_markers_data]
         
         hover_labels = [
-            f"{t}° {l}" for t, l in zip(
+            f"{t}° {l}\n{hu}% humidity" for t, hu, l in zip(
                 cache['Hourly']['temperatures'],
+                cache['Hourly']['humidities'],
                 ["Now"] + [h['time'] for h in cache['Hourly']['info']]
             )
         ]
@@ -335,7 +339,8 @@ def build_popover(cache):
             max_config=cache['Hourly'].get('max'),
             time_markers=time_markers,
             time_labels=time_labels,
-            hover_labels=hover_labels
+            hover_labels=hover_labels,
+            secondary_data=cache['Hourly']['humidities']
         )
         graph_box.append(graph)
         hourly_container.append(graph_box)
