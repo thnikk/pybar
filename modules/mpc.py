@@ -271,7 +271,7 @@ def build_popover(module, data):
     ctrl_box.set_halign(Gtk.Align.CENTER)
 
     def mpc_cmd(btn, cmd):
-        Popen(['mpc', cmd])
+        Popen(['mpc', cmd], stdout=DEVNULL, stderr=DEVNULL)
 
     prev_btn = c.button('', style='music-button')
     prev_btn.set_valign(Gtk.Align.FILL)
