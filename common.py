@@ -846,6 +846,12 @@ class Widget(Gtk.Popover):
     def __init__(self):
         super().__init__()
         self.set_position(Gtk.PositionType.TOP)
+
+        # Check config for autohide behavior
+        config = state_manager.get('config') or {}
+        autohide = config.get('popover-autohide', True)
+        self.set_autohide(autohide)
+
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
 

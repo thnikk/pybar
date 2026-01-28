@@ -128,6 +128,7 @@ def main():
 
     args = parse_args()
     config = Config.load(args.config)
+    c.state_manager.update('config', config)
 
     # Set the cache directory if it's not specified in the config
     if "cache" not in list(config):
