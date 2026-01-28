@@ -353,7 +353,7 @@ class Graph(Gtk.DrawingArea):
                     cr.set_font_size(9)
                     text_extents = cr.text_extents(label)
                     text_x = x - text_extents.width / 2
-                    text_y = 12
+                    text_y = h / 2  # Show label in middle of graph
                     cr.move_to(text_x, text_y)
                     cr.show_text(label)
                     cr.set_dash([2, 2])
