@@ -483,7 +483,7 @@ class MPRIS(c.BaseModule):
         # Volume inline
         vol_box = c.box('h', spacing=5)
         vol_box.set_hexpand(True)
-        widget.pop_volume = c.slider(data.get('volume', 0), scrollable=False)
+        widget.pop_volume = c.slider(data.get('volume', 0), scrollable=True)
 
         def on_volume(s):
             if self.active_player_proxy:
@@ -519,6 +519,43 @@ class MPRIS(c.BaseModule):
             m.text.set_ellipsize(Pango.EllipsizeMode.END)
         m.set_visible(False)
         m.popover_built = False
+
+        # Scroll to change volume
+        scroll = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL)
+
+        def on_scroll(_widget, _dx, dy):
+            if self.active_player_proxy:
+                try:
+                    vol = unwrap(self.active_player_proxy.Volume)
+                    step = 0.05
+                    if dy > 0:
+                        new_vol = max(0.0, vol - step)
+                    else:
+                        new_vol = min(1.0, vol + step)
+                    self.active_player_proxy.Volume = new_vol
+                    self.update_state()
+                except Exception as e:
+                    c.print_debug(f"MPRIS volume scroll error: {e}")
+            return True
+
+        scroll.connect('scroll', on_scroll)
+        m.add_controller(scroll)
+
+        # Right click to toggle play/pause
+        click = Gtk.GestureClick()
+        click.set_button(3)
+
+        def on_right_click(_gesture, _n_press, _x, _y):
+            if self.active_player_proxy:
+                try:
+                    self.active_player_proxy.PlayPause()
+                    self.update_state()
+                except Exception as e:
+                    c.print_debug(f"MPRIS toggle error: {e}")
+
+        click.connect('released', on_right_click)
+        m.add_controller(click)
 
         c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(m, data))
