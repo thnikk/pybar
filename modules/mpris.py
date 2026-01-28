@@ -446,7 +446,7 @@ class MPRIS(c.BaseModule):
         pos = data.get('position_str', '00:00')
         length = data.get('length_str', '00:00')
         widget.pop_time = c.label(
-            f"{pos} / {length}", style='mpris-time', ha='center', he=True)
+            f"{pos} / {length}", style='music-time', ha='center', he=True)
         # seek_box.append(widget.pop_time)
         content_box.append(seek_box)
 
@@ -484,7 +484,8 @@ class MPRIS(c.BaseModule):
         # Volume inline
         vol_box = c.box('h', spacing=5)
         vol_box.set_hexpand(True)
-        widget.pop_volume = c.slider(data.get('volume', 0), scrollable=True)
+        widget.pop_volume = c.slider(
+                data.get('volume', 0), scrollable=True, style='music-volume')
 
         def on_volume(s):
             if self.active_player_proxy:
