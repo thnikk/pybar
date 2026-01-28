@@ -234,13 +234,29 @@ class Graph(Gtk.DrawingArea):
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             return x, y
 
-        # Draw grid lines at every 10 units
+        # Draw grid lines with dynamic spacing
         grid_color = (0.56, 0.63, 0.75)
         cr.set_line_width(1)
         cr.set_source_rgba(grid_color[0], grid_color[1], grid_color[2], 0.1)
 
-        start_line = math.ceil(min_val / 10) * 10
-        for val in range(int(start_line), int(max_val) + 1, 10):
+        # Calculate dynamic grid step
+        target_lines = 5
+        grid_step = 10
+        if range_val > 0:
+            mag = 10**math.floor(math.log10(range_val / target_lines))
+            ratio = (range_val / target_lines) / mag
+            if ratio < 1.5:
+                multiplier = 1
+            elif ratio < 3.5:
+                multiplier = 2
+            elif ratio < 7.5:
+                multiplier = 5
+            else:
+                multiplier = 10
+            grid_step = max(mag * multiplier, 1)
+
+        start_line = math.ceil(min_val / grid_step) * grid_step
+        for val in range(int(start_line), int(max_val) + 1, int(grid_step)):
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             cr.move_to(0, y)
             cr.line_to(w, y)
