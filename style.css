@@ -34,7 +34,7 @@ window {
 }
 
 .stale {
-	opacity: 0.4 !important;
+	opacity: 0.4;
 }
 
 .module:hover {
