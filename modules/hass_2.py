@@ -66,7 +66,7 @@ class HASS2(c.BaseModule):
         return False
 
     def build_popover(self, data):
-        box = c.box('v', spacing=20, style='small-widget')
+        box = c.box('v', spacing=20)
         box.append(c.label('Home Assistant', style='heading'))
 
         for section, devices in data.get('sections', {}).items():
