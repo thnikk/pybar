@@ -46,6 +46,7 @@ class MPRIS(c.BaseModule):
         self.active_player_props_proxy = None
         self.player_observer = None
         self.last_used_player = None
+        self.art_size = config.get('art_size', 300)
 
     def find_player(self):
         """ Find a player matching the config """
@@ -119,7 +120,8 @@ class MPRIS(c.BaseModule):
             self.active_player_proxy = None
             self.active_player_props_proxy = None
 
-    def on_properties_changed(self, interface, changed_props, invalidated_props):
+    def on_properties_changed(
+            self, interface, changed_props, invalidated_props):
         """ Handle MPRIS property changes """
         if interface == 'org.mpris.MediaPlayer2.Player':
             self.update_state()
@@ -162,7 +164,7 @@ class MPRIS(c.BaseModule):
             length = metadata.get('mpris:length', 0)
             if not isinstance(length, (int, float)):
                 length = 0
-                
+
             position = 0
             try:
                 position = unwrap(self.active_player_proxy.Position)
@@ -175,12 +177,19 @@ class MPRIS(c.BaseModule):
             if length > 0:
                 percent = int((position / length) * 100)
 
+            volume = 0
+            try:
+                volume = int(unwrap(self.active_player_proxy.Volume) * 100)
+            except Exception:
+                pass
+
             return {
                 "status": status,
                 "song": title,
                 "artist": artist,
                 "art": art_path,
                 "percent": percent,
+                "volume": volume,
                 "text": title,
                 "player": self.active_player_bus_name
             }
@@ -278,7 +287,7 @@ class MPRIS(c.BaseModule):
             widget.last_art_path = art_path
             if art_path and os.path.exists(art_path):
                 try:
-                    art_size = 300
+                    art_size = self.art_size
                     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                         art_path, art_size, art_size, True)
                     texture = Gdk.Texture.new_for_pixbuf(pixbuf)
@@ -315,6 +324,12 @@ class MPRIS(c.BaseModule):
             widget.pop_seekbar.set_value(data.get('percent', 0))
             widget.pop_seekbar.handler_unblock(widget.pop_seekbar_handler)
 
+        # Update volume bar
+        if hasattr(widget, 'pop_volume'):
+            widget.pop_volume.handler_block(widget.pop_volume_handler)
+            widget.pop_volume.set_value(data.get('volume', 0))
+            widget.pop_volume.handler_unblock(widget.pop_volume_handler)
+
         # Update play/pause button
         if hasattr(widget, 'pop_play_btn'):
             label = '' if data.get('status') == 'playing' else ''
@@ -330,7 +345,7 @@ class MPRIS(c.BaseModule):
         widget.pop_player_name = c.label(player_name, style='heading')
         main_box.append(widget.pop_player_name)
 
-        art_size = 300
+        art_size = self.art_size
         art_path = data.get('art')
 
         # Album Art Container
@@ -373,9 +388,11 @@ class MPRIS(c.BaseModule):
 
         # Track info
         widget.pop_song = c.label(
-            data.get('song', 'Unknown Song'), length=20, style='title')
+            data.get('song', 'Unknown Song'),
+            length=art_size // 15, style='title')
         widget.pop_artist = c.label(
-                data.get('artist', ''), style='artist', wrap=20)
+                data.get('artist', ''), style='artist',
+                wrap=art_size // 15)
         widget.pop_artist.set_visible(bool(data.get('artist')))
 
         content_box.append(widget.pop_song)
@@ -383,6 +400,7 @@ class MPRIS(c.BaseModule):
 
         # Seekbar
         widget.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
+
         def on_seek(s):
             if self.active_player_proxy:
                 try:
@@ -403,9 +421,9 @@ class MPRIS(c.BaseModule):
             'value-changed', on_seek)
         content_box.append(widget.pop_seekbar)
 
-        # Controls
-        ctrl_box = c.box('h')
-        ctrl_box.set_halign(Gtk.Align.CENTER)
+        # Controls and volume inline
+        ctrl_box = Gtk.CenterBox()
+        ctrl_box.set_hexpand(True)
 
         def mpris_cmd(_btn, cmd):
             if self.active_player_proxy:
@@ -434,9 +452,30 @@ class MPRIS(c.BaseModule):
         next_btn.set_valign(Gtk.Align.FILL)
         next_btn.connect('clicked', mpris_cmd, 'next')
 
-        ctrl_box.append(prev_btn)
-        ctrl_box.append(widget.pop_play_btn)
-        ctrl_box.append(next_btn)
+        # Volume inline
+        vol_box = c.box('h', spacing=5)
+        vol_box.set_hexpand(True)
+        widget.pop_volume = c.slider(data.get('volume', 0), scrollable=False)
+
+        def on_volume(s):
+            if self.active_player_proxy:
+                try:
+                    self.active_player_proxy.Volume = s.get_value() / 100.0
+                except Exception as e:
+                    c.print_debug(f"MPRIS volume error: {e}")
+
+        widget.pop_volume_handler = widget.pop_volume.connect(
+            'value-changed', on_volume)
+        widget.pop_volume.set_hexpand(True)
+        vol_box.append(widget.pop_volume)
+
+        btn_box = c.box('h')
+        btn_box.append(prev_btn)
+        btn_box.append(widget.pop_play_btn)
+        btn_box.append(next_btn)
+
+        ctrl_box.set_start_widget(vol_box)
+        ctrl_box.set_center_widget(btn_box)
 
         content_box.append(ctrl_box)
         main_box.append(content_box)

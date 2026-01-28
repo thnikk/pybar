@@ -138,7 +138,7 @@ scrollbar slider { background: none; border: none; }
 .module levelbar block { border-radius: 3px; border: none; background: @gray; }
 .module levelbar block.filled { background-color: alpha(@white, 0.8); }
 
-scale trough { padding: 3px; min-width: 100px; background: @black; border: none; }
+scale trough { padding: 3px;  background: @black; border: none; }
 scale trough highlight {
 	border: none;
 	background: alpha(@blue, 1);
@@ -296,6 +296,7 @@ popover.background arrow {
 	color: @white;
 	text-shadow: none;
 	font-size: 16px;
+	padding: 5px 10px;
 }
 
 .play-button {
