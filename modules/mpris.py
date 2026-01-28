@@ -358,7 +358,7 @@ class MPRIS(c.BaseModule):
 
     def build_popover(self, widget, data):
         """ Build mpris popover """
-        main_box = c.box('v', spacing=20, style='small-widget')
+        main_box = c.box('v', spacing=10, style='small-widget')
 
         # Player Name at the very top
         player_name = data.get('player', '').split('.')[-1].capitalize()
