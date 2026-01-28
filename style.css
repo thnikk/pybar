@@ -290,6 +290,12 @@ popover.background arrow {
 	font-size: 16px;
 }
 
+.mpris-time {
+	font-size: 12px;
+	color: @white;
+	opacity: 0.4;
+}
+
 .music-button {
 	background: none;
 	border: none;

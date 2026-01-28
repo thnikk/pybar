@@ -32,6 +32,18 @@ def unwrap(val):
     return val
 
 
+def format_time(microseconds):
+    """ Format microseconds to MM:SS or HH:MM:SS """
+    seconds = int(microseconds / 1000000)
+    minutes = seconds // 60
+    seconds %= 60
+    hours = minutes // 60
+    minutes %= 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
+
+
 class MPRIS(c.BaseModule):
     def __init__(self, name, config):
         super().__init__(name, config)
@@ -190,6 +202,8 @@ class MPRIS(c.BaseModule):
                 "art": art_path,
                 "percent": percent,
                 "volume": volume,
+                "position_str": format_time(position),
+                "length_str": format_time(length),
                 "text": title,
                 "player": self.active_player_bus_name
             }
@@ -324,6 +338,11 @@ class MPRIS(c.BaseModule):
             widget.pop_seekbar.set_value(data.get('percent', 0))
             widget.pop_seekbar.handler_unblock(widget.pop_seekbar_handler)
 
+        if hasattr(widget, 'pop_time'):
+            pos = data.get('position_str', '00:00')
+            length = data.get('length_str', '00:00')
+            widget.pop_time.set_text(f"{pos} / {length}")
+
         # Update volume bar
         if hasattr(widget, 'pop_volume'):
             widget.pop_volume.handler_block(widget.pop_volume_handler)
@@ -398,6 +417,7 @@ class MPRIS(c.BaseModule):
         content_box.append(widget.pop_song)
         content_box.append(widget.pop_artist)
 
+        seek_box = c.box('v')
         # Seekbar
         widget.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
 
@@ -419,7 +439,15 @@ class MPRIS(c.BaseModule):
 
         widget.pop_seekbar_handler = widget.pop_seekbar.connect(
             'value-changed', on_seek)
-        content_box.append(widget.pop_seekbar)
+        seek_box.append(widget.pop_seekbar)
+
+        # Timestamps
+        pos = data.get('position_str', '00:00')
+        length = data.get('length_str', '00:00')
+        widget.pop_time = c.label(
+            f"{pos} / {length}", style='mpris-time', ha='center', he=True)
+        # seek_box.append(widget.pop_time)
+        content_box.append(seek_box)
 
         # Controls and volume inline
         ctrl_box = Gtk.CenterBox()
@@ -474,7 +502,8 @@ class MPRIS(c.BaseModule):
         btn_box.append(widget.pop_play_btn)
         btn_box.append(next_btn)
 
-        ctrl_box.set_start_widget(vol_box)
+        ctrl_box.set_start_widget(widget.pop_time)
+        ctrl_box.set_end_widget(vol_box)
         ctrl_box.set_center_widget(btn_box)
 
         content_box.append(ctrl_box)
