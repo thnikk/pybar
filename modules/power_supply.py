@@ -75,22 +75,26 @@ class PowerSupply(c.BaseModule):
 
     def build_popover(self, widget, data):
         widget.popover_widgets = []
-        box = c.box('v', spacing=20, style='small-widget')
+        box = c.box('v', spacing=10, style='small-widget')
         box.append(c.label('Power Supply', style='heading'))
 
-        outer = c.box('v', style='box')
         for i, dev in enumerate(data['devices']):
+            device_box = c.box('v')
+            outer = c.box('v', style='box')
             row = c.box('h', spacing=10, style="inner-box")
-            row.append(c.label(dev['name'], ha="start", he=True))
+            name = c.label(dev['name'], ha="start", he=True, style='title')
+            device_box.append(name)
 
             lvl = Gtk.LevelBar.new_for_interval(0, 4)
             lvl.set_min_value(0)
             lvl.set_max_value(4)
             lvl.set_value(dev['level'] + 1)
+            lvl.set_hexpand(True)
             row.append(lvl)
 
             percent = (dev['level'] + 1) * 25
             pct_label = c.label(f"{percent}%", style='percent')
+            pct_label.set_width_chars(4)
             row.append(pct_label)
 
             widget.popover_widgets.append({
@@ -102,8 +106,9 @@ class PowerSupply(c.BaseModule):
             outer.append(row)
             if i < len(data['devices']) - 1:
                 outer.append(c.sep('h'))
+            device_box.append(outer)
+            box.append(device_box)
 
-        box.append(outer)
         return box
 
     def create_widget(self, bar):
