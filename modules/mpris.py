@@ -59,6 +59,7 @@ class MPRIS(c.BaseModule):
         self.player_observer = None
         self.last_used_player = None
         self.art_size = config.get('art_size', 300)
+        self.show_title = config.get('show_title', True)
 
     def find_player(self):
         """ Find a player matching the config """
@@ -574,7 +575,10 @@ class MPRIS(c.BaseModule):
         else:
             widget.set_icon('')
 
-        widget.set_label(data.get('song', 'Stopped'))
+        if self.show_title:
+            widget.set_label(data.get('song', 'Stopped'))
+        else:
+            widget.set_label('')
         widget.set_visible(True)
 
         # Update popover content
