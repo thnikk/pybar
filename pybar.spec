@@ -1,12 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('style.css', '.')],
-    hiddenimports=[],
+    datas=[
+        ('style.css', '.'),
+        ('modules', 'modules'),
+        ('fonts', 'fonts'),
+    ],
+    hiddenimports=collect_submodules('modules'),
     hookspath=[],
     hooksconfig={
         "gi": {
@@ -14,7 +19,14 @@ a = Analysis(
             "icons": ["Adwaita"],
             "languages": ["en_US"],
             "module-versions": {
-                "Gtk": "3.0",
+                "Gtk": "4.0",
+                "Gtk4LayerShell": "1.0",
+                "Gdk": "4.0",
+                "GdkPixbuf": "2.0",
+                "Pango": "1.0",
+                "Gio": "2.0",
+                "GLib": "2.0",
+                "GObject": "2.0",
             },
         },
     },

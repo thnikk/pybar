@@ -120,7 +120,12 @@ def main():
     """ Main function """
     log_file = setup_logging()
     logging.info(f"Starting pybar, logging to {log_file}")
-    
+
+    # Register bundled fonts
+    fonts_dir = c.get_resource_path('fonts')
+    if os.path.exists(fonts_dir):
+        c.register_fonts(fonts_dir)
+
     args = parse_args()
     config = Config.load(args.config)
 

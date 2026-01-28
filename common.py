@@ -26,6 +26,31 @@ align = {
 align_map = align
 
 
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    import sys
+    base_path = getattr(
+        sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
+def register_fonts(font_dir):
+    """ Register fonts with fontconfig for the application """
+    from ctypes import CDLL, c_char_p, c_bool, c_void_p
+    try:
+        fontconfig = CDLL('libfontconfig.so.1')
+        # FcConfigAppFontAddDir adds a directory to the application's font set
+        # FcConfigAppFontAddDir(FcConfig *config, const FcChar8 *file)
+        fontconfig.FcConfigAppFontAddDir.argtypes = [c_void_p, c_char_p]
+        fontconfig.FcConfigAppFontAddDir.restype = c_bool
+
+        success = fontconfig.FcConfigAppFontAddDir(
+            None, font_dir.encode('utf-8'))
+        print_debug(f"Registered fonts in {font_dir}: {success}")
+    except Exception as e:
+        print_debug(f"Font registration failed: {e}", color='red')
+
+
 class Graph(Gtk.DrawingArea):
     """ Smooth history graph """
 

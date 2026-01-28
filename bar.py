@@ -94,7 +94,7 @@ class Display:
                 return
         bar = Bar(self, monitor)
         bar.populate()
-        css_path = "/".join(__file__.split('/')[:-1]) + '/style.css'
+        css_path = c.get_resource_path('style.css')
         bar.css(css_path)
         try:
             bar.css(self.config['style'])

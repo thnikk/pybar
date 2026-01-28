@@ -22,7 +22,7 @@ _module_map = {}
 def discover_modules():
     """Automatically discover modules in the modules/ directory"""
     global _module_map
-    modules_dir = os.path.join(os.path.dirname(__file__), 'modules')
+    modules_dir = c.get_resource_path('modules')
     if not os.path.exists(modules_dir):
         return
 
