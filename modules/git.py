@@ -163,7 +163,7 @@ class Git(c.BaseModule):
             scroll_holder.append(outer_box)
 
         if len(data['commits']) > 5:
-            scroll = c.scroll(height=600)
+            scroll = c.scroll(height=600, style='scroll')
             scroll.set_child(scroll_holder)
             commits_box.append(scroll)
         else:
