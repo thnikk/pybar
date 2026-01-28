@@ -20,6 +20,7 @@ def load(path):
     "modules-right": [
         "weather", "volume", "network", "tray", "clock", "power"],
     "popover-autohide": true,
+    "popover-exclusive": false,
     "modules": {
         "weather": {
             "zip_code": "94102"

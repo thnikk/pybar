@@ -854,10 +854,23 @@ class Widget(Gtk.Popover):
 
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
+        self.connect("unmap", self._on_unmap)
 
     def _on_map(self, _):
         """ Check if we are close to the screen edge and flatten corners """
         handle_popover_edge(self)
+
+        config = state_manager.get('config') or {}
+        if config.get('popover-exclusive', False):
+            active = state_manager.get('active_popover')
+            if active and active != self:
+                active.popdown()
+            state_manager.update('active_popover', self)
+
+    def _on_unmap(self, _):
+        """ Clear active popover if it's us """
+        if state_manager.get('active_popover') == self:
+            state_manager.update('active_popover', None)
 
     def heading(self, string):
         self.box.append(label(string))
