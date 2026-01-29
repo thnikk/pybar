@@ -118,6 +118,8 @@ class Privacy(c.BaseModule):
         }
 
         for friendly_name, info in data.items():
+            if not isinstance(info, dict):
+                continue
             path = info.get('path', '')
             if path.startswith('/dev/video'):
                 categories['Video Recording']['devices'][friendly_name] = info
@@ -195,6 +197,8 @@ class Privacy(c.BaseModule):
         has_video = False
 
         for device_info in data.values():
+            if not isinstance(device_info, dict):
+                continue
             path = device_info.get('path', '')
             if path.startswith('/dev/video'):
                 has_video = True
