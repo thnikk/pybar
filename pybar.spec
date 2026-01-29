@@ -11,7 +11,13 @@ a = Analysis(
         ('modules', 'modules'),
         ('fonts', 'fonts'),
     ],
-    hiddenimports=collect_submodules('modules'),
+    hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
+        'requests',
+        'hid',
+        'pulsectl',
+        'psutil',
+        'transmission_rpc',
+    ],
     hookspath=[],
     hooksconfig={
         "gi": {
