@@ -25,7 +25,8 @@ class HASS(c.BaseModule):
                 timeout=3
             ).json()
             return response
-        except Exception:
+        except Exception as e:
+            c.print_debug(f"HASS fetch failed: {e}", color='red')
             return None
 
     def fetch_data(self):

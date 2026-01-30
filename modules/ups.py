@@ -90,7 +90,8 @@ class UPS(c.BaseModule):
                     "battery_full": ups.full(),
                     "class": "" if ac else "red"
                 }
-        except Exception:
+        except Exception as e:
+            c.print_debug(f"UPS fetch failed: {e}", color='red')
             return {}
 
     def build_popover(self, data):
