@@ -13,6 +13,9 @@ from gi.repository import Gtk  # noqa
 
 
 class Weather(c.BaseModule):
+    DEFAULT_INTERVAL = 300
+    STALE_INTERVAL = 600
+
     def lookup(self, code, mode, night=False):
         """ Get description for weather code """
         weather_lookup = {
@@ -398,6 +401,8 @@ class Weather(c.BaseModule):
             return
         widget.set_label(data.get('text', ''))
         widget.set_visible(True)
+        if data.get('stale'):
+            c.add_style(widget, 'stale')
         if not widget.get_active():
             widget.set_widget(self.build_popover(data))
 

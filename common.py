@@ -28,7 +28,6 @@ align_map = align
 
 def get_resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
-    import sys
     base_path = getattr(
         sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
@@ -483,6 +482,9 @@ class BaseModule:
         self.last_data = None
         self.is_hass = name.startswith('hass') or \
             config.get('type', '').startswith('hass')
+        self.empty_is_error = getattr(
+            self.__class__, 'EMPTY_IS_ERROR', True
+        )
 
     def fetch_data(self):
         """Override this to fetch data for the module"""
@@ -501,7 +503,10 @@ class BaseModule:
                     if cached:
                         self.last_data = cached
                         stale_init = cached.copy()
-                        stale_init['stale'] = True
+                        if 'timestamp' in cached:
+                            cache_age = time.time() - cached['timestamp']
+                            if cache_age > self.interval * 2:
+                                stale_init['stale'] = True
                         stale_init['timestamp'] = datetime.now().timestamp()
                         state_manager.update(self.name, stale_init)
                         print_debug(
@@ -515,19 +520,31 @@ class BaseModule:
             try:
                 new_data = self.fetch_data()
                 if new_data is not None:
-                    data = new_data
-                    self.last_data = data
-                    if not self.is_hass:
-                        try:
-                            os.makedirs(
-                                os.path.dirname(self.cache_path),
-                                exist_ok=True)
-                            with open(self.cache_path, 'w') as f:
-                                json.dump(data, f)
-                        except Exception as e:
-                            print_debug(
-                                f"Failed to save cache for {self.name}: {e}",
-                                color='red')
+                    if new_data == {} and self.last_data and self.empty_is_error:
+                        data = self.last_data.copy()
+                        if 'timestamp' in self.last_data:
+                            cache_age = time.time() - self.last_data['timestamp']
+                            if cache_age > self.interval * 2:
+                                data['stale'] = True
+                        else:
+                            data['stale'] = True
+                        print_debug(
+                            f"{self.name} returned empty, using stale cache",
+                            color='yellow')
+                    else:
+                        data = new_data
+                        self.last_data = data
+                        if not self.is_hass:
+                            try:
+                                os.makedirs(
+                                    os.path.dirname(self.cache_path),
+                                    exist_ok=True)
+                                with open(self.cache_path, 'w') as f:
+                                    json.dump(data, f)
+                            except Exception as e:
+                                print_debug(
+                                    f"Failed to save cache for {self.name}: {e}",
+                                    color='red')
                 else:
                     if self.last_data:
                         data = self.last_data.copy()

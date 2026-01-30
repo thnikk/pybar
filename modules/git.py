@@ -192,6 +192,8 @@ class Git(c.BaseModule):
             return
         widget.set_label(data.get('text', ''))
         widget.set_visible(bool(data.get('text')))
+        if data.get('stale'):
+            c.add_style(widget, 'stale')
 
         if not widget.get_active():
             widget.set_widget(self.build_popover(data))

@@ -137,6 +137,8 @@ class XDrip(c.BaseModule):
         widget.reset_style()
         if data.get('class'):
             c.add_style(widget, data['class'])
+        if data.get('stale'):
+            c.add_style(widget, 'stale')
 
         if not widget.get_active():
             widget.set_widget(self.build_popover(data))

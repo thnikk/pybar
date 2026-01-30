@@ -595,5 +595,7 @@ class MPRIS(c.BaseModule):
 
 
 module_map = {
-    'mpris': MPRIS
+    'mpris': MPRIS,
+    'mpd': MPRIS,
+    'music': MPRIS
 }

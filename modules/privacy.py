@@ -14,6 +14,7 @@ from gi.repository import Gtk  # noqa
 
 class Privacy(c.BaseModule):
     DEFAULT_INTERVAL = 3
+    EMPTY_IS_ERROR = False
 
     def get_friendly_name(self, device_path):
         """
