@@ -65,12 +65,11 @@ class NVTop(c.BaseModule):
 
         devices_box = c.box('v', spacing=10)
 
-        for i in range(2):
+        for i in range(len(devices)):
             card_box = c.box('v', spacing=0)
 
             # Device title
-            dev_name = devices[i].get('device_name', f'Device {i}') if i < len(
-                devices) else f'Device {i}'
+            dev_name = devices[i].get('device_name', f'Device {i}')
             device_label = c.label(dev_name, style='title', ha='start', he=True)
             card_box.append(device_label)
 
@@ -103,8 +102,7 @@ class NVTop(c.BaseModule):
             load_lvl.set_hexpand(True)
             c.add_style(load_lvl, 'level-horizontal')
             levelbar_size_group.add_widget(load_lvl)
-            load_val = self.safe_parse_percent(
-                devices[i].get('gpu_util')) if i < len(devices) else 0
+            load_val = self.safe_parse_percent(devices[i].get('gpu_util'))
             load_lvl.set_value(load_val)
             load_label = Gtk.Label.new(f'{load_val}%')
             load_label.set_xalign(1)
@@ -126,8 +124,7 @@ class NVTop(c.BaseModule):
             temp_lvl.set_hexpand(True)
             c.add_style(temp_lvl, 'level-horizontal')
             levelbar_size_group.add_widget(temp_lvl)
-            temp_val = self.safe_parse_temp(
-                devices[i].get('temp')) if i < len(devices) else 0
+            temp_val = self.safe_parse_temp(devices[i].get('temp'))
             temp_lvl.set_value(temp_val)
             temp_label = Gtk.Label.new(f'{temp_val}°C')
             temp_label.set_xalign(1)
@@ -159,8 +156,7 @@ class NVTop(c.BaseModule):
             mem_lvl.set_hexpand(True)
             c.add_style(mem_lvl, 'level-horizontal')
             levelbar_size_group.add_widget(mem_lvl)
-            mem_val = self.safe_parse_percent(
-                devices[i].get('mem_util')) if i < len(devices) else 0
+            mem_val = self.safe_parse_percent(devices[i].get('mem_util'))
             mem_lvl.set_value(mem_val)
             mem_label = Gtk.Label.new(f'{mem_val}%')
             mem_label.set_xalign(1)
@@ -171,9 +167,7 @@ class NVTop(c.BaseModule):
             device_widgets['mem'] = {'level': mem_lvl, 'label': mem_label}
 
             # Memory GB row - only if data available
-            dev_has_mem_data = (i < len(devices) and
-                                devices[i].get('mem_total') is not None)
-            if dev_has_mem_data:
+            if devices[i].get('mem_total') is not None:
                 mem_gb_box = c.box('h', spacing=10)
                 mem_gb_box.set_hexpand(True)
                 mem_gb_icon = c.label('', style='gray')
@@ -195,7 +189,7 @@ class NVTop(c.BaseModule):
             card_box.append(info_outer_box)
 
             # Add graph
-            if hasattr(self, 'history') and i < len(self.history):
+            if hasattr(self, 'history'):
                 h = self.history[i]
                 graph_data = [h['load'], h['mem']]
                 hover_labels = [f"GPU: {l}%, VRAM: {m}%"
@@ -220,9 +214,6 @@ class NVTop(c.BaseModule):
             devices_box.append(card_box)
             widget.popover_widgets.append(device_widgets)
 
-            if i >= len(devices):
-                card_box.set_visible(False)
-
         main_box.append(devices_box)
         return main_box
 
@@ -245,25 +236,6 @@ class NVTop(c.BaseModule):
         m.box.set_spacing(5)
         m.set_visible(True)
 
-        for _ in range(2):
-            levels_box = c.box('h', spacing=4)
-            l1 = Gtk.LevelBar.new_for_interval(0, 100)
-            l1.set_min_value(0)
-            l1.set_max_value(100)
-            Gtk.Orientable.set_orientation(l1, Gtk.Orientation.VERTICAL)
-            l1.set_inverted(True)
-
-            l2 = Gtk.LevelBar.new_for_interval(0, 100)
-            l2.set_min_value(0)
-            l2.set_max_value(100)
-            Gtk.Orientable.set_orientation(l2, Gtk.Orientation.VERTICAL)
-            l2.set_inverted(True)
-
-            levels_box.append(l1)
-            levels_box.append(l2)
-            m.bar_gpu_levels.append((l1, l2))
-            m.cards_box.append(levels_box)
-
         c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(m, data))
         return m
@@ -283,6 +255,31 @@ class NVTop(c.BaseModule):
         # Initialize history if needed
         while len(self.history) < len(devices):
             self.history.append({'load': [0] * 100, 'mem': [0] * 100})
+
+        # Dynamically manage level bars
+        while len(widget.bar_gpu_levels) < len(devices):
+            levels_box = c.box('h', spacing=4)
+            l1 = Gtk.LevelBar.new_for_interval(0, 100)
+            l1.set_min_value(0)
+            l1.set_max_value(100)
+            Gtk.Orientable.set_orientation(l1, Gtk.Orientation.VERTICAL)
+            l1.set_inverted(True)
+
+            l2 = Gtk.LevelBar.new_for_interval(0, 100)
+            l2.set_min_value(0)
+            l2.set_max_value(100)
+            Gtk.Orientable.set_orientation(l2, Gtk.Orientation.VERTICAL)
+            l2.set_inverted(True)
+
+            levels_box.append(l1)
+            levels_box.append(l2)
+            widget.bar_gpu_levels.append((l1, l2))
+            widget.cards_box.append(levels_box)
+
+        # Hide excess level bars
+        while len(widget.bar_gpu_levels) > len(devices):
+            l1, l2 = widget.bar_gpu_levels.pop()
+            l1.get_parent().set_visible(False)
 
         # Update bar icons and history
         for i, (l1, l2) in enumerate(widget.bar_gpu_levels):
