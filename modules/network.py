@@ -13,6 +13,8 @@ from gi.repository import Gtk, GLib  # noqa
 
 
 class Network(c.BaseModule):
+    DEFAULT_INTERVAL = 3
+
     def get_devices(self):
         """ Get active NetworkManager connections """
         try:

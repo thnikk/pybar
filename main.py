@@ -87,10 +87,6 @@ def on_activate(app, config):
         # Load the module config if it exists
         module_config = config['modules'].get(name, {})
 
-        # Set the interval if it's not specified
-        if 'interval' not in module_config:
-            module_config['interval'] = 5
-
         # Start the worker thread for this module
         module.start_worker(name, module_config)
 

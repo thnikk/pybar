@@ -477,7 +477,8 @@ class BaseModule:
     def __init__(self, name, config):
         self.name = name
         self.config = config
-        self.interval = config.get('interval', 60)
+        module_default = getattr(self.__class__, 'DEFAULT_INTERVAL', None)
+        self.interval = config.get('interval', module_default or 60)
         self.cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
         self.last_data = None
         self.is_hass = name.startswith('hass') or \
@@ -510,6 +511,7 @@ class BaseModule:
                         f"Failed to load cache for {self.name}: {e}",
                         color='red')
 
+            start_time = time.time()
             try:
                 new_data = self.fetch_data()
                 if new_data:
@@ -536,6 +538,8 @@ class BaseModule:
                     data = self.last_data.copy()
                     data['stale'] = True
 
+            execution_time = time.time() - start_time
+
             if data:
                 if isinstance(data, dict):
                     data['timestamp'] = datetime.now().timestamp()
@@ -544,7 +548,8 @@ class BaseModule:
             first_run = False
             if self.interval <= 0:
                 break
-            time.sleep(self.interval)
+            sleep_time = max(0, self.interval - execution_time)
+            time.sleep(sleep_time)
 
     def create_widget(self, bar):
         """Create the GTK widget for the bar"""

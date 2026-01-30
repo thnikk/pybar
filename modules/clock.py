@@ -14,6 +14,8 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 class Clock(c.BaseModule):
+    DEFAULT_INTERVAL = 1
+
     def fetch_data(self):
         """ Get current time """
         now = datetime.now()

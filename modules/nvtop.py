@@ -12,6 +12,8 @@ from gi.repository import Gtk  # noqa
 
 
 class NVTop(c.BaseModule):
+    DEFAULT_INTERVAL = 1
+
     def fetch_data(self):
         """ Get GPU data from nvtop """
         try:

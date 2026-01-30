@@ -13,6 +13,8 @@ from gi.repository import Gtk  # noqa
 
 
 class Privacy(c.BaseModule):
+    DEFAULT_INTERVAL = 5
+
     def get_friendly_name(self, device_path):
         """
         Attempts to find a friendlier name for a device node.
