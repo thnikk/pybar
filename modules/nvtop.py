@@ -35,6 +35,26 @@ class NVTop(c.BaseModule):
         except (ValueError, TypeError):
             return 0
 
+    def safe_parse_temp(self, val):
+        """ Safely parse temperature string to int """
+        if val is None:
+            return 0
+        if isinstance(val, int):
+            return val
+        try:
+            return int(str(val).strip('C'))
+        except (ValueError, TypeError):
+            return 0
+
+    def bytes_to_gb(self, bytes_val):
+        """ Convert bytes to GB as float """
+        if bytes_val is None:
+            return 0.0
+        try:
+            return round(int(bytes_val) / (1024 ** 3), 1)
+        except (TypeError, ValueError, ZeroDivisionError):
+            return 0.0
+
     def build_popover(self, widget, data):
         """ Build the complex original popover layout """
         devices = data.get('devices', [])
@@ -46,7 +66,7 @@ class NVTop(c.BaseModule):
         devices_box = c.box('v', spacing=10)
 
         for i in range(2):
-            card_box = c.box('v', spacing=4)
+            card_box = c.box('v', spacing=0)
 
             # Device title
             dev_name = devices[i].get('device_name', f'Device {i}') if i < len(
@@ -54,45 +74,121 @@ class NVTop(c.BaseModule):
             device_label = c.label(dev_name, style='title', ha='start', he=True)
             card_box.append(device_label)
 
-            info_outer_box = c.box('v', spacing=0, style='box')
+            info_outer_box = c.box('v', spacing=0, style='gpu-info')
             inner_info_box = c.box('v', spacing=10, style='inner-box')
 
             device_widgets = {'device_label': device_label}
 
-            # Row for GPU and Memory utilization icons inline
             inline_box = c.box('h', spacing=10)
-            size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
 
-            items = [('gpu_util', ''), ('mem_util', '')]
-            for idx, (item_key, label_icon) in enumerate(items):
-                line_box = c.box('h', spacing=10)
-                line_box.set_hexpand(True)
-                size_group.add_widget(line_box)
-                line_box.append(c.label(label_icon, style='gray'))
+            # Size groups for alignment
+            icon_size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+            levelbar_size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+            side_size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
 
-                lvl = Gtk.LevelBar.new_for_interval(0, 100)
-                lvl.set_min_value(0)
-                lvl.set_max_value(100)
-                lvl.set_hexpand(True)
-                c.add_style(lvl, 'level-horizontal')
+            # Left side: GPU load and temp
+            left_box = c.box('v', spacing=5)
+            left_box.set_hexpand(True)
+            side_size_group.add_widget(left_box)
 
-                val = self.safe_parse_percent(devices[i].get(
-                    item_key)) if i < len(devices) else 0
-                lvl.set_value(val)
+            # GPU load row
+            load_box = c.box('h', spacing=10)
+            load_box.set_hexpand(True)
+            load_icon = c.label('', style='gray')
+            icon_size_group.add_widget(load_icon)
+            load_box.append(load_icon)
+            load_lvl = Gtk.LevelBar.new_for_interval(0, 100)
+            load_lvl.set_min_value(0)
+            load_lvl.set_max_value(100)
+            load_lvl.set_hexpand(True)
+            c.add_style(load_lvl, 'level-horizontal')
+            levelbar_size_group.add_widget(load_lvl)
+            load_val = self.safe_parse_percent(
+                devices[i].get('gpu_util')) if i < len(devices) else 0
+            load_lvl.set_value(load_val)
+            load_label = Gtk.Label.new(f'{load_val}%')
+            load_label.set_xalign(1)
+            load_label.set_width_chars(4)
+            load_box.append(load_lvl)
+            load_box.append(load_label)
+            left_box.append(load_box)
+            device_widgets['load'] = {'level': load_lvl, 'label': load_label}
 
-                pct_label = Gtk.Label.new(f'{val}%')
-                pct_label.set_xalign(1)
-                pct_label.set_width_chars(4)
+            # Temp row
+            temp_box = c.box('h', spacing=10)
+            temp_box.set_hexpand(True)
+            temp_icon = c.label('', style='gray')
+            icon_size_group.add_widget(temp_icon)
+            temp_box.append(temp_icon)
+            temp_lvl = Gtk.LevelBar.new_for_interval(0, 100)
+            temp_lvl.set_min_value(0)
+            temp_lvl.set_max_value(100)
+            temp_lvl.set_hexpand(True)
+            c.add_style(temp_lvl, 'level-horizontal')
+            levelbar_size_group.add_widget(temp_lvl)
+            temp_val = self.safe_parse_temp(
+                devices[i].get('temp')) if i < len(devices) else 0
+            temp_lvl.set_value(temp_val)
+            temp_label = Gtk.Label.new(f'{temp_val}°C')
+            temp_label.set_xalign(1)
+            temp_label.set_width_chars(4)
+            temp_box.append(temp_lvl)
+            temp_box.append(temp_label)
+            left_box.append(temp_box)
+            device_widgets['temp'] = {'level': temp_lvl, 'label': temp_label}
 
-                line_box.append(lvl)
-                line_box.append(pct_label)
-                inline_box.append(line_box)
+            inline_box.append(left_box)
 
-                if idx < len(items) - 1:
-                    inline_box.append(c.sep('v'))
+            # Vertical separator
+            inline_box.append(c.sep('v'))
 
-                short_key = 'load' if 'gpu' in item_key else 'mem'
-                device_widgets[short_key] = {'level': lvl, 'label': pct_label}
+            # Right side: Memory and Memory GB
+            right_box = c.box('v', spacing=5)
+            right_box.set_hexpand(True)
+            side_size_group.add_widget(right_box)
+
+            # Memory util row
+            mem_box = c.box('h', spacing=10)
+            mem_box.set_hexpand(True)
+            mem_icon = c.label('', style='gray')
+            icon_size_group.add_widget(mem_icon)
+            mem_box.append(mem_icon)
+            mem_lvl = Gtk.LevelBar.new_for_interval(0, 100)
+            mem_lvl.set_min_value(0)
+            mem_lvl.set_max_value(100)
+            mem_lvl.set_hexpand(True)
+            c.add_style(mem_lvl, 'level-horizontal')
+            levelbar_size_group.add_widget(mem_lvl)
+            mem_val = self.safe_parse_percent(
+                devices[i].get('mem_util')) if i < len(devices) else 0
+            mem_lvl.set_value(mem_val)
+            mem_label = Gtk.Label.new(f'{mem_val}%')
+            mem_label.set_xalign(1)
+            mem_label.set_width_chars(4)
+            mem_box.append(mem_lvl)
+            mem_box.append(mem_label)
+            right_box.append(mem_box)
+            device_widgets['mem'] = {'level': mem_lvl, 'label': mem_label}
+
+            # Memory GB row - only if data available
+            dev_has_mem_data = (i < len(devices) and
+                                devices[i].get('mem_total') is not None)
+            if dev_has_mem_data:
+                mem_gb_box = c.box('h', spacing=10)
+                mem_gb_box.set_hexpand(True)
+                mem_gb_icon = c.label('', style='gray')
+                icon_size_group.add_widget(mem_gb_icon)
+                mem_gb_box.append(mem_gb_icon)
+                mem_used = self.bytes_to_gb(devices[i].get('mem_used'))
+                mem_total = round(
+                        self.bytes_to_gb(devices[i].get('mem_total')))
+                mem_gb_label = Gtk.Label.new(f'{mem_used} / {mem_total}GB')
+                mem_gb_label.set_hexpand(True)
+                mem_gb_box.append(mem_gb_label)
+                right_box.append(mem_gb_box)
+                device_widgets['mem_gb'] = mem_gb_label
+
+            inline_box.append(right_box)
 
             inner_info_box.append(inline_box)
             info_outer_box.append(inner_info_box)
@@ -106,7 +202,7 @@ class NVTop(c.BaseModule):
                                 for l, m in zip(h['load'], h['mem'])]  # noqa
                 colors = [(0.56, 0.63, 0.75), (0.63, 0.75, 0.56)]
 
-                graph_box = c.box('v', style='box')
+                graph_box = c.box('v', style='gpu-graph')
                 graph_box.set_overflow(Gtk.Overflow.HIDDEN)
                 graph = c.Graph(
                     graph_data,
@@ -224,6 +320,19 @@ class NVTop(c.BaseModule):
                         device_widgets['load']['label'].set_text(f"{load}%")
                         device_widgets['mem']['level'].set_value(mem)
                         device_widgets['mem']['label'].set_text(f"{mem}%")
+
+                        temp = self.safe_parse_temp(dev.get('temp'))
+                        device_widgets['temp']['level'].set_value(temp)
+                        device_widgets['temp']['level'].set_hexpand(True)
+                        device_widgets['temp']['label'].set_text(f'{temp}°C')
+
+                        if ('mem_gb' in device_widgets and
+                                dev.get('mem_total') is not None):
+                            mem_used = self.bytes_to_gb(dev.get('mem_used'))
+                            mem_total = round(
+                                    self.bytes_to_gb(dev.get('mem_total')))
+                            device_widgets['mem_gb'].set_text(
+                                f'{mem_used} / {mem_total}GB')
 
                         if 'device_label' in device_widgets:
                             device_widgets['device_label'].set_text(

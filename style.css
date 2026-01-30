@@ -460,6 +460,19 @@ button.power-item:hover {
 	border: 1px solid @gray;
 }
 
+/* GPU module */
+.gpu-info {
+	background: #2b303b;
+	border: 1px solid rgba(255,255,255,0.1);
+	border-radius: 10px 10px 0px 0px;
+}
+.gpu-graph {
+	background: #2b303b;
+	border: 1px solid rgba(255,255,255,0.1);
+	border-radius: 0px 0px 10px 10px;
+	border-top: none;
+}
+
 /* tray */
 .tray-module {
 	background: #2b303b;
