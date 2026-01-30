@@ -514,7 +514,7 @@ class BaseModule:
             start_time = time.time()
             try:
                 new_data = self.fetch_data()
-                if new_data:
+                if new_data is not None:
                     data = new_data
                     self.last_data = data
                     if not self.is_hass:
@@ -540,7 +540,7 @@ class BaseModule:
 
             execution_time = time.time() - start_time
 
-            if data:
+            if data is not None:
                 if isinstance(data, dict):
                     data['timestamp'] = datetime.now().timestamp()
                 state_manager.update(self.name, data)

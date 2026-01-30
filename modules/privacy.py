@@ -1,26 +1,26 @@
 #!/usr/bin/python3 -u
 """
-Description: Privacy module using process-based device detection
+Description: Privacy module using PipeWire device detection
 Author: thnikk
 """
 import common as c
-import re
 import os
 import gi
-import time
+import json
+import subprocess
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
 
 class Privacy(c.BaseModule):
-    DEFAULT_INTERVAL = 5
+    DEFAULT_INTERVAL = 3
 
     def get_friendly_name(self, device_path):
         """
         Attempts to find a friendlier name for a device node.
+        Only used for /dev/video* devices.
         """
         if device_path.startswith('/dev/video'):
-            # For video, we can often find the name in sysfs
             index = device_path.replace('/dev/video', '')
             name_path = f'/sys/class/video4linux/video{index}/name'
             if os.path.exists(name_path):
@@ -28,36 +28,15 @@ class Privacy(c.BaseModule):
                     return f"{f.read().strip()} ({device_path})"
             return f"Webcam/Video Device ({device_path})"
 
-        if '/dev/snd/pcm' in device_path:
-            # Regex to extract Card and Device numbers from pcmC#D#c
-            match = re.search(r'pcmC(\d+)D(\d+)c', device_path)
-            if match:
-                card, device = match.groups()
-                # Look up the card name in /proc/asound/cards
-                try:
-                    with open('/proc/asound/cards', 'r', encoding='utf-8') as f:
-                        cards_info = f.read()
-                        # Standard ALSA format: " 0 [PCH]: HDA Intel PCH..."
-                        card_match = re.search(
-                            rf'^\s*{card}\s+\[(.*?)\s*\]',
-                            cards_info, re.MULTILINE)
-                        if card_match:
-                            return (
-                                    f"Audio Input: {card_match.group(1)} "
-                                    f"(Card {card}, Dev {device})")
-                except FileNotFoundError:
-                    pass
-                return f"Capture Device (Card {card}, Dev {device})"
-
         return device_path
 
-    def get_processes_using_devices(self):
+    def get_webcam_processes_using_devices(self):
         """
-        Scans /proc to find processes with open handles to specific devices.
+        Scans /proc to find processes with open webcam devices.
+        Only scans for /dev/video* devices.
         """
         device_usage = {}
 
-        # Iterate over all named folders in /proc that are numeric (PIDs)
         for pid in [p for p in os.listdir('/proc') if p.isdigit()]:
             fd_dir = os.path.join('/proc', pid, 'fd')
             try:
@@ -66,12 +45,7 @@ class Privacy(c.BaseModule):
                     try:
                         target_path = os.readlink(full_fd_path)
 
-                        is_video = target_path.startswith('/dev/video')
-                        is_audio_input = (
-                            target_path.startswith('/dev/snd/pcm')
-                            and target_path.endswith('c'))
-
-                        if is_video or is_audio_input:
+                        if target_path.startswith('/dev/video'):
                             with open(
                                 f'/proc/{pid}/comm', 'r', encoding='utf-8'
                             ) as f:
@@ -82,7 +56,8 @@ class Privacy(c.BaseModule):
                             if friendly_name not in device_usage:
                                 device_usage[friendly_name] = {
                                     'path': target_path,
-                                    'processes': []
+                                    'processes': [],
+                                    'type': 'video'
                                 }
 
                             process_info = f"{comm} (PID: {pid})"
@@ -97,13 +72,158 @@ class Privacy(c.BaseModule):
 
         return device_usage
 
-    def fetch_data(self):
-        """ Fetch toggle data """
+    def get_process_name_from_pid(self, pid):
+        """
+        Get process name from PID via /proc
+        """
+        if not pid:
+            return None
         try:
-            return self.get_processes_using_devices()
-        except Exception as e:
-            c.print_debug(f"[PRIVACY] Fetch error: {e}")
+            with open(f'/proc/{pid}/comm', 'r', encoding='utf-8') as f:
+                return f.read().strip()
+        except (FileNotFoundError, PermissionError):
+            return None
+
+    def get_pipewire_device_usage(self):
+        """
+        Detect active audio/video devices using PipeWire
+        Returns dict with same format as get_processes_using_devices()
+        """
+        device_usage = {}
+        try:
+            result = subprocess.run(
+                ['pw-dump', '-N'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode != 0:
+                return {}
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             return {}
+        except Exception:
+            return {}
+
+        try:
+            pw_data = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return {}
+
+        # Build maps for quick lookup
+        nodes_map = {}
+        links_map = {}
+
+        for obj in pw_data:
+            obj_type = obj.get('type')
+            obj_id = obj.get('id')
+            info = obj.get('info', {})
+
+            if obj_type == 'PipeWire:Interface:Node':
+                nodes_map[obj_id] = {
+                    'props': info.get('props', {}),
+                    'state': info.get('state'),
+                    'max_input_ports': info.get('max-input-ports'),
+                    'n_input_ports': info.get('n-input-ports'),
+                }
+            elif obj_type == 'PipeWire:Interface:Link':
+                link_info = info
+                if link_info.get('state') == 'active':
+                    links_map[obj_id] = {
+                        'output_node': link_info.get('output-node-id'),
+                        'input_node': link_info.get('input-node-id'),
+                    }
+
+        # Process active links to find device usage
+        for link_id, link in links_map.items():
+            source_id = link['output_node']
+            target_id = link['input_node']
+
+            source_node = nodes_map.get(source_id)
+            target_node = nodes_map.get(target_id)
+
+            if not source_node or not target_node:
+                continue
+
+            source_props = source_node['props']
+            target_props = target_node['props']
+
+            media_class = source_props.get('media.class', '')
+            media_role = source_props.get('media.role', '')
+            node_name = source_props.get('node.name', '')
+            node_desc = source_props.get('node.description', '')
+            factory = source_props.get('factory.name', '')
+
+            # Determine device type
+            device_type = None
+            device_name = None
+
+            if media_class == 'Audio/Source':
+                device_type = 'audio'
+                device_name = node_desc or node_name or 'Unknown Audio Source'
+            elif media_class == 'Video/Source':
+                if 'portal' in node_name.lower() or 'xdg-desktop' in node_name.lower():
+                    device_type = 'screen_share'
+                    device_name = f"Screen Share ({node_name})"
+                # Webcam detection handled by /proc scanning
+
+            if not device_type:
+                continue
+
+            # Get process info from target node
+            app_name = target_props.get('application.name')
+            app_pid = target_props.get('application.process.id')
+            target_node_name = target_props.get('node.name')
+            process_name = self.get_process_name_from_pid(app_pid)
+
+            if app_name:
+                proc_info = app_name
+            elif process_name:
+                proc_info = process_name
+            elif target_node_name:
+                # Fallback to target node name (e.g., for portal streams)
+                proc_info = target_node_name
+            else:
+                continue
+
+            if app_pid:
+                proc_info = f"{proc_info} (PID: {app_pid})"
+
+            path = f"pipewire:node:{source_id}"
+            friendly_key = f"{device_name}"
+
+            if friendly_key not in device_usage:
+                device_usage[friendly_key] = {
+                    'path': path,
+                    'processes': [],
+                    'type': device_type
+                }
+
+            if proc_info not in device_usage[friendly_key]['processes']:
+                device_usage[friendly_key]['processes'].append(proc_info)
+
+        return device_usage
+
+    def fetch_data(self):
+        """ Fetch privacy data using hybrid approach """
+        device_usage = {}
+
+        try:
+            pipewire_result = self.get_pipewire_device_usage()
+            # if pipewire_result:
+            #     c.print_debug("[PRIVACY] PipeWire detection found devices")
+            device_usage.update(pipewire_result)
+        except Exception as e:
+            c.print_debug(f"[PRIVACY] PipeWire error: {e}")
+
+        try:
+            webcam_result = self.get_webcam_processes_using_devices()
+            # if webcam_result:
+            #     c.print_debug("[PRIVACY] /proc webcam detection found devices")
+            device_usage.update(webcam_result)
+        except Exception as e:
+            c.print_debug(f"[PRIVACY] /proc webcam error: {e}")
+
+        return device_usage
 
     def build_popover(self, data):
         """ Build privacy popover content """
@@ -117,16 +237,20 @@ class Privacy(c.BaseModule):
         categories = {
             'Audio Recording': {'icon': '', 'devices': {}},
             'Video Recording': {'icon': '', 'devices': {}},
+            'Screen Sharing': {'icon': '', 'devices': {}},
         }
 
         for friendly_name, info in data.items():
             if not isinstance(info, dict):
                 continue
-            path = info.get('path', '')
-            if path.startswith('/dev/video'):
-                categories['Video Recording']['devices'][friendly_name] = info
-            else:
+            device_type = info.get('type')
+
+            if device_type == 'audio':
                 categories['Audio Recording']['devices'][friendly_name] = info
+            elif device_type == 'video':
+                categories['Video Recording']['devices'][friendly_name] = info
+            elif device_type == 'screen_share':
+                categories['Screen Sharing']['devices'][friendly_name] = info
 
         active_cats = {k: v for k, v in categories.items() if v['devices']}
 
@@ -193,25 +317,36 @@ class Privacy(c.BaseModule):
         """ Update privacy UI """
         if not data:
             widget.set_visible(False)
+            widget.set_label('')
+            # Hide and clear any existing popover when no data
+            popover = widget.get_popover()
+            if popover:
+                popover.popdown()
             return
 
         has_audio = False
         has_video = False
+        has_screen_share = False
 
         for device_info in data.values():
             if not isinstance(device_info, dict):
                 continue
-            path = device_info.get('path', '')
-            if path.startswith('/dev/video'):
-                has_video = True
-            elif '/dev/snd/pcm' in path:
+            device_type = device_info.get('type')
+
+            if device_type == 'audio':
                 has_audio = True
+            elif device_type == 'video':
+                has_video = True
+            elif device_type == 'screen_share':
+                has_screen_share = True
 
         icons = []
         if has_audio:
             icons.append('')
         if has_video:
             icons.append('')
+        if has_screen_share:
+            icons.append('')
 
         if icons:
             widget.set_label("  ".join(icons))
