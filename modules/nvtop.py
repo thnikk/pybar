@@ -21,6 +21,8 @@ class NVTop(c.BaseModule):
                       check=True).stdout.decode('utf-8')
             devices = json.loads(res)
             return {"devices": devices}
+        except FileNotFoundError:
+            return {"error": "command_not_found"}
         except Exception:
             return {}
 
@@ -244,6 +246,15 @@ class NVTop(c.BaseModule):
         """ Update GPU UI including bar and popover """
         if not data:
             return
+
+        if data.get('error') == 'command_not_found':
+            widget.cards_box.set_visible(False)
+            widget.set_icon('⚠')
+            widget.set_label('Install nvtop')
+            c.add_style(widget, 'red')
+            widget.set_visible(True)
+            return
+
         devices = data.get('devices', [])
 
         if devices:
