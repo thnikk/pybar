@@ -98,11 +98,14 @@ class UPS(c.BaseModule):
         main_box.append(c.label('UPS stats', style='heading'))
 
         wide_box = c.box('h', spacing=20)
-        wide_box.append(c.label(f"{data['load_percent']}%", style='large-text'))
+        wide_box.append(c.label(
+            f"{data['load_percent']}%", style='large-text'))
 
         detail_box = c.box('v')
-        detail_box.append(c.label(f"{data['runtime']} minutes", ha='start'))
-        detail_box.append(c.label("runtime", style='gray', ha='start'))
+        detail_box.append(c.label(
+            f"{data['runtime']} minutes", ha='end', he=True))
+        detail_box.append(
+                c.label("runtime", style='gray', ha='end', he=True))
         wide_box.append(detail_box)
         main_box.append(wide_box)
 
@@ -118,7 +121,7 @@ class UPS(c.BaseModule):
         items.append(f"{data['load_watts']}W")
 
         for i, item in enumerate(items):
-            info_line.append(c.label(item))
+            info_line.append(c.label(item, style='inner-box', he=True))
             if i < len(items) - 1:
                 info_line.append(c.sep('v'))
 
