@@ -7,6 +7,7 @@
 @define-color green #a3be8c;
 @define-color orange #d08770;
 @define-color yellow #ebcb8b;
+@define-color purple #b48ead;
 
 /* bar */
 window {
@@ -55,10 +56,6 @@ window {
 	min-height: 0;
 }
 
-.module-overlay {
-	min-height: 100%;
-}
-
 .module-fixed button {
 	min-width: 70px;
 }
@@ -87,9 +84,9 @@ window {
 .indicator.monitor-1 { background: @green; }
 .indicator.monitor-2 { background: @blue; }
 .indicator.monitor-3 { background: @red; }
-.indicator.monitor-4 { background: @orange; }
+.indicator.monitor-4 { background: @purple; }
 .indicator.monitor-5 { background: @yellow; }
-.indicator.monitor-6 { background: @light_gray; }
+.indicator.monitor-6 { background: @orange; }
 
 .scroll {
 	border-radius: 10px;
