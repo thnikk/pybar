@@ -987,6 +987,12 @@ class Tray(c.BaseModule):
             'default': False,
             'label': 'Debug Mode',
             'description': 'Enable debug output for tray'
+        },
+        'custom_icons': {
+            'type': 'dict',
+            'default': {},
+            'label': 'Custom Icons',
+            'description': 'Set custom icons for tray programs'
         }
     }
 
