@@ -31,6 +31,7 @@ window {
 	text-shadow: none;
 	opacity: 0.8;
 	transition: opacity 200ms ease;
+	min-height: 0;
 }
 
 .stale {
@@ -46,11 +47,16 @@ window {
 .module > button.toggle {
 	background: transparent;
 	border: none;
-	padding: 2px 5px;
+	padding: 0 5px;
 	margin: 0;
 	box-shadow: none;
 	transition: none;
 	color: @white;
+	min-height: 0;
+}
+
+.module-overlay {
+	min-height: 100%;
 }
 
 .module-fixed button {
@@ -69,14 +75,13 @@ window {
 	background: transparent;
 	border-radius: 5px;
 	color: alpha(@white, 0.8);
-	border: 1px solid transparent;
+	border: none;
 	min-width: 20px;
 }
 
 .focused {
 	background: @white;
 	color: @black;
-	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 .indicator.monitor-1 { background: @green; }
@@ -119,9 +124,19 @@ text {
 .blue:active { background: @white; color: @blue; }
 
 .indicator {
-	border-radius: 2px;
-	/* margin-bottom: 0px; */
+	border-radius: 3px 3px 0px 0px;
+	/* box-sizing: border-box; */
+	margin-bottom: 0px;
+	border: 1px solid rgba(0,0,0,0.5);
+	border-bottom: 0px;
+	min-height: 3px;
 }
+
+/*
+ * To adjust indicator sizing:
+ * - min-height: Controls the indicator's thickness
+ * - margin-bottom: Controls gap from module's bottom edge
+ */
 
 /* Override default rules */
 tooltip {

@@ -605,17 +605,22 @@ class Module(Gtk.MenuButton):
         self.set_cursor_from_name("pointer")
         self.added_styles = []
 
-        self.con = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.con = Gtk.Overlay()
+        self.con.get_style_context().add_class('module-overlay')
         self.indicator = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         self.indicator.get_style_context().add_class('indicator')
         self.indicator_added_styles = []
 
         self.box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self.box.set_vexpand(True)
+        self.box.set_vexpand(False)
         self.box.set_halign(Gtk.Align.CENTER)
+        self.box.set_margin_top(4)
+        self.box.set_margin_bottom(4)
 
-        self.con.append(self.box)
-        self.con.append(self.indicator)
+        self.con.set_child(self.box)
+        self.indicator.set_valign(Gtk.Align.END)
+        self.con.add_overlay(self.indicator)
+        self.indicator.set_visible(False)
         self.set_child(self.con)
 
         self.icon = None
@@ -706,6 +711,7 @@ class Module(Gtk.MenuButton):
         for style in self.indicator_added_styles:
             self.indicator.get_style_context().remove_class(style)
         self.indicator_added_styles = []
+        self.indicator.set_visible(False)
 
     def add_style(self, style_class):
         """ Set style """
@@ -731,6 +737,39 @@ class Module(Gtk.MenuButton):
                 if item in self.added_styles:
                     self.get_style_context().remove_class(item)
                     self.added_styles.remove(item)
+        return self
+
+    def add_indicator_style(self, style_class):
+        """ Add style to indicator and show it """
+        was_empty = not self.indicator_added_styles
+        if isinstance(style_class, str):
+            if style_class not in self.indicator_added_styles:
+                self.indicator.get_style_context().add_class(style_class)
+                self.indicator_added_styles.append(style_class)
+        elif isinstance(style_class, list):
+            for item in style_class:
+                if item not in self.indicator_added_styles:
+                    self.indicator.get_style_context().add_class(item)
+                    self.indicator_added_styles.append(item)
+        if was_empty:
+            self.box.set_vexpand(True)
+        self.indicator.set_visible(True)
+        return self
+
+    def del_indicator_style(self, style_class):
+        """ Remove style from indicator and hide if empty """
+        if isinstance(style_class, str):
+            if style_class in self.indicator_added_styles:
+                self.indicator.get_style_context().remove_class(style_class)
+                self.indicator_added_styles.remove(style_class)
+        elif isinstance(style_class, list):
+            for item in style_class:
+                if item in self.indicator_added_styles:
+                    self.indicator.get_style_context().remove_class(item)
+                    self.indicator_added_styles.remove(item)
+        if not self.indicator_added_styles:
+            self.box.set_vexpand(False)
+            self.indicator.set_visible(False)
         return self
 
     def set_widget(self, box):

@@ -85,7 +85,7 @@ class Docker(c.BaseModule):
             return
         if data.get('running'):
             widget.set_icon('')
-            c.add_style(widget.indicator, 'green')
+            widget.add_indicator_style('green')
         else:
             widget.set_icon('')
             widget.reset_style()

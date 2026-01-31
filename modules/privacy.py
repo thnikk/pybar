@@ -307,7 +307,7 @@ class Privacy(c.BaseModule):
     def create_widget(self, bar):
         m = c.Module()
         m.set_position(bar.position)
-        c.add_style(m.indicator, 'green')
+        m.add_indicator_style('green')
         m.set_visible(False)
 
         c.state_manager.subscribe(

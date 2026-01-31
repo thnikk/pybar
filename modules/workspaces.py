@@ -137,7 +137,6 @@ class Workspaces(c.BaseModule):
 
             indicator = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             indicator.get_style_context().add_class('indicator')
-            indicator.set_size_request(-1, 3)
             indicator.set_halign(Gtk.Align.FILL)
             indicator.set_valign(Gtk.Align.END)
             box.indicators.append(indicator)
