@@ -120,7 +120,22 @@ def validate_field(value, schema_field):
         return isinstance(value, str)
 
     elif field_type == FieldType.LIST:
-        return isinstance(value, list)
+        if not isinstance(value, list):
+            return False
+
+        item_type = schema_field.get('item_type', FieldType.STRING)
+        min_items = schema_field.get('min_items')
+        max_items = schema_field.get('max_items')
+
+        if min_items is not None and len(value) < min_items:
+            return False
+        if max_items is not None and len(value) > max_items:
+            return False
+
+        for item in value:
+            if not validate_field(item, {'type': item_type}):
+                return False
+        return True
 
     elif field_type == FieldType.DICT:
         if not isinstance(value, dict):

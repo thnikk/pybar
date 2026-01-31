@@ -319,6 +319,103 @@ class DictEditor(FieldEditor):
         return result if result else None
 
 
+class ListEditor(FieldEditor):
+    """Editor for list fields with dynamic items"""
+
+    def __init__(self, key, schema_field, value, on_change):
+        super().__init__(key, schema_field, value, on_change)
+        self.rows = []
+        self.item_type = schema_field.get('item_type', FieldType.STRING)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(150)
+        scroll.set_vexpand(True)
+
+        self.rows_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        scroll.set_child(self.rows_box)
+        self.append(scroll)
+
+        add_btn = Gtk.Button(label='+ Add Item')
+        add_btn.get_style_context().add_class('flat')
+        add_btn.connect('clicked', self._on_add_item)
+        self.append(add_btn)
+
+        if value and isinstance(value, list):
+            for item in value:
+                self._add_item(item)
+
+    def _add_item(self, value=''):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+
+        item_schema = {'type': self.item_type}
+        row.item_editor = create_editor(
+            f'{self.key}_item_{len(self.rows)}',
+            item_schema,
+            value,
+            lambda k, v: self._emit_change()
+        )
+        row.item_editor.set_hexpand(True)
+
+        up_btn = Gtk.Button(label='▲')
+        up_btn.get_style_context().add_class('flat')
+        up_btn.connect('clicked', lambda _: self._move_item_up(row))
+
+        down_btn = Gtk.Button(label='▼')
+        down_btn.get_style_context().add_class('flat')
+        down_btn.connect('clicked', lambda _: self._move_item_down(row))
+
+        delete_btn = Gtk.Button(label='-')
+        delete_btn.get_style_context().add_class('flat')
+        delete_btn.connect('clicked', lambda _: self._remove_item(row))
+
+        row.append(row.item_editor)
+        row.append(up_btn)
+        row.append(down_btn)
+        row.append(delete_btn)
+
+        self.rows_box.append(row)
+        self.rows.append(row)
+
+    def _remove_item(self, row):
+        if row in self.rows:
+            self.rows_box.remove(row)
+            self.rows.remove(row)
+            self._emit_change()
+
+    def _move_item_up(self, row):
+        index = self.rows.index(row)
+        if index > 0:
+            prev_row = self.rows[index - 1]
+            self.rows_box.remove(row)
+            self.rows_box.insert_child_after(row, prev_row)
+            self.rows.remove(row)
+            self.rows.insert(index - 1, row)
+            self._emit_change()
+
+    def _move_item_down(self, row):
+        index = self.rows.index(row)
+        if index < len(self.rows) - 1:
+            next_row = self.rows[index + 1]
+            self.rows_box.remove(next_row)
+            self.rows_box.insert_child_after(next_row, row)
+            self.rows.remove(next_row)
+            self.rows.insert(index, next_row)
+            self._emit_change()
+
+    def _on_add_item(self, _):
+        self._add_item('')
+        self._emit_change()
+
+    def get_value(self):
+        result = []
+        for row in self.rows:
+            value = row.item_editor.get_value()
+            result.append(value)
+        return result if result else None
+
+
 def create_editor(key, schema_field, value, on_change):
     """Factory function to create appropriate editor for field type"""
     field_type = schema_field.get('type', FieldType.STRING)
@@ -331,6 +428,7 @@ def create_editor(key, schema_field, value, on_change):
         FieldType.CHOICE: ChoiceEditor,
         FieldType.FILE: FileEditor,
         FieldType.DICT: DictEditor,
+        FieldType.LIST: ListEditor,
     }
 
     editor_class = editors.get(field_type, StringEditor)

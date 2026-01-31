@@ -47,8 +47,8 @@ def format_time(microseconds):
 class MPRIS(c.BaseModule):
     SCHEMA = {
         'players': {
-            'type': 'string',
-            'default': '',
+            'type': 'list',
+            'default': [],
             'label': 'Players',
             'description': 'Comma-separated list of player names to show '
                            '(e.g. "spotify,firefox"). Empty for any player.'

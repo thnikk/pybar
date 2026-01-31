@@ -27,7 +27,13 @@ class Updates(c.BaseModule):
             'default': 'kitty',
             'label': 'Terminal',
             'description': 'Terminal emulator for running updates'
-        }
+        },
+        'alerts': {
+            'type': 'list',
+            'default': [],
+            'label': 'Alerts',
+            'description': 'List of packages to prioritize in package list'
+            }
     }
 
     manager_config = {

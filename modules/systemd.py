@@ -13,6 +13,13 @@ from gi.repository import Gtk  # noqa
 
 class Systemd(c.BaseModule):
     SCHEMA = {
+        'blacklist': {
+            'type': 'list',
+            'item_type': 'string',
+            'default': [],
+            'label': 'Blacklist',
+            'description': 'Service prefixes to ignore'
+        },
         'interval': {
             'type': 'integer',
             'default': 60,
