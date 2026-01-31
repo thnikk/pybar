@@ -10,6 +10,8 @@ from gi.repository import Gtk  # noqa
 
 
 class Debug(c.BaseModule):
+    EMPTY_IS_ERROR = False
+
     def fetch_data(self):
         """ Debug module doesn't need external data """
         return {}
