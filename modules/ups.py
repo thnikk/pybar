@@ -63,6 +63,37 @@ class CyberPower:
 
 
 class UPS(c.BaseModule):
+    SCHEMA = {
+        'vendor': {
+            'type': 'string',
+            'default': '0764',
+            'label': 'Vendor ID',
+            'description': 'USB vendor ID in hex (e.g. 0764 for CyberPower)'
+        },
+        'product': {
+            'type': 'string',
+            'default': '0501',
+            'label': 'Product ID',
+            'description': 'USB product ID in hex'
+        },
+        'offset': {
+            'type': 'integer',
+            'default': 0,
+            'label': 'Watt Offset',
+            'description': 'Subtract this value from load watts',
+            'min': 0,
+            'max': 500
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 5,
+            'label': 'Update Interval',
+            'description': 'How often to poll UPS status (seconds)',
+            'min': 1,
+            'max': 60
+        }
+    }
+
     def fetch_data(self):
         vendor = int(self.config.get('vendor', "0764"), 16)
         product = int(self.config.get('product', "0501"), 16)

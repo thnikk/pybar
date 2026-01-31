@@ -14,6 +14,17 @@ capacity_lookup = ["critical", "low", "normal", "high", "full"]
 
 
 class PowerSupply(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 60,
+            'label': 'Update Interval',
+            'description': 'How often to check power supply status (seconds)',
+            'min': 10,
+            'max': 300
+        }
+    }
+
     def parse_uevent(self, uevent):
         output = {}
         for line in uevent.splitlines():

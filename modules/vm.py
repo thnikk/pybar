@@ -11,6 +11,17 @@ from gi.repository import Gtk  # noqa
 
 
 class VM(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 10,
+            'label': 'Update Interval',
+            'description': 'How often to check for running VMs (seconds)',
+            'min': 5,
+            'max': 60
+        }
+    }
+
     def fetch_data(self):
         try:
             domains = [

@@ -15,6 +15,23 @@ from gi.repository import Gtk, GLib  # noqa
 class Network(c.BaseModule):
     DEFAULT_INTERVAL = 3
 
+    SCHEMA = {
+        'always_show': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Always Show Icon',
+            'description': 'Show network icon even when connected'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 3,
+            'label': 'Update Interval',
+            'description': 'Seconds between network checks',
+            'min': 1,
+            'max': 60
+        }
+    }
+
     def get_devices(self):
         """ Get active NetworkManager connections """
         try:

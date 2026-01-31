@@ -12,6 +12,17 @@ from gi.repository import Gtk  # noqa
 
 
 class Systemd(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 60,
+            'label': 'Update Interval',
+            'description': 'How often to check for failed services (seconds)',
+            'min': 10,
+            'max': 600
+        }
+    }
+
     def get_failed(self, user=False):
         cmd = ['systemctl', '--failed', '--legend=no']
         if user:

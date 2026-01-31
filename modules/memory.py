@@ -11,6 +11,17 @@ from gi.repository import Gtk  # noqa
 
 
 class Memory(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 5,
+            'label': 'Update Interval',
+            'description': 'How often to update memory stats (seconds)',
+            'min': 1,
+            'max': 60
+        }
+    }
+
     def fetch_data(self):
         """ Get memory usage """
         mem = psutil.virtual_memory()

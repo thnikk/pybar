@@ -13,6 +13,23 @@ from gi.repository import Gtk  # noqa
 
 
 class Updates(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Update Interval',
+            'description': 'Seconds between update checks',
+            'min': 60,
+            'max': 3600
+        },
+        'terminal': {
+            'type': 'string',
+            'default': 'kitty',
+            'label': 'Terminal',
+            'description': 'Terminal emulator for running updates'
+        }
+    }
+
     manager_config = {
         "Pacman": {
             "command": ["checkupdates"],

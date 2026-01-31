@@ -11,6 +11,21 @@ from gi.repository import Gtk  # noqa
 
 
 class Toggle(c.BaseModule):
+    SCHEMA = {
+        'icon': {
+            'type': 'string',
+            'default': '',
+            'label': 'Icon',
+            'description': 'Icon to display next to the toggle'
+        },
+        'program': {
+            'type': 'string',
+            'default': '',
+            'label': 'Program',
+            'description': 'Command to run when toggled on (space-separated)'
+        }
+    }
+
     def __init__(self, name, config):
         super().__init__(name, config)
         self.proc = None

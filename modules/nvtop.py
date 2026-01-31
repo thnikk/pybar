@@ -12,6 +12,17 @@ from gi.repository import Gtk  # noqa
 
 
 class NVTop(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 1,
+            'label': 'Update Interval',
+            'description': 'How often to update GPU stats (seconds)',
+            'min': 1,
+            'max': 10
+        }
+    }
+
     DEFAULT_INTERVAL = 1
 
     def fetch_data(self):

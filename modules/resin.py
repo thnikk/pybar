@@ -17,6 +17,29 @@ except ImportError:
 
 
 class Resin(c.BaseModule):
+    SCHEMA = {
+        'ltuid': {
+            'type': 'string',
+            'default': '',
+            'label': 'HoYoLAB UID',
+            'description': 'HoYoLAB account ltuid cookie value'
+        },
+        'ltoken': {
+            'type': 'string',
+            'default': '',
+            'label': 'HoYoLAB Token',
+            'description': 'HoYoLAB account ltoken cookie value'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Update Interval',
+            'description': 'How often to fetch resin data (seconds)',
+            'min': 60,
+            'max': 1800
+        }
+    }
+
     def time_diff(self, now, future, rate):
         max_time = future - now
         until_next = (max_time.seconds // 60) % (rate * 40)

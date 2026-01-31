@@ -12,6 +12,29 @@ from gi.repository import Gtk  # noqa
 
 
 class Docker(c.BaseModule):
+    SCHEMA = {
+        'path': {
+            'type': 'file',
+            'default': '',
+            'label': 'Compose Directory',
+            'description': 'Path to docker-compose directory'
+        },
+        'label': {
+            'type': 'string',
+            'default': 'Docker',
+            'label': 'Label',
+            'description': 'Label to show in the bar'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 30,
+            'label': 'Update Interval',
+            'description': 'How often to check docker status (seconds)',
+            'min': 5,
+            'max': 300
+        }
+    }
+
     def fetch_data(self):
         """ Get docker compose status and logs """
         path = os.path.expanduser(self.config.get('path', ''))

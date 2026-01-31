@@ -12,6 +12,53 @@ from gi.repository import Gtk  # noqa
 
 
 class XDrip(c.BaseModule):
+    SCHEMA = {
+        'ip': {
+            'type': 'string',
+            'default': '',
+            'label': 'IP Address',
+            'description': 'XDrip+ server IP address or hostname'
+        },
+        'port': {
+            'type': 'integer',
+            'default': 17580,
+            'label': 'Port',
+            'description': 'XDrip+ web service port',
+            'min': 1,
+            'max': 65535
+        },
+        'api_secret': {
+            'type': 'string',
+            'default': '',
+            'label': 'API Secret',
+            'description': 'XDrip+ API secret'
+        },
+        'min': {
+            'type': 'integer',
+            'default': 40,
+            'label': 'Graph Minimum',
+            'description': 'Minimum value for glucose graph',
+            'min': 0,
+            'max': 100
+        },
+        'max': {
+            'type': 'integer',
+            'default': 200,
+            'label': 'Graph Maximum',
+            'description': 'Maximum value for glucose graph',
+            'min': 100,
+            'max': 400
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 60,
+            'label': 'Update Interval',
+            'description': 'How often to fetch glucose data (seconds)',
+            'min': 30,
+            'max': 300
+        }
+    }
+
     def fetch_data(self):
         ip = self.config.get('ip') or self.config.get('host')
         port = self.config.get('port')

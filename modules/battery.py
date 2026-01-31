@@ -11,6 +11,17 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 class Battery(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 60,
+            'label': 'Update Interval',
+            'description': 'Seconds between battery checks',
+            'min': 10,
+            'max': 300
+        }
+    }
+
     def fetch_data(self):
         """ Get battery data """
         info = {}

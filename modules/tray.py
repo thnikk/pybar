@@ -960,6 +960,36 @@ class TrayModuleWidget(Gtk.Box):
 
 
 class Tray(c.BaseModule):
+    SCHEMA = {
+        'icon_size': {
+            'type': 'integer',
+            'default': 18,
+            'label': 'Icon Size',
+            'description': 'Size of tray icons in pixels',
+            'min': 12,
+            'max': 48
+        },
+        'direction': {
+            'type': 'choice',
+            'default': 'left',
+            'label': 'Expand Direction',
+            'description': 'Direction the tray expands when opened',
+            'choices': ['left', 'right']
+        },
+        'collapsed': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Start Collapsed',
+            'description': 'Start with tray icons hidden'
+        },
+        'debug': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Debug Mode',
+            'description': 'Enable debug output for tray'
+        }
+    }
+
     def run_worker(self):
         """ Tray uses D-Bus, no periodic fetch needed """
         pass

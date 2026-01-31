@@ -16,6 +16,17 @@ CACHE_DIR = os.path.expanduser('~/.cache/pybar')
 
 
 class MPC(c.BaseModule):
+    SCHEMA = {
+        'art_size': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Album Art Size',
+            'description': 'Size of album art in popover (pixels)',
+            'min': 100,
+            'max': 500
+        }
+    }
+
     def get_mpc_status(self):
         try:
             # Get status and current song info

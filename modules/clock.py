@@ -16,6 +16,23 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 class Clock(c.BaseModule):
     DEFAULT_INTERVAL = 1
 
+    SCHEMA = {
+        'format': {
+            'type': 'string',
+            'default': '%I:%M %m/%d',
+            'label': 'Time Format',
+            'description': 'strftime format string for the clock display'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 1,
+            'label': 'Update Interval',
+            'description': 'Seconds between updates',
+            'min': 1,
+            'max': 60
+        }
+    }
+
     def fetch_data(self):
         """ Get current time """
         now = datetime.now()

@@ -11,6 +11,29 @@ from gi.repository import Gtk  # noqa
 
 
 class HASS2(c.BaseModule):
+    SCHEMA = {
+        'server': {
+            'type': 'string',
+            'default': '',
+            'label': 'Server',
+            'description': 'Home Assistant server address (e.g. 192.168.1.100:8123)'
+        },
+        'bearer_token': {
+            'type': 'string',
+            'default': '',
+            'label': 'Bearer Token',
+            'description': 'Long-lived access token from Home Assistant'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 30,
+            'label': 'Update Interval',
+            'description': 'How often to poll devices (seconds)',
+            'min': 5,
+            'max': 600
+        }
+    }
+
     def get_ha_state(self, server, entity, token):
         try:
             res = requests.get(

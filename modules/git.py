@@ -14,6 +14,29 @@ from gi.repository import Gtk  # noqa
 
 
 class Git(c.BaseModule):
+    SCHEMA = {
+        'path': {
+            'type': 'file',
+            'default': '',
+            'label': 'Repository Path',
+            'description': 'Path to the git repository'
+        },
+        'icon': {
+            'type': 'string',
+            'default': '',
+            'label': 'Icon',
+            'description': 'Icon to display in the bar'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Update Interval',
+            'description': 'How often to check for updates (seconds)',
+            'min': 60,
+            'max': 3600
+        }
+    }
+
     def get_repo_name(self, path):
         try:
             output = run(

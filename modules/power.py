@@ -11,6 +11,21 @@ from gi.repository import Gtk  # noqa
 
 
 class Power(c.BaseModule):
+    SCHEMA = {
+        'lock': {
+            'type': 'string',
+            'default': 'swaylock',
+            'label': 'Lock Command',
+            'description': 'Command to lock the screen'
+        },
+        'log_out': {
+            'type': 'string',
+            'default': 'swaymsg exit',
+            'label': 'Log Out Command',
+            'description': 'Command to log out'
+        }
+    }
+
     def fetch_data(self):
         """ Power module doesn't really have data but we follow the pattern """
         return {"icon": ""}

@@ -16,6 +16,41 @@ class Weather(c.BaseModule):
     DEFAULT_INTERVAL = 300
     STALE_INTERVAL = 600
 
+    SCHEMA = {
+        'zip_code': {
+            'type': 'string',
+            'default': '94102',
+            'label': 'ZIP Code / City',
+            'description': 'Location for weather lookup (ZIP code or city name)'
+        },
+        'night_icons': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Night Icons',
+            'description': 'Use moon icons after sunset'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Update Interval',
+            'description': 'Seconds between weather updates',
+            'min': 60,
+            'max': 3600
+        },
+        'min': {
+            'type': 'integer',
+            'default': None,
+            'label': 'Graph Min Temp',
+            'description': 'Minimum temperature on graph (auto if empty)'
+        },
+        'max': {
+            'type': 'integer',
+            'default': None,
+            'label': 'Graph Max Temp',
+            'description': 'Maximum temperature on graph (auto if empty)'
+        }
+    }
+
     def lookup(self, code, mode, night=False):
         """ Get description for weather code """
         weather_lookup = {

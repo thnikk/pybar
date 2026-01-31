@@ -45,6 +45,30 @@ def format_time(microseconds):
 
 
 class MPRIS(c.BaseModule):
+    SCHEMA = {
+        'players': {
+            'type': 'string',
+            'default': '',
+            'label': 'Players',
+            'description': 'Comma-separated list of player names to show '
+                           '(e.g. "spotify,firefox"). Empty for any player.'
+        },
+        'art_size': {
+            'type': 'integer',
+            'default': 300,
+            'label': 'Album Art Size',
+            'description': 'Size of album art in popover (pixels)',
+            'min': 100,
+            'max': 500
+        },
+        'show_title': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Show Title',
+            'description': 'Show song title in the bar'
+        }
+    }
+
     def __init__(self, name, config):
         super().__init__(name, config)
         # Handle both string (single player) and list (multiple players)

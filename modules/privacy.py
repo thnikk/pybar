@@ -13,6 +13,17 @@ from gi.repository import Gtk  # noqa
 
 
 class Privacy(c.BaseModule):
+    SCHEMA = {
+        'interval': {
+            'type': 'integer',
+            'default': 3,
+            'label': 'Update Interval',
+            'description': 'How often to check for active devices (seconds)',
+            'min': 1,
+            'max': 30
+        }
+    }
+
     DEFAULT_INTERVAL = 3
     EMPTY_IS_ERROR = False
 

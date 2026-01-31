@@ -13,6 +13,23 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 
 
 class Backlight(c.BaseModule):
+    SCHEMA = {
+        'device': {
+            'type': 'string',
+            'default': '',
+            'label': 'Backlight Device',
+            'description': 'Device name (e.g., intel_backlight). Leave empty for auto.'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 5,
+            'label': 'Update Interval',
+            'description': 'Seconds between brightness checks',
+            'min': 1,
+            'max': 60
+        }
+    }
+
     def get_brightness_info(self, device=None):
         base_dir = "/sys/class/backlight"
         base_path = None

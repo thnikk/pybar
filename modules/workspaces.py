@@ -14,6 +14,21 @@ from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 
 class Workspaces(c.BaseModule):
+    SCHEMA = {
+        'always_show_number': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Always Show Number',
+            'description': 'Show workspace number alongside icon'
+        },
+        'colorize_by_monitor': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Colorize by Monitor',
+            'description': 'Color workspaces based on which monitor they are on'
+        }
+    }
+
     def get_wm(self):
         try:
             run(['swaymsg', '-t', 'get_version'], capture_output=False,

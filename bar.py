@@ -133,6 +133,12 @@ class Bar:
         self.window.set_child(self.bar)
         self.monitor = monitor
 
+        # Add right-click handler for settings
+        right_click = Gtk.GestureClick()
+        right_click.set_button(3)  # Right click
+        right_click.connect('pressed', self._on_right_click)
+        self.bar.add_controller(right_click)
+
     def populate(self):
         """ Populate bar with modules """
         for section_name, section in {
@@ -144,6 +150,80 @@ class Bar:
                 loaded_module = module.module(self, name, self.config)
                 if loaded_module:
                     section.append(loaded_module)
+
+    def _on_right_click(self, gesture, n_press, x, y):
+        """ Handle right-click on bar to show context menu """
+        # Check if the click is on a module widget (not blank bar area)
+        # Get the widget at the click coordinates
+        widget = self.bar.pick(x, y, Gtk.PickFlags.DEFAULT)
+
+        # Only show menu if clicking on the bar itself or section boxes
+        # (not on module widgets which have their own right-click handlers)
+        if widget is not None:
+            # Walk up the widget tree to check if we're on a module
+            current = widget
+            while current is not None:
+                style_context = current.get_style_context()
+                # Check if this is a module widget
+                if (style_context.has_class('module') or
+                        style_context.has_class('workspaces') or
+                        style_context.has_class('tray-module')):
+                    # Click is on a module, don't show bar context menu
+                    return
+                # Check if we've reached the bar/section level
+                if (current == self.bar or
+                        current == self.left or
+                        current == self.center or
+                        current == self.right):
+                    break
+                current = current.get_parent()
+
+        # Create popover menu
+        popover = Gtk.Popover()
+        popover.set_position(Gtk.PositionType.TOP)
+        popover.set_autohide(True)
+
+        menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        # Settings button
+        settings_btn = Gtk.Button(label='Settings')
+        settings_btn.get_style_context().add_class('flat')
+        settings_btn.connect('clicked', self._open_settings, popover)
+        menu_box.append(settings_btn)
+
+        # Reload button
+        reload_btn = Gtk.Button(label='Reload')
+        reload_btn.get_style_context().add_class('flat')
+        reload_btn.connect('clicked', self._reload_bar, popover)
+        menu_box.append(reload_btn)
+
+        popover.set_child(menu_box)
+
+        # Position the popover at click location
+        rect = Gdk.Rectangle()
+        rect.x = int(x)
+        rect.y = int(y)
+        rect.width = 1
+        rect.height = 1
+        popover.set_pointing_to(rect)
+        popover.set_parent(self.bar)
+        popover.popup()
+
+    def _open_settings(self, btn, popover):
+        """ Open settings window """
+        popover.popdown()
+        from settings import launch_settings_window
+        config_path = self.display.app.config_path
+        launch_settings_window(config_path)
+
+    def _reload_bar(self, btn, popover):
+        """ Reload the bar configuration """
+        popover.popdown()
+        # Trigger a config reload
+        import config as Config
+        new_config = Config.load(self.display.app.config_path)
+        c.state_manager.update('config', new_config)
+        c.state_manager.update('config_reload', True)
 
     def css(self, file):
         """ Load CSS from file """

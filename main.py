@@ -141,6 +141,7 @@ def main():
         application_id='org.thnikk.pybar',
         flags=flags
     )
+    app.config_path = args.config  # Store config path for settings window
     app.connect('activate', lambda app: on_activate(app, config))
     
     # Use an empty list for argv to prevent GTK from parsing custom args

@@ -15,6 +15,31 @@ except ImportError:
 
 
 class Transmission(c.BaseModule):
+    SCHEMA = {
+        'host': {
+            'type': 'string',
+            'default': 'localhost',
+            'label': 'Host',
+            'description': 'Transmission RPC host'
+        },
+        'port': {
+            'type': 'integer',
+            'default': 9091,
+            'label': 'Port',
+            'description': 'Transmission RPC port',
+            'min': 1,
+            'max': 65535
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 30,
+            'label': 'Update Interval',
+            'description': 'How often to check torrent status (seconds)',
+            'min': 10,
+            'max': 300
+        }
+    }
+
     def fetch_data(self):
         if not Client:
             return {}

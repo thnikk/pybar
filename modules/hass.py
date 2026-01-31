@@ -14,6 +14,61 @@ HISTORY = {}
 
 
 class HASS(c.BaseModule):
+    SCHEMA = {
+        'server': {
+            'type': 'string',
+            'default': '',
+            'label': 'Server',
+            'description': 'Home Assistant server address (e.g. 192.168.1.100:8123)'
+        },
+        'sensor': {
+            'type': 'string',
+            'default': '',
+            'label': 'Sensor Entity ID',
+            'description': 'Entity ID of the sensor (e.g. sensor.temperature)'
+        },
+        'bearer_token': {
+            'type': 'string',
+            'default': '',
+            'label': 'Bearer Token',
+            'description': 'Long-lived access token from Home Assistant'
+        },
+        'format': {
+            'type': 'string',
+            'default': '{}',
+            'label': 'Format String',
+            'description': 'Format string with {} for value (e.g. "{}°C")'
+        },
+        'history': {
+            'type': 'integer',
+            'default': 100,
+            'label': 'History Length',
+            'description': 'Number of data points to keep for graph',
+            'min': 10,
+            'max': 500
+        },
+        'min': {
+            'type': 'float',
+            'default': None,
+            'label': 'Graph Minimum',
+            'description': 'Minimum value for graph scale (optional)'
+        },
+        'max': {
+            'type': 'float',
+            'default': None,
+            'label': 'Graph Maximum',
+            'description': 'Maximum value for graph scale (optional)'
+        },
+        'interval': {
+            'type': 'integer',
+            'default': 30,
+            'label': 'Update Interval',
+            'description': 'How often to poll sensor (seconds)',
+            'min': 5,
+            'max': 600
+        }
+    }
+
     def get_ha_data(self, server, sensor, bearer_token):
         try:
             response = requests.get(
