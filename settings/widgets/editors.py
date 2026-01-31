@@ -73,8 +73,11 @@ class IntegerEditor(FieldEditor):
         max_val = schema_field.get('max', 999999)
 
         # Use a box with entry and spin buttons
+        default_value = schema_field.get('default')
+        if default_value is None:
+            default_value = 0
         self.adjustment = Gtk.Adjustment(
-            value=value if value is not None else schema_field.get('default', 0),
+            value=value if value is not None else default_value,
             lower=min_val,
             upper=max_val,
             step_increment=1,
@@ -124,8 +127,11 @@ class FloatEditor(FieldEditor):
         max_val = schema_field.get('max', 999999.0)
         step = schema_field.get('step', 0.1)
 
+        default_value = schema_field.get('default')
+        if default_value is None:
+            default_value = 0.0
         self.adjustment = Gtk.Adjustment(
-            value=value if value is not None else schema_field.get('default', 0),
+            value=value if value is not None else default_value,
             lower=min_val,
             upper=max_val,
             step_increment=step,
