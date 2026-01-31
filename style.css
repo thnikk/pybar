@@ -79,6 +79,13 @@ window {
 	border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+.indicator.monitor-1 { background: @green; }
+.indicator.monitor-2 { background: @blue; }
+.indicator.monitor-3 { background: @red; }
+.indicator.monitor-4 { background: @orange; }
+.indicator.monitor-5 { background: @yellow; }
+.indicator.monitor-6 { background: @light_gray; }
+
 .scroll {
 	border-radius: 10px;
 }
@@ -112,8 +119,8 @@ text {
 .blue:active { background: @white; color: @blue; }
 
 .indicator {
-	margin-top: -1px;
 	border-radius: 2px;
+	margin-bottom: 1px;
 }
 
 /* Override default rules */
