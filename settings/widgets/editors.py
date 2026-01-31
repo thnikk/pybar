@@ -186,7 +186,8 @@ class ChoiceEditor(FieldEditor):
         elif choices:
             self.dropdown.set_selected(0)
 
-        self.dropdown.connect('notify::selected', lambda *_: self._emit_change())
+        self.dropdown.connect(
+            'notify::selected', lambda *_: self._emit_change())
         self.append(self.dropdown)
 
     def get_value(self):
@@ -235,6 +236,89 @@ class FileEditor(FieldEditor):
         return text if text else None
 
 
+class DictEditor(FieldEditor):
+    """Editor for dict fields with dynamic key-value pairs"""
+
+    def __init__(self, key, schema_field, value, on_change):
+        super().__init__(key, schema_field, value, on_change)
+        self.rows = []
+        self.key_type = schema_field.get('key_type', FieldType.STRING)
+        self.value_type = schema_field.get('value_type', FieldType.STRING)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(150)
+        scroll.set_vexpand(True)
+
+        self.rows_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        scroll.set_child(self.rows_box)
+        self.append(scroll)
+
+        add_btn = Gtk.Button(label='+ Add Entry')
+        add_btn.get_style_context().add_class('flat')
+        add_btn.connect('clicked', self._on_add_row)
+        self.append(add_btn)
+
+        if value and isinstance(value, dict):
+            for k, v in value.items():
+                self._add_row(k, v)
+
+    def _add_row(self, key='', value=''):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+
+        key_schema = {'type': self.key_type}
+        row.key_editor = create_editor(
+            f'{self.key}_key_{len(self.rows)}',
+            key_schema,
+            key,
+            lambda k, v: self._emit_change()
+        )
+        if hasattr(row.key_editor, 'entry'):
+            row.key_editor.entry.set_width_chars(15)
+        elif hasattr(row.key_editor, 'spin'):
+            row.key_editor.spin.set_width_chars(10)
+
+        value_schema = {'type': self.value_type}
+        row.value_editor = create_editor(
+            f'{self.key}_value_{len(self.rows)}',
+            value_schema,
+            value,
+            lambda k, v: self._emit_change()
+        )
+        row.value_editor.set_hexpand(True)
+
+        delete_btn = Gtk.Button(label='-')
+        delete_btn.get_style_context().add_class('flat')
+        delete_btn.connect('clicked', lambda _: self._remove_row(row))
+
+        row.append(row.key_editor)
+        row.append(row.value_editor)
+        row.append(delete_btn)
+
+        self.rows_box.append(row)
+        self.rows.append(row)
+
+    def _remove_row(self, row):
+        if row in self.rows:
+            self.rows_box.remove(row)
+            self.rows.remove(row)
+            self._emit_change()
+
+    def _on_add_row(self, _):
+        self._add_row('', '')
+        self._emit_change()
+
+    def get_value(self):
+        result = {}
+        for row in self.rows:
+            key = row.key_editor.get_value()
+            if key is None or (isinstance(key, str) and not key.strip()):
+                continue
+            result[key] = row.value_editor.get_value()
+        return result if result else None
+
+
 def create_editor(key, schema_field, value, on_change):
     """Factory function to create appropriate editor for field type"""
     field_type = schema_field.get('type', FieldType.STRING)
@@ -246,6 +330,7 @@ def create_editor(key, schema_field, value, on_change):
         FieldType.BOOLEAN: BooleanEditor,
         FieldType.CHOICE: ChoiceEditor,
         FieldType.FILE: FileEditor,
+        FieldType.DICT: DictEditor,
     }
 
     editor_class = editors.get(field_type, StringEditor)

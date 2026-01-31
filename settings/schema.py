@@ -15,6 +15,7 @@ class FieldType:
     COLOR = 'color'
     FILE = 'file'
     LIST = 'list'
+    DICT = 'dict'
 
 
 # Global config schema for bar-level settings
@@ -120,6 +121,20 @@ def validate_field(value, schema_field):
 
     elif field_type == FieldType.LIST:
         return isinstance(value, list)
+
+    elif field_type == FieldType.DICT:
+        if not isinstance(value, dict):
+            return False
+
+        key_type = schema_field.get('key_type', FieldType.STRING)
+        value_type = schema_field.get('value_type', FieldType.STRING)
+
+        for k, v in value.items():
+            if not validate_field(k, {'type': key_type}):
+                return False
+            if not validate_field(v, {'type': value_type}):
+                return False
+        return True
 
     return True
 

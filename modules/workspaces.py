@@ -15,6 +15,16 @@ from gi.repository import Gtk, Gdk, GLib, GObject  # noqa
 
 class Workspaces(c.BaseModule):
     SCHEMA = {
+        'icons': {
+            'type': 'dict',
+            'key_type': 'string',
+            'value_type': 'string',
+            'default': {},
+            'label': 'Workspace Icons',
+            'description': (
+                'Map workspace numbers to custom icons (e.g., "1": " ", '
+                '"2": " ", "default": " ")')
+        },
         'always_show_number': {
             'type': 'boolean',
             'default': False,
@@ -25,7 +35,8 @@ class Workspaces(c.BaseModule):
             'type': 'boolean',
             'default': False,
             'label': 'Colorize by Monitor',
-            'description': 'Color workspaces based on which monitor they are on'
+            'description': (
+                'Color workspaces based on which monitor they are on')
         }
     }
 
@@ -134,8 +145,11 @@ class Workspaces(c.BaseModule):
 
         for n in range(1, 11):
             label = self.config.get('icons', {}).get(
-                str(n), self.config.get('icons', {}).get('default', str(n)))
-            if self.config.get('always_show_number', False) and label != str(n):
+                str(n),
+                self.config.get('icons', {}).get(
+                    'default', str(n)))
+            if (label != str(n) and
+                    self.config.get('always_show_number', False)):
                 label = f"{n} {label}"
             button = c.button(label=None, style='workspace')
             button.set_visible(False)
@@ -170,7 +184,7 @@ class Workspaces(c.BaseModule):
 
         for n, (button, indicator) in enumerate(
                 zip(widget.buttons, widget.indicators)):
-            name = str(n+1)
+            name = str(n + 1)
             if name in workspaces:
                 button.set_visible(True)
             else:
