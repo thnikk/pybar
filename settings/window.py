@@ -6,25 +6,18 @@ Author: thnikk
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gdk, Gio  # noqa
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Gdk, Gio, Adw
 
 import config as Config
 
 SETTINGS_CSS = """
-.heading {
-    font-weight: bold;
-    font-size: 1.1em;
-}
-
-.title {
-    font-weight: bold;
-}
-
 .module-chip {
     padding: 4px 8px;
     border-radius: 6px;
@@ -94,100 +87,87 @@ from settings.tabs.modules import ModulesTab
 from settings.tabs.appearance import AppearanceTab
 
 
-class SettingsWindow(Gtk.ApplicationWindow):
-    """Main settings window with tabbed interface"""
+class SettingsWindow(Adw.PreferencesWindow):
+    """Main settings window with libadwaita preferences"""
 
     def __init__(self, app, config, config_path):
-        super().__init__(application=app, title='Pybar Settings')
-        self.set_default_size(750, 600)
+        super().__init__(application=app)
+        self.set_title('Pybar Settings')
         self.config = config.copy()
         self.config_path = config_path
         self.pending_changes = {}
         self.module_changes = {}
+        self.has_changes = False
 
-        # Load CSS
         self._load_css()
 
-        # Main container
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        general_page = self._create_general_page()
+        self.add(general_page)
 
-        # Header bar
-        header = Gtk.HeaderBar()
-        header.set_show_title_buttons(True)
-        self.set_titlebar(header)
+        modules_page = self._create_modules_page()
+        self.add(modules_page)
 
-        # Save button
-        self.save_btn = Gtk.Button(label='Save')
-        self.save_btn.get_style_context().add_class('suggested-action')
-        self.save_btn.connect('clicked', self._on_save)
-        self.save_btn.set_sensitive(False)
-        header.pack_end(self.save_btn)
+        appearance_page = self._create_appearance_page()
+        self.add(appearance_page)
 
-        # Reload button
-        reload_btn = Gtk.Button()
-        reload_btn.set_icon_name('view-refresh-symbolic')
-        reload_btn.set_tooltip_text('Reload config from disk')
-        reload_btn.connect('clicked', self._on_reload)
-        header.pack_start(reload_btn)
+        self.connect('close-request', self._on_close_request)
 
-        # Notebook (tabbed interface)
-        self.notebook = Gtk.Notebook()
-        self.notebook.set_vexpand(True)
+    def _create_general_page(self):
+        """Create general settings page"""
+        page = Adw.PreferencesPage()
+        page.set_title('General')
+        page.set_icon_name('preferences-system-symbolic')
 
-        # Create tabs
         self.general_tab = GeneralTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.general_tab, Gtk.Label(label='General'))
+        page.add(self.general_tab)
+
+        return page
+
+    def _create_modules_page(self):
+        """Create modules page"""
+        page = Adw.PreferencesPage()
+        page.set_title('Modules')
+        page.set_icon_name('application-x-addon-symbolic')
 
         self.modules_tab = ModulesTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.modules_tab, Gtk.Label(label='Modules'))
+        page.add(self.modules_tab)
+
+        return page
+
+    def _create_appearance_page(self):
+        """Create appearance page"""
+        page = Adw.PreferencesPage()
+        page.set_title('Appearance')
+        page.set_icon_name('preferences-desktop-theme-symbolic')
 
         self.appearance_tab = AppearanceTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.appearance_tab, Gtk.Label(label='Appearance'))
+        page.add(self.appearance_tab)
 
-        main_box.append(self.notebook)
-
-        # Status bar
-        self.status_bar = Gtk.Label(label='')
-        self.status_bar.set_halign(Gtk.Align.START)
-        self.status_bar.set_margin_start(10)
-        self.status_bar.set_margin_end(10)
-        self.status_bar.set_margin_top(5)
-        self.status_bar.set_margin_bottom(5)
-        main_box.append(self.status_bar)
-
-        self.set_child(main_box)
+        return page
 
     def _on_change(self, key, value, module_name=None):
         """Handle setting change from any tab"""
         if key == '__layout__':
-            # Layout change - value is dict of section -> modules
             for section, modules in value.items():
                 self.pending_changes[section] = modules
         elif module_name:
-            # Module-specific setting
             if module_name not in self.module_changes:
                 self.module_changes[module_name] = {}
             self.module_changes[module_name][key] = value
         else:
-            # Global setting
             self.pending_changes[key] = value
 
-        self.save_btn.set_sensitive(True)
-        self.status_bar.set_text('Unsaved changes')
+        self.has_changes = True
+        self._save_config()
 
-    def _on_save(self, _):
+    def _save_config(self):
         """Save configuration to disk"""
-        # Apply pending changes to config
         for key, value in self.pending_changes.items():
             if value is None:
                 self.config.pop(key, None)
             else:
                 self.config[key] = value
 
-        # Apply module changes
         if 'modules' not in self.config:
             self.config['modules'] = {}
         for module_name, changes in self.module_changes.items():
@@ -199,48 +179,24 @@ class SettingsWindow(Gtk.ApplicationWindow):
                 else:
                     self.config['modules'][module_name][key] = value
 
-        # Save to disk
         try:
             Config.save(self.config_path, self.config)
             self.pending_changes.clear()
             self.module_changes.clear()
-            self.save_btn.set_sensitive(False)
-            self.status_bar.set_text('Saved successfully - restart pybar to apply')
-
+            self.has_changes = False
+            self._show_toast('Saved - restart pybar to apply changes')
         except Exception as e:
-            self.status_bar.set_text(f'Save failed: {e}')
+            self._show_toast(f'Save failed: {e}')
 
-    def _on_reload(self, _):
-        """Reload config from disk"""
-        try:
-            self.config = Config.load(self.config_path)
-            self.pending_changes.clear()
-            self.module_changes.clear()
-            self.save_btn.set_sensitive(False)
-            self.status_bar.set_text('Reloaded from disk')
-            # Rebuild tabs
-            self._rebuild_tabs()
-        except Exception as e:
-            self.status_bar.set_text(f'Reload failed: {e}')
+    def _show_toast(self, message):
+        """Show a toast notification"""
+        toast = Adw.Toast.new(message)
+        toast.set_timeout(3)
+        self.add_toast(toast)
 
-    def _rebuild_tabs(self):
-        """Rebuild all tabs with fresh config"""
-        # Remove old tabs
-        while self.notebook.get_n_pages() > 0:
-            self.notebook.remove_page(0)
-
-        # Recreate tabs
-        self.general_tab = GeneralTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.general_tab, Gtk.Label(label='General'))
-
-        self.modules_tab = ModulesTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.modules_tab, Gtk.Label(label='Modules'))
-
-        self.appearance_tab = AppearanceTab(self.config, self._on_change)
-        self.notebook.append_page(
-            self.appearance_tab, Gtk.Label(label='Appearance'))
+    def _on_close_request(self, _):
+        """Handle window close request"""
+        return False
 
     def _load_css(self):
         """Load custom CSS for settings window"""
@@ -248,10 +204,11 @@ class SettingsWindow(Gtk.ApplicationWindow):
         css_provider.load_from_data(SETTINGS_CSS.encode())
         display = Gdk.Display.get_default()
         Gtk.StyleContext.add_provider_for_display(
-            display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
 
-class SettingsApplication(Gtk.Application):
+class SettingsApplication(Adw.Application):
     """Separate GTK application for settings window"""
 
     def __init__(self, config_path):
