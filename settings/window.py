@@ -77,6 +77,14 @@ SETTINGS_CSS = """
 entry.error {
     border-color: @error_color;
 }
+
+button.restart-btn {
+    color: @destructive_color;
+}
+
+button.restart-btn:hover {
+    background: alpha(@destructive_color, 0.1);
+}
 """
 from settings.tabs.general import GeneralTab
 from settings.tabs.modules import ModulesTab
@@ -113,6 +121,17 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.save_btn.connect('clicked', self._on_save)
         self.save_btn.set_sensitive(False)
         header.pack_end(self.save_btn)
+
+        self.restart_btn = Gtk.Button(label='Restart')
+        restart_icon = Gtk.Image.new_from_icon_name(
+            'view-refresh-symbolic'
+        )
+        self.restart_btn.set_child(restart_icon)
+        self.restart_btn.add_css_class('flat')
+        self.restart_btn.add_css_class('restart-btn')
+        self.restart_btn.set_tooltip_text('Restart pybar')
+        self.restart_btn.connect('clicked', self._on_restart)
+        header.pack_end(self.restart_btn)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
@@ -228,6 +247,27 @@ class SettingsWindow(Adw.ApplicationWindow):
             self._show_toast('Saved - restart pybar to apply changes')
         except Exception as e:
             self._show_toast(f'Save failed: {e}')
+
+    def _on_restart(self, _):
+        """Restart pybar in place"""
+        import subprocess
+        import sys
+        import os
+
+        main_script = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'main.py'
+        ))
+
+        subprocess.Popen([
+            sys.executable,
+            main_script,
+            '--config',
+            self.config_path,
+            '--replace'
+        ])
+
+        self._show_toast('Restarting pybar...')
 
     def _show_toast(self, message):
         """Show a toast notification"""
