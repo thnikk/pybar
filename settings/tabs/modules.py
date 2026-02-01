@@ -126,18 +126,23 @@ class SectionRow(Gtk.Box):
         self.append(label)
 
         scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scroll.set_hexpand(True)
         scroll.set_min_content_height(48)
         scroll.add_css_class('section-scroll')
 
         frame = Gtk.Frame()
         frame.add_css_class('section-frame')
+        frame.set_hexpand(True)
 
-        self.chips_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.chips_box.set_spacing(8)
-        self.chips_box.set_halign(Gtk.Align.START)
-        self.chips_box.set_valign(Gtk.Align.CENTER)
+        self.chips_box = Gtk.FlowBox()
+        self.chips_box.set_valign(Gtk.Align.START)
+        self.chips_box.set_halign(Gtk.Align.FILL)
+        self.chips_box.set_homogeneous(False)
+        self.chips_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.chips_box.set_max_children_per_line(100)
+        self.chips_box.set_column_spacing(8)
+        self.chips_box.set_row_spacing(8)
         self.chips_box.set_margin_top(12)
         self.chips_box.set_margin_bottom(12)
         self.chips_box.set_margin_start(16)
@@ -145,15 +150,15 @@ class SectionRow(Gtk.Box):
 
         self.placeholder = Gtk.Label(label='Drop modules here')
         self.placeholder.add_css_class('dim-label')
+        self.placeholder.set_valign(Gtk.Align.CENTER)
         self.placeholder.set_margin_start(8)
         self.placeholder.set_margin_end(8)
 
-        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        inner.set_valign(Gtk.Align.CENTER)
-        inner.append(self.chips_box)
-        inner.append(self.placeholder)
+        overlay = Gtk.Overlay()
+        overlay.set_child(self.chips_box)
+        overlay.add_overlay(self.placeholder)
 
-        frame.set_child(inner)
+        frame.set_child(overlay)
         scroll.set_child(frame)
         self.append(scroll)
 
@@ -172,7 +177,7 @@ class SectionRow(Gtk.Box):
         scroll.add_controller(drop_target)
 
         self._frame = frame
-        self._inner = inner
+        self._overlay = overlay
         self._scroll = scroll
 
     def _add_chip(self, name, position=-1):
@@ -182,12 +187,7 @@ class SectionRow(Gtk.Box):
         if position < 0 or position >= len(self._get_chips()):
             self.chips_box.append(chip)
         else:
-            chips = self._get_chips()
-            for c in chips:
-                self.chips_box.remove(c)
-            chips.insert(position, chip)
-            for c in chips:
-                self.chips_box.append(c)
+            self.chips_box.insert(chip, position)
         self._update_placeholder()
 
     def _on_remove(self, chip):
@@ -198,39 +198,69 @@ class SectionRow(Gtk.Box):
     def _update_placeholder(self):
         has_chips = len(self._get_chips()) > 0
         self.placeholder.set_visible(not has_chips)
-        self.chips_box.set_visible(has_chips)
 
     def _get_chips(self):
         """Get all module chips"""
         chips = []
         child = self.chips_box.get_first_child()
         while child:
-            if isinstance(child, ModuleChip):
-                chips.append(child)
+            if isinstance(child, Gtk.FlowBoxChild):
+                chip_child = child.get_child()
+                if isinstance(chip_child, ModuleChip):
+                    chips.append(chip_child)
             child = child.get_next_sibling()
         return chips
 
-    def _get_drop_index(self, x):
-        """Calculate drop index based on x coordinate"""
+    def _get_drop_index(self, x, y):
+        """Calculate drop index based on x, y coordinates"""
         chips = self._get_chips()
         if not chips:
             return 0
 
-        for i, chip in enumerate(chips):
-            point = Graphene.Point()
-            point.x = 0
-            point.y = 0
+        child_at_pos = self.chips_box.get_child_at_pos(x, y)
+        if not child_at_pos:
+            return len(chips)
 
-            success, translated = chip.compute_point(self._scroll, point)
+        point = Graphene.Point()
+        point.x = x
+        point.y = y
+
+        success, scroll_coords = self.chips_box.compute_point(
+            self._scroll, point
+        )
+        if not success:
+            return len(chips)
+
+        for i, chip in enumerate(chips):
+            child = chip.get_parent()
+            if not child:
+                continue
+
+            success, chip_pos = child.compute_point(self._scroll, point)
             if not success:
                 continue
 
-            chip_left = translated.x
-            chip_width = chip.get_width()
-            chip_center = chip_left + chip_width / 2
+            success, bounds = child.compute_bounds(child)
+            if not success:
+                continue
 
-            if x < chip_center:
-                return i
+            chip_width = bounds.get_width()
+            chip_height = bounds.get_height()
+
+            success, chip_origin = child.compute_point(self._scroll,
+                                                       Graphene.Point())
+            if not success:
+                continue
+
+            chip_left = chip_origin.x
+            chip_top = chip_origin.y
+            chip_center_x = chip_left + chip_width / 2
+            chip_center_y = chip_top + chip_height / 2
+
+            if child == child_at_pos:
+                if scroll_coords.x < chip_center_x:
+                    return i
+                return i + 1
 
         return len(chips)
 
@@ -252,7 +282,7 @@ class SectionRow(Gtk.Box):
 
     def _on_motion(self, target, x, y):
         self._auto_scroll(x)
-        new_index = self._get_drop_index(x)
+        new_index = self._get_drop_index(x, y)
         if new_index != self._drop_index:
             self._drop_index = new_index
             self._update_drop_indicator()
@@ -278,28 +308,19 @@ class SectionRow(Gtk.Box):
         elif self._drop_index >= len(chips):
             self.chips_box.append(self._drop_indicator)
         else:
-            all_children = []
-            child = self.chips_box.get_first_child()
-            while child:
-                all_children.append(child)
-                child = child.get_next_sibling()
-
-            for c in all_children:
-                self.chips_box.remove(c)
-
-            chip_index = 0
-            for c in all_children:
-                if chip_index == self._drop_index:
-                    self.chips_box.append(self._drop_indicator)
-                self.chips_box.append(c)
-                chip_index += 1
+            self.chips_box.insert(self._drop_indicator, self._drop_index)
 
     def _remove_drop_indicator(self):
         """Remove the drop indicator"""
         if self._drop_indicator:
             parent = self._drop_indicator.get_parent()
             if parent:
-                parent.remove(self._drop_indicator)
+                if isinstance(parent, Gtk.FlowBoxChild):
+                    parent_of_child = parent.get_parent()
+                    if parent_of_child:
+                        parent_of_child.remove(parent)
+                else:
+                    parent.remove(self._drop_indicator)
             self._drop_indicator = None
         self._update_placeholder()
 
