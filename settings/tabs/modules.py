@@ -760,11 +760,8 @@ class ModulesTab(Gtk.Box):
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
         )
         left_scroll.set_vexpand(True)
-        
+
         left_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        left_content.set_margin_top(12)
-        left_content.set_margin_bottom(12)
-        left_content.set_margin_start(12)
         left_content.set_margin_end(12)
         left_content.set_spacing(18)
 
@@ -802,10 +799,7 @@ class ModulesTab(Gtk.Box):
         right_scroll.set_vexpand(True)
 
         right_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        right_content.set_margin_top(12)
-        right_content.set_margin_bottom(12)
         right_content.set_margin_start(12)
-        right_content.set_margin_end(12)
         right_content.set_size_request(400, -1)
 
         self.settings_group = ModuleSettingsGroup()
