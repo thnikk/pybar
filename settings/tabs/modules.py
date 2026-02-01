@@ -754,7 +754,7 @@ class ModulesTab(Gtk.Box):
         # Left side: Layout and available modules
         left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         left_box.set_spacing(12)
-        
+
         left_scroll = Gtk.ScrolledWindow()
         left_scroll.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
@@ -762,7 +762,10 @@ class ModulesTab(Gtk.Box):
         left_scroll.set_vexpand(True)
 
         left_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        left_content.set_margin_end(12)
+        left_content.set_margin_top(20)
+        left_content.set_margin_bottom(20)
+        left_content.set_margin_start(20)
+        left_content.set_margin_end(20)
         left_content.set_spacing(18)
 
         layout_group = Adw.PreferencesGroup()
@@ -799,24 +802,27 @@ class ModulesTab(Gtk.Box):
         right_scroll.set_vexpand(True)
 
         right_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        right_content.set_margin_start(12)
+        right_content.set_margin_top(20)
+        right_content.set_margin_bottom(20)
+        right_content.set_margin_start(20)
+        right_content.set_margin_end(20)
+
+        # right_content.set_margin_start(12)
         right_content.set_size_request(400, -1)
 
         self.settings_group = ModuleSettingsGroup()
         right_content.append(self.settings_group)
         right_scroll.set_child(right_content)
 
-        # Use Paned for resizable split
-        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        paned.set_start_child(left_scroll)
-        paned.set_end_child(right_scroll)
-        paned.set_resize_start_child(True)
-        paned.set_resize_end_child(False)
-        paned.set_shrink_start_child(False)
-        paned.set_shrink_end_child(False)
-        paned.set_position(450)
+        # Use OverlaySplitView for sidebar styling
+        split_view = Adw.OverlaySplitView()
+        split_view.set_sidebar(right_scroll)
+        split_view.set_sidebar_position(Gtk.PackType.END)
+        split_view.set_content(left_scroll)
+        split_view.set_sidebar_width_fraction(0.5)
+        split_view.set_show_sidebar(True)
 
-        self.append(paned)
+        self.append(split_view)
 
     def _on_module_select(self, module_name):
         self.settings_group.show_module_settings(
