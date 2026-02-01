@@ -97,7 +97,17 @@ class SettingsWindow(Adw.ApplicationWindow):
         self._load_css()
 
         header = Adw.HeaderBar()
-        
+
+        inspector_btn = Gtk.Button()
+        inspector_icon = Gtk.Image.new_from_icon_name(
+            'emblem-system-symbolic'
+        )
+        inspector_btn.set_child(inspector_icon)
+        inspector_btn.add_css_class('flat')
+        inspector_btn.set_tooltip_text('Open GTK Inspector')
+        inspector_btn.connect('clicked', self._open_inspector)
+        header.pack_start(inspector_btn)
+
         self.save_btn = Gtk.Button(label='Save')
         self.save_btn.add_css_class('suggested-action')
         self.save_btn.connect('clicked', self._on_save)
@@ -186,6 +196,10 @@ class SettingsWindow(Adw.ApplicationWindow):
             self.pending_changes[key] = value
 
         self.save_btn.set_sensitive(True)
+
+    def _open_inspector(self, _):
+        """Open GTK inspector for debugging"""
+        self.set_interactive_debugging(True)
 
     def _on_save(self, _):
         """Save configuration to disk"""
