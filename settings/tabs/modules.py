@@ -24,10 +24,10 @@ class ModuleChip(Gtk.Box):
         self.on_remove = on_remove
 
         self.add_css_class('module-chip')
-        self.set_margin_top(4)
-        self.set_margin_bottom(4)
-        self.set_margin_start(4)
-        self.set_margin_end(4)
+        # self.set_margin_top(4)
+        # self.set_margin_bottom(4)
+        # self.set_margin_start(4)
+        # self.set_margin_end(4)
 
         module_config = (
             config.get('modules', {}).get(name, {}) if config else {}
@@ -141,12 +141,12 @@ class SectionRow(Gtk.Box):
         self.chips_box.set_homogeneous(False)
         self.chips_box.set_selection_mode(Gtk.SelectionMode.NONE)
         self.chips_box.set_max_children_per_line(100)
-        self.chips_box.set_column_spacing(8)
-        self.chips_box.set_row_spacing(8)
-        self.chips_box.set_margin_top(12)
-        self.chips_box.set_margin_bottom(12)
-        self.chips_box.set_margin_start(16)
-        self.chips_box.set_margin_end(16)
+        self.chips_box.set_column_spacing(4)
+        self.chips_box.set_row_spacing(4)
+        self.chips_box.set_margin_top(4)
+        self.chips_box.set_margin_bottom(4)
+        self.chips_box.set_margin_start(4)
+        self.chips_box.set_margin_end(4)
 
         self.placeholder = Gtk.Label(label='Drop modules here')
         self.placeholder.add_css_class('dim-label')
