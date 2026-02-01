@@ -15,12 +15,13 @@ from gi.repository import Gtk, Gdk, GLib, GObject, Pango  # noqa
 class Volume(c.BaseModule):
     SCHEMA = {
         'icons': {
-            'type': 'string',
-            'default': '',
+            'type': 'dict',
+            'default': {},
             'label': 'Custom Icons',
-            'description': 'JSON object mapping device names to icons'
+            'description': 'Custom icons to use for devices (name: icon)'
         }
     }
+
     def get_volume_data(self, pulse, blacklist=None):
         """ Get current pulse data """
         if blacklist is None:
