@@ -13,12 +13,13 @@ from settings.schema import FieldType
 class FieldEditor(Gtk.Box):
     """Base class for field editors"""
 
-    def __init__(self, key, schema_field, value, on_change):
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.key = key
         self.schema_field = schema_field
         self.on_change = on_change
-        self._build_label()
+        if show_label:
+            self._build_label()
 
     def _build_label(self):
         """Build the label and description"""
@@ -50,8 +51,8 @@ class FieldEditor(Gtk.Box):
 class StringEditor(FieldEditor):
     """Editor for string fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
         self.entry = Gtk.Entry()
         self.entry.set_text(str(value) if value is not None else '')
         self.entry.set_hexpand(True)
@@ -66,8 +67,8 @@ class StringEditor(FieldEditor):
 class IntegerEditor(FieldEditor):
     """Editor for integer fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
 
         min_val = schema_field.get('min', -999999)
         max_val = schema_field.get('max', 999999)
@@ -126,8 +127,8 @@ class IntegerEditor(FieldEditor):
 class FloatEditor(FieldEditor):
     """Editor for float fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
 
         min_val = schema_field.get('min', -999999.0)
         max_val = schema_field.get('max', 999999.0)
@@ -164,8 +165,8 @@ class FloatEditor(FieldEditor):
 class BooleanEditor(FieldEditor):
     """Editor for boolean fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
         self.switch = Gtk.Switch()
         self.switch.set_active(bool(value) if value is not None else False)
         self.switch.set_halign(Gtk.Align.START)
@@ -179,8 +180,8 @@ class BooleanEditor(FieldEditor):
 class ChoiceEditor(FieldEditor):
     """Editor for choice/dropdown fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
 
         choices = schema_field.get('choices', [])
         self.choices = choices
@@ -213,8 +214,8 @@ class ChoiceEditor(FieldEditor):
 class FileEditor(FieldEditor):
     """Editor for file path fields"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         self.entry = Gtk.Entry()
@@ -252,8 +253,8 @@ class FileEditor(FieldEditor):
 class DictEditor(FieldEditor):
     """Editor for dict fields with dynamic key-value pairs"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
         self.rows = []
         self.key_type = schema_field.get('key_type', FieldType.STRING)
         self.value_type = schema_field.get('value_type', FieldType.STRING)
@@ -264,7 +265,7 @@ class DictEditor(FieldEditor):
         # scroll.set_vexpand(True)
 
         self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            orientation=Gtk.Orientation.VERTICAL, spacing=5)
         self.append(self.rows_box)
         # scroll.set_child(self.rows_box)
         # self.append(scroll)
@@ -286,7 +287,8 @@ class DictEditor(FieldEditor):
             f'{self.key}_key_{len(self.rows)}',
             key_schema,
             key,
-            lambda k, v: self._emit_change()
+            lambda k, v: self._emit_change(),
+            show_label=False
         )
         if hasattr(row.key_editor, 'entry'):
             row.key_editor.entry.set_width_chars(15)
@@ -298,7 +300,8 @@ class DictEditor(FieldEditor):
             f'{self.key}_value_{len(self.rows)}',
             value_schema,
             value,
-            lambda k, v: self._emit_change()
+            lambda k, v: self._emit_change(),
+            show_label=False
         )
         row.value_editor.set_hexpand(True)
 
@@ -336,8 +339,8 @@ class DictEditor(FieldEditor):
 class ListEditor(FieldEditor):
     """Editor for list fields with dynamic items"""
 
-    def __init__(self, key, schema_field, value, on_change):
-        super().__init__(key, schema_field, value, on_change)
+    def __init__(self, key, schema_field, value, on_change, show_label=True):
+        super().__init__(key, schema_field, value, on_change, show_label)
         self.rows = []
         self.item_type = schema_field.get('item_type', FieldType.STRING)
 
@@ -347,7 +350,7 @@ class ListEditor(FieldEditor):
         # scroll.set_vexpand(True)
 
         self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            orientation=Gtk.Orientation.VERTICAL, spacing=5)
         self.append(self.rows_box)
         # scroll.set_child(self.rows_box)
         # self.append(scroll)
@@ -369,7 +372,8 @@ class ListEditor(FieldEditor):
             f'{self.key}_item_{len(self.rows)}',
             item_schema,
             value,
-            lambda k, v: self._emit_change()
+            lambda k, v: self._emit_change(),
+            show_label=False
         )
         row.item_editor.set_hexpand(True)
 
@@ -431,7 +435,7 @@ class ListEditor(FieldEditor):
         return result if result else None
 
 
-def create_editor(key, schema_field, value, on_change):
+def create_editor(key, schema_field, value, on_change, show_label=True):
     """Factory function to create appropriate editor for field type"""
     field_type = schema_field.get('type', FieldType.STRING)
 
@@ -447,4 +451,4 @@ def create_editor(key, schema_field, value, on_change):
     }
 
     editor_class = editors.get(field_type, StringEditor)
-    return editor_class(key, schema_field, value, on_change)
+    return editor_class(key, schema_field, value, on_change, show_label)
