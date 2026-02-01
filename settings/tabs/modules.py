@@ -408,16 +408,26 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         flowbox.set_homogeneous(False)
         flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
         flowbox.set_max_children_per_line(10)
-        flowbox.set_column_spacing(8)
-        flowbox.set_row_spacing(8)
-        flowbox.set_margin_top(8)
-        flowbox.set_margin_bottom(8)
+        flowbox.set_column_spacing(4)
+        flowbox.set_row_spacing(4)
+        flowbox.set_margin_top(4)
+        flowbox.set_margin_bottom(4)
+        flowbox.set_margin_start(4)
+        flowbox.set_margin_end(4)
 
         for name in all_modules:
-            btn = Gtk.Button(label=name)
-            btn.add_css_class('pill')
-            btn.set_tooltip_text(f"Add {name} module")
-            btn.connect('clicked', lambda b, n=name: self._on_add_clicked(n))
+            chip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            chip_box.add_css_class('module-chip')
+            chip_box.set_tooltip_text(f"Add {name} module")
+
+            label = Gtk.Label(label=name)
+            label.add_css_class('caption')
+            chip_box.append(label)
+
+            click = Gtk.GestureClick()
+            click.set_button(1)
+            click.connect('released', lambda gesture, n_press, x, y, m=name: self._on_add_clicked(m))
+            chip_box.add_controller(click)
 
             drag_source = Gtk.DragSource()
             drag_source.set_actions(Gdk.DragAction.MOVE)
@@ -427,13 +437,14 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
             drag_source.connect(
                 'drag-begin', lambda s, d, n=name: self._drag_begin(d, n)
             )
-            btn.add_controller(drag_source)
+            chip_box.add_controller(drag_source)
 
-            flowbox.append(btn)
+            flowbox.append(chip_box)
 
-        row = Adw.ActionRow()
-        row.set_child(flowbox)
-        self.add(row)
+        frame = Gtk.Frame()
+        frame.add_css_class('section-frame')
+        frame.set_child(flowbox)
+        self.add(frame)
 
     def _drag_prepare(self, name):
         return Gdk.ContentProvider.new_for_value(f"available:{name}")
