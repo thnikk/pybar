@@ -182,17 +182,18 @@ class Bar:
         popover = Gtk.Popover()
         popover.set_position(Gtk.PositionType.TOP)
         popover.set_autohide(True)
+        popover.get_style_context().add_class('bar-context-menu')
 
         menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
         # Settings button
-        settings_btn = Gtk.Button(label='Settings')
+        settings_btn = c.icon_button("", "Settings")
         settings_btn.get_style_context().add_class('flat')
         settings_btn.connect('clicked', self._open_settings, popover)
         menu_box.append(settings_btn)
 
         # Reload button
-        reload_btn = Gtk.Button(label='Restart')
+        reload_btn = c.icon_button(' ', 'Restart')
         reload_btn.get_style_context().add_class('flat')
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)

@@ -1006,6 +1006,15 @@ def button(label=None, style=None, ha=None, length=None):
     return widget
 
 
+def icon_button(icon, text, spacing=10):
+    button = Gtk.Button()
+    button_box = box('h', spacing)
+    button_box.append(label(icon, ha='start', he=True))
+    button_box.append(label(text))
+    button.set_child(button_box)
+    return button
+
+
 def sep(orientation, style=None):
     """ Separator """
     separator = Gtk.Separator(

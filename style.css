@@ -537,6 +537,23 @@ popover.tray-popover modelbutton:hover {
 	color: @white;
 }
 
+/* Bar context menu styling - matches tray popover */
+popover.bar-context-menu button {
+	padding: 0px 10px;
+	border-radius: 10px;
+	min-height: 30px;
+	color: @white;
+	transition: background 0.1s;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+}
+
+popover.bar-context-menu button:hover {
+	background-color: alpha(@white, 0.1);
+	color: @white;
+}
+
 /* Scroll indicators for scrollable areas */
 scrolledwindow undershoot.top {
 	background: linear-gradient(to bottom,
