@@ -193,7 +193,10 @@ class Workspaces(c.BaseModule):
                 c.del_style(indicator, f'monitor-{m}')
 
             if colorize and name in monitor_map:
+                indicator.set_visible(True)
                 c.add_style(indicator, f'monitor-{monitor_map[name]}')
+            else:
+                indicator.set_visible(False)
 
             if name == focused:
                 c.add_style(button, 'focused')
