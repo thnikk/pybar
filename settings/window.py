@@ -54,6 +54,12 @@ SETTINGS_CSS = """
     margin-right: 3px;
 }
 
+.drag-indicator {
+    border: 2px dashed alpha(@accent_color, 0.5);
+    border-radius: 14px;
+    padding: 4px;
+}
+
 .dim-label {
     opacity: 0.6;
 }

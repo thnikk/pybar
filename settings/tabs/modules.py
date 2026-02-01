@@ -393,7 +393,8 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         super().__init__()
         self.set_title('Add Module')
         self.set_description(
-            'Click a module type to add it to a section'
+            'Select a module type and drag it to a section or click the + '
+            'button'
         )
         self.on_add = on_add
         self.sections = sections
@@ -402,64 +403,84 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         mod.discover_modules()
         all_modules = sorted(mod._module_map.keys())
 
-        # Use FlowBox for wrapping without nested scrolling
-        flowbox = Gtk.FlowBox()
-        flowbox.set_valign(Gtk.Align.START)
-        flowbox.set_homogeneous(False)
-        flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        flowbox.set_max_children_per_line(10)
-        flowbox.set_column_spacing(4)
-        flowbox.set_row_spacing(4)
-        flowbox.set_margin_top(4)
-        flowbox.set_margin_bottom(4)
-        flowbox.set_margin_start(4)
-        flowbox.set_margin_end(4)
+        # Create a horizontal box for the dropdown and button
+        controls_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        controls_box.set_spacing(8)
+        controls_box.set_halign(Gtk.Align.START)
+        controls_box.set_margin_top(8)
+        controls_box.set_margin_bottom(8)
+        controls_box.set_margin_start(8)
+        controls_box.set_margin_end(8)
 
+        # Create a box with dotted border to indicate draggability
+        drag_indicator = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        drag_indicator.add_css_class('drag-indicator')
+        drag_indicator.set_hexpand(False)
+
+        # Create dropdown
+        dropdown = Gtk.DropDown()
+        string_list = Gtk.StringList()
         for name in all_modules:
-            chip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            chip_box.add_css_class('module-chip')
-            chip_box.set_tooltip_text(f"Add {name} module")
+            string_list.append(name)
+        dropdown.set_model(string_list)
+        dropdown.set_size_request(200, -1)
 
-            label = Gtk.Label(label=name)
-            label.add_css_class('caption')
-            chip_box.append(label)
+        drag_source = Gtk.DragSource()
+        drag_source.set_actions(Gdk.DragAction.MOVE)
+        drag_source.connect(
+            'prepare', lambda s, x, y: self._drag_prepare(dropdown)
+        )
+        drag_source.connect(
+            'drag-begin', lambda s, d: self._drag_begin(d, dropdown)
+        )
+        dropdown.add_controller(drag_source)
 
-            click = Gtk.GestureClick()
-            click.set_button(1)
-            click.connect('released', lambda gesture, n_press, x, y, m=name: self._on_add_clicked(m))
-            chip_box.add_controller(click)
+        drag_indicator.append(dropdown)
+        controls_box.append(drag_indicator)
 
-            drag_source = Gtk.DragSource()
-            drag_source.set_actions(Gdk.DragAction.MOVE)
-            drag_source.connect(
-                'prepare', lambda s, x, y, n=name: self._drag_prepare(n)
-            )
-            drag_source.connect(
-                'drag-begin', lambda s, d, n=name: self._drag_begin(d, n)
-            )
-            chip_box.add_controller(drag_source)
+        # Create add button
+        add_btn = Gtk.Button()
+        add_btn.set_icon_name('list-add-symbolic')
+        add_btn.set_tooltip_text('Add module')
+        add_btn.connect('clicked', lambda b: self._on_add_clicked_btn(dropdown))
+        controls_box.append(add_btn)
 
-            flowbox.append(chip_box)
+        self.add(controls_box)
 
-        frame = Gtk.Frame()
-        frame.add_css_class('section-frame')
-        frame.set_child(flowbox)
-        self.add(frame)
-
-    def _drag_prepare(self, name):
+    def _drag_prepare(self, combo_row):
+        selected = combo_row.get_selected()
+        if selected == Gtk.INVALID_LIST_POSITION:
+            return None
+        model = combo_row.get_model()
+        name = model.get_string(selected)
         return Gdk.ContentProvider.new_for_value(f"available:{name}")
 
-    def _drag_begin(self, drag, name):
+    def _drag_begin(self, drag, combo_row):
+        selected = combo_row.get_selected()
+        if selected == Gtk.INVALID_LIST_POSITION:
+            return
+        model = combo_row.get_model()
+        name = model.get_string(selected)
+
         icon = Gtk.DragIcon.get_for_drag(drag)
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        box.set_margin_start(10)
-        box.set_margin_end(10)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.add_css_class('module-chip')
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+        box.set_margin_start(4)
+        box.set_margin_end(4)
         label = Gtk.Label(label=name)
+        label.add_css_class('caption')
         box.append(label)
-        box.add_css_class('card')
         icon.set_child(box)
+
+    def _on_add_clicked_btn(self, combo_row):
+        selected = combo_row.get_selected()
+        if selected == Gtk.INVALID_LIST_POSITION:
+            return
+        model = combo_row.get_model()
+        module_type = model.get_string(selected)
+        self._on_add_clicked(module_type)
 
     def _on_add_clicked(self, module_type):
         dialog = Adw.MessageDialog.new(None)
