@@ -258,15 +258,16 @@ class DictEditor(FieldEditor):
         self.key_type = schema_field.get('key_type', FieldType.STRING)
         self.value_type = schema_field.get('value_type', FieldType.STRING)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_min_content_height(150)
-        scroll.set_vexpand(True)
+        # scroll = Gtk.ScrolledWindow()
+        # scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        # scroll.set_min_content_height(150)
+        # scroll.set_vexpand(True)
 
         self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        scroll.set_child(self.rows_box)
-        self.append(scroll)
+            orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.append(self.rows_box)
+        # scroll.set_child(self.rows_box)
+        # self.append(scroll)
 
         add_btn = Gtk.Button(label='+ Add Entry')
         add_btn.get_style_context().add_class('flat')
@@ -340,15 +341,16 @@ class ListEditor(FieldEditor):
         self.rows = []
         self.item_type = schema_field.get('item_type', FieldType.STRING)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_min_content_height(150)
-        scroll.set_vexpand(True)
+        # scroll = Gtk.ScrolledWindow()
+        # scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        # scroll.set_min_content_height(150)
+        # scroll.set_vexpand(True)
 
         self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        scroll.set_child(self.rows_box)
-        self.append(scroll)
+            orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.append(self.rows_box)
+        # scroll.set_child(self.rows_box)
+        # self.append(scroll)
 
         add_btn = Gtk.Button(label='+ Add Item')
         add_btn.get_style_context().add_class('flat')

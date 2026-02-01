@@ -535,17 +535,23 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
     def __init__(self):
         super().__init__()
         self.set_title('Module Settings')
-        self.set_description('Select a module above to configure')
+        self.set_description('Select a module to configure')
         self.selected_module = None
         self.config = None
         self.on_change = None
         self.sections = None
         self._current_rows = []
 
+        # Vertical box for settings with spacing
+        self._content_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=20
+        )
+        self.add(self._content_box)
+
         # Initial placeholder
         placeholder_row = Adw.ActionRow()
         placeholder_label = Gtk.Label(
-            label='Click a module above to configure its settings'
+            label='Click a module to configure its settings'
         )
         placeholder_label.set_opacity(0.5)
         placeholder_label.set_vexpand(True)
@@ -553,7 +559,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         placeholder_label.set_margin_top(24)
         placeholder_label.set_margin_bottom(24)
         placeholder_row.set_child(placeholder_label)
-        self.add(placeholder_row)
+        self._content_box.append(placeholder_row)
         self._current_rows.append(placeholder_row)
 
     def show_module_settings(
@@ -567,7 +573,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
 
         # Remove all previously added rows
         for row in self._current_rows:
-            self.remove(row)
+            self._content_box.remove(row)
         self._current_rows.clear()
 
         module_config = config.get('modules', {}).get(module_name, {})
@@ -588,7 +594,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
             placeholder_label.set_margin_top(24)
             placeholder_label.set_margin_bottom(24)
             placeholder_row.set_child(placeholder_label)
-            self.add(placeholder_row)
+            self._content_box.append(placeholder_row)
             self._current_rows.append(placeholder_row)
             return
 
@@ -608,7 +614,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         name_row.connect(
             'changed', lambda r: self._on_name_changed(r, module_name)
         )
-        self.add(name_row)
+        self._content_box.append(name_row)
         self._current_rows.append(name_row)
         self._name_row = name_row
         self._name_apply_btn = name_row.get_last_child()
@@ -622,13 +628,13 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
                         m, k, v
                     )
                 )
-                self.add(editor)
+                self._content_box.append(editor)
                 self._current_rows.append(editor)
         else:
             info_row = Adw.ActionRow()
             info_row.set_title("No configurable options")
             info_row.set_subtitle(f"Module type: {module_type}")
-            self.add(info_row)
+            self._content_box.append(info_row)
             self._current_rows.append(info_row)
 
     def _create_apply_button(self, module_name, module_type, entry_row):

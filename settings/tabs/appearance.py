@@ -16,7 +16,7 @@ class AppearanceTab(Gtk.Box):
     """Appearance and styling settings tab"""
 
     def __init__(self, config, on_change):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=20)
 
         self.config = config
         self.on_change = on_change

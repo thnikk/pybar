@@ -23,6 +23,8 @@ class GeneralTab(Adw.PreferencesGroup):
         self.config = config
         self.on_change = on_change
         self.editors = {}
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        self.add(self.box)
 
         for key, schema_field in GLOBAL_SCHEMA.items():
             value = config.get(key, schema_field.get('default'))
@@ -30,7 +32,7 @@ class GeneralTab(Adw.PreferencesGroup):
                 key, schema_field, value, self._on_field_change
             )
             self.editors[key] = editor
-            self.add(editor)
+            self.box.append(editor)
 
     def _on_field_change(self, key, value):
         """Handle field value changes"""

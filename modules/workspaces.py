@@ -22,8 +22,7 @@ class Workspaces(c.BaseModule):
             'default': {},
             'label': 'Workspace Icons',
             'description': (
-                'Map workspace numbers to custom icons (e.g., "1": " ", '
-                '"2": " ", "default": " ")')
+                'Map workspace numbers to custom icons')
         },
         'always_show_number': {
             'type': 'boolean',
