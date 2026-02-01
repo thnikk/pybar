@@ -31,6 +31,19 @@ class HASS2(c.BaseModule):
             'description': 'How often to poll devices (seconds)',
             'min': 5,
             'max': 600
+        },
+        'devices': {
+            'type': 'dict',
+            'key_type': 'string',
+            'value_type': 'dict',
+            'schema': {
+                'type': 'dict',
+                'key_type': 'string',
+                'value_type': 'string'
+            },
+            'default': {},
+            'label': 'Devices',
+            'description': 'Home Assistant devices organized by section'
         }
     }
 

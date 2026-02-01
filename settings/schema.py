@@ -142,13 +142,18 @@ def validate_field(value, schema_field):
             return False
 
         key_type = schema_field.get('key_type', FieldType.STRING)
-        value_type = schema_field.get('value_type', FieldType.STRING)
+        nested_schema = schema_field.get('schema')
 
         for k, v in value.items():
             if not validate_field(k, {'type': key_type}):
                 return False
-            if not validate_field(v, {'type': value_type}):
-                return False
+            if nested_schema:
+                if not validate_field(v, nested_schema):
+                    return False
+            else:
+                value_type = schema_field.get('value_type', FieldType.STRING)
+                if not validate_field(v, {'type': value_type}):
+                    return False
         return True
 
     return True

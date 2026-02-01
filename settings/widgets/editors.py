@@ -254,10 +254,12 @@ class DictEditor(FieldEditor):
     """Editor for dict fields with dynamic key-value pairs"""
 
     def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+        super().__init__(key, schema_field, value, on_change, show_label=True)
         self.rows = []
         self.key_type = schema_field.get('key_type', FieldType.STRING)
         self.value_type = schema_field.get('value_type', FieldType.STRING)
+        self.nested_schema = schema_field.get('schema')
+        self.has_nested = self.nested_schema is not None
 
         # scroll = Gtk.ScrolledWindow()
         # scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -280,6 +282,112 @@ class DictEditor(FieldEditor):
                 self._add_row(k, v)
 
     def _add_row(self, key='', value=''):
+        if self.has_nested:
+            self._add_nested_row(key, value)
+        else:
+            self._add_simple_row(key, value)
+
+    def _add_nested_row(self, key='', value=''):
+        container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+
+        key_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        key_schema = {'type': self.key_type}
+        key_row.key_editor = create_editor(
+            f'{self.key}_key_{len(self.rows)}',
+            key_schema,
+            key,
+            lambda k, v: self._emit_change(),
+            show_label=False
+        )
+        if hasattr(key_row.key_editor, 'entry'):
+            key_row.key_editor.entry.set_width_chars(15)
+        elif hasattr(key_row.key_editor, 'spin'):
+            key_row.key_editor.spin.set_width_chars(10)
+
+        delete_btn = Gtk.Button(label='-')
+        delete_btn.get_style_context().add_class('flat')
+        delete_btn.connect('clicked', lambda _: self._remove_row(container))
+
+        key_row.append(key_row.key_editor)
+        key_row.append(delete_btn)
+
+        container.append(key_row)
+
+        nested_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        nested_box.set_margin_start(10)
+        nested_box.set_margin_top(10)
+        nested_box.set_margin_bottom(10)
+        nested_box.set_margin_end(10)
+        nested_frame = Gtk.Frame()
+        nested_frame.get_style_context().add_class('view')
+        nested_frame.set_child(nested_box)
+
+        container.nested_editors = []
+
+        add_nested_btn = Gtk.Button(label='+ Add Entry')
+        add_nested_btn.get_style_context().add_class('flat')
+        add_nested_btn.connect(
+            'clicked', lambda _, nb=nested_box, c=container:
+            self._add_nested_entry(nb, '', '', c))
+        nested_box.append(add_nested_btn)
+        container.add_nested_btn = add_nested_btn
+
+        if value and isinstance(value, dict):
+            for nk, nv in value.items():
+                self._add_nested_entry(nested_box, nk, nv, container)
+
+        container.append(nested_frame)
+        self.rows_box.append(container)
+        self.rows.append(container)
+
+    def _add_nested_entry(self, parent_box, key='', value='', container=None):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+
+        key_schema = {'type': self.nested_schema.get('key_type', FieldType.STRING)}
+        row.key_editor = create_editor(
+            f'nested_key_{len(container.nested_editors)}',
+            key_schema,
+            key,
+            lambda k, v: self._emit_change(),
+            show_label=False
+        )
+        if hasattr(row.key_editor, 'entry'):
+            row.key_editor.entry.set_width_chars(15)
+        elif hasattr(row.key_editor, 'spin'):
+            row.key_editor.spin.set_width_chars(10)
+
+        nested_value_type = self.nested_schema.get('value_type', FieldType.STRING)
+        value_schema = {'type': nested_value_type}
+        row.value_editor = create_editor(
+            f'nested_value_{len(container.nested_editors)}',
+            value_schema,
+            value,
+            lambda k, v: self._emit_change(),
+            show_label=False
+        )
+        row.value_editor.set_hexpand(True)
+
+        delete_btn = Gtk.Button(label='-')
+        delete_btn.get_style_context().add_class('flat')
+        delete_btn.connect('clicked', lambda _: self._remove_nested_entry(row, parent_box))
+
+        row.append(row.key_editor)
+        row.append(row.value_editor)
+        row.append(delete_btn)
+
+        parent_box.prepend(row)
+        container.nested_editors.append(row)
+
+    def _remove_nested_entry(self, row, parent_box):
+        if parent_box:
+            parent_box.remove(row)
+        if hasattr(parent_box, 'get_parent'):
+            container = parent_box.get_parent()
+            if hasattr(container, 'nested_editors') and row in container.nested_editors:
+                container.nested_editors.remove(row)
+        self._emit_change()
+
+    def _add_simple_row(self, key='', value=''):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
 
         key_schema = {'type': self.key_type}
@@ -327,13 +435,30 @@ class DictEditor(FieldEditor):
         self._emit_change()
 
     def get_value(self):
-        result = {}
-        for row in self.rows:
-            key = row.key_editor.get_value()
-            if key is None or (isinstance(key, str) and not key.strip()):
-                continue
-            result[key] = row.value_editor.get_value()
-        return result if result else None
+        if self.has_nested:
+            result = {}
+            for container in self.rows:
+                key_row = container.get_first_child()
+                key = key_row.key_editor.get_value()
+                if key is None or (isinstance(key, str) and not key.strip()):
+                    continue
+                nested_value = {}
+                if hasattr(container, 'nested_editors'):
+                    for nested_row in container.nested_editors:
+                        n_key = nested_row.key_editor.get_value()
+                        if n_key is None or (isinstance(n_key, str) and not n_key.strip()):
+                            continue
+                        nested_value[n_key] = nested_row.value_editor.get_value()
+                result[key] = nested_value if nested_value else {}
+            return result if result else None
+        else:
+            result = {}
+            for row in self.rows:
+                key = row.key_editor.get_value()
+                if key is None or (isinstance(key, str) and not key.strip()):
+                    continue
+                result[key] = row.value_editor.get_value()
+            return result if result else None
 
 
 class ListEditor(FieldEditor):
