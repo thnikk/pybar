@@ -19,9 +19,9 @@ import config as Config
 
 SETTINGS_CSS = """
 .module-chip {
-    padding: 4px 8px;
-    border-radius: 6px;
-    min-height: 20px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    min-height: 24px;
     background: alpha(@theme_fg_color, 0.08);
     border: 1px solid alpha(@theme_fg_color, 0.15);
 }
@@ -31,18 +31,14 @@ SETTINGS_CSS = """
 }
 
 .module-chip button {
-    min-width: 14px;
-    min-height: 14px;
+    min-width: 16px;
+    min-height: 16px;
     padding: 0;
-    margin-left: 4px;
-}
-
-.module-add-btn {
-    padding: 4px 10px;
+    margin-left: 6px;
 }
 
 .section-frame {
-    min-height: 36px;
+    min-height: 48px;
 }
 
 .section-frame.drop-target {
@@ -53,9 +49,9 @@ SETTINGS_CSS = """
     background: @theme_selected_bg_color;
     border-radius: 2px;
     min-width: 3px;
-    min-height: 24px;
-    margin-left: 2px;
-    margin-right: 2px;
+    min-height: 32px;
+    margin-left: 3px;
+    margin-right: 3px;
 }
 
 .dim-label {
@@ -87,63 +83,95 @@ from settings.tabs.modules import ModulesTab
 from settings.tabs.appearance import AppearanceTab
 
 
-class SettingsWindow(Adw.PreferencesWindow):
-    """Main settings window with libadwaita preferences"""
+class SettingsWindow(Adw.ApplicationWindow):
+    """Main settings window with libadwaita"""
 
     def __init__(self, app, config, config_path):
-        super().__init__(application=app)
-        self.set_title('Pybar Settings')
+        super().__init__(application=app, title='Pybar Settings')
+        self.set_default_size(800, 600)
         self.config = config.copy()
         self.config_path = config_path
         self.pending_changes = {}
         self.module_changes = {}
-        self.has_changes = False
 
         self._load_css()
 
-        general_page = self._create_general_page()
-        self.add(general_page)
+        header = Adw.HeaderBar()
+        
+        self.save_btn = Gtk.Button(label='Save')
+        self.save_btn.add_css_class('suggested-action')
+        self.save_btn.connect('clicked', self._on_save)
+        self.save_btn.set_sensitive(False)
+        header.pack_end(self.save_btn)
 
-        modules_page = self._create_modules_page()
-        self.add(modules_page)
+        toolbar_view = Adw.ToolbarView()
+        toolbar_view.add_top_bar(header)
 
-        appearance_page = self._create_appearance_page()
-        self.add(appearance_page)
+        view_stack = Adw.ViewStack()
+        
+        general_page = Gtk.ScrolledWindow()
+        general_page.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        general_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        general_box.set_margin_top(24)
+        general_box.set_margin_bottom(24)
+        general_box.set_margin_start(24)
+        general_box.set_margin_end(24)
+        self.general_tab = GeneralTab(self.config, self._on_change)
+        general_box.append(self.general_tab)
+        general_page.set_child(general_box)
+        view_stack.add_titled_with_icon(
+            general_page, 'general', 'General',
+            'preferences-system-symbolic'
+        )
+
+        modules_page = Gtk.ScrolledWindow()
+        modules_page.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        modules_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        modules_box.set_margin_top(24)
+        modules_box.set_margin_bottom(24)
+        modules_box.set_margin_start(24)
+        modules_box.set_margin_end(24)
+        self.modules_tab = ModulesTab(self.config, self._on_change)
+        modules_box.append(self.modules_tab)
+        modules_page.set_child(modules_box)
+        view_stack.add_titled_with_icon(
+            modules_page, 'modules', 'Modules',
+            'application-x-addon-symbolic'
+        )
+
+        appearance_page = Gtk.ScrolledWindow()
+        appearance_page.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        appearance_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        appearance_box.set_margin_top(24)
+        appearance_box.set_margin_bottom(24)
+        appearance_box.set_margin_start(24)
+        appearance_box.set_margin_end(24)
+        self.appearance_tab = AppearanceTab(self.config, self._on_change)
+        appearance_box.append(self.appearance_tab)
+        appearance_page.set_child(appearance_box)
+        view_stack.add_titled_with_icon(
+            appearance_page, 'appearance', 'Appearance',
+            'preferences-desktop-theme-symbolic'
+        )
+
+        view_switcher = Adw.ViewSwitcher()
+        view_switcher.set_stack(view_stack)
+        view_switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
+        header.set_title_widget(view_switcher)
+
+        self.toast_overlay = Adw.ToastOverlay()
+        self.toast_overlay.set_child(view_stack)
+        
+        toolbar_view.set_content(self.toast_overlay)
+        self.set_content(toolbar_view)
 
         self.connect('close-request', self._on_close_request)
-
-    def _create_general_page(self):
-        """Create general settings page"""
-        page = Adw.PreferencesPage()
-        page.set_title('General')
-        page.set_icon_name('preferences-system-symbolic')
-
-        self.general_tab = GeneralTab(self.config, self._on_change)
-        page.add(self.general_tab)
-
-        return page
-
-    def _create_modules_page(self):
-        """Create modules page"""
-        page = Adw.PreferencesPage()
-        page.set_title('Modules')
-        page.set_icon_name('application-x-addon-symbolic')
-
-        self.modules_tab = ModulesTab(self.config, self._on_change)
-        page.add(self.modules_tab)
-
-        return page
-
-    def _create_appearance_page(self):
-        """Create appearance page"""
-        page = Adw.PreferencesPage()
-        page.set_title('Appearance')
-        page.set_icon_name('preferences-desktop-theme-symbolic')
-
-        self.appearance_tab = AppearanceTab(self.config, self._on_change)
-        page.add(self.appearance_tab)
-
-        return page
 
     def _on_change(self, key, value, module_name=None):
         """Handle setting change from any tab"""
@@ -157,10 +185,9 @@ class SettingsWindow(Adw.PreferencesWindow):
         else:
             self.pending_changes[key] = value
 
-        self.has_changes = True
-        self._save_config()
+        self.save_btn.set_sensitive(True)
 
-    def _save_config(self):
+    def _on_save(self, _):
         """Save configuration to disk"""
         for key, value in self.pending_changes.items():
             if value is None:
@@ -183,7 +210,7 @@ class SettingsWindow(Adw.PreferencesWindow):
             Config.save(self.config_path, self.config)
             self.pending_changes.clear()
             self.module_changes.clear()
-            self.has_changes = False
+            self.save_btn.set_sensitive(False)
             self._show_toast('Saved - restart pybar to apply changes')
         except Exception as e:
             self._show_toast(f'Save failed: {e}')
@@ -192,10 +219,39 @@ class SettingsWindow(Adw.PreferencesWindow):
         """Show a toast notification"""
         toast = Adw.Toast.new(message)
         toast.set_timeout(3)
-        self.add_toast(toast)
+        self.toast_overlay.add_toast(toast)
 
     def _on_close_request(self, _):
         """Handle window close request"""
+        if self.save_btn.get_sensitive():
+            dialog = Adw.MessageDialog.new(self)
+            dialog.set_heading("Unsaved Changes")
+            dialog.set_body(
+                "You have unsaved changes. "
+                "Do you want to save before closing?"
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("discard", "Discard")
+            dialog.add_response("save", "Save")
+            dialog.set_response_appearance(
+                "discard", Adw.ResponseAppearance.DESTRUCTIVE
+            )
+            dialog.set_response_appearance(
+                "save", Adw.ResponseAppearance.SUGGESTED
+            )
+            dialog.set_default_response("save")
+            dialog.set_close_response("cancel")
+            
+            def on_response(dlg, response):
+                if response == "save":
+                    self._on_save(None)
+                    self.destroy()
+                elif response == "discard":
+                    self.destroy()
+            
+            dialog.connect('response', on_response)
+            dialog.present()
+            return True
         return False
 
     def _load_css(self):

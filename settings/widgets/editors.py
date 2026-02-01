@@ -87,6 +87,12 @@ class IntegerEditor(FieldEditor):
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
         self.spin.connect('value-changed', lambda _: self._emit_change())
+        
+        # Disable scroll events on the spin button
+        scroll_controller = Gtk.EventControllerScroll()
+        scroll_controller.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll_controller.connect('scroll', lambda *args: True)
+        self.spin.add_controller(scroll_controller)
 
         # Add a "clear" option for nullable fields
         if schema_field.get('default') is None:
@@ -142,6 +148,13 @@ class FloatEditor(FieldEditor):
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
         self.spin.connect('value-changed', lambda _: self._emit_change())
+        
+        # Disable scroll events on the spin button
+        scroll_controller = Gtk.EventControllerScroll()
+        scroll_controller.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll_controller.connect('scroll', lambda *args: True)
+        self.spin.add_controller(scroll_controller)
+        
         self.append(self.spin)
 
     def get_value(self):

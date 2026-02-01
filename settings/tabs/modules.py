@@ -17,17 +17,17 @@ class ModuleChip(Gtk.Box):
     """A draggable chip representing a module using Adwaita styling"""
 
     def __init__(self, name, on_select, on_remove, section, config=None):
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.name = name
         self.section = section
         self.on_select = on_select
         self.on_remove = on_remove
 
         self.add_css_class('module-chip')
-        self.set_margin_top(3)
-        self.set_margin_bottom(3)
-        self.set_margin_start(3)
-        self.set_margin_end(3)
+        self.set_margin_top(4)
+        self.set_margin_bottom(4)
+        self.set_margin_start(4)
+        self.set_margin_end(4)
 
         module_config = (
             config.get('modules', {}).get(name, {}) if config else {}
@@ -99,14 +99,14 @@ class DropIndicator(Gtk.Box):
         self.add_css_class('drop-indicator')
 
 
-class SectionRow(Adw.ActionRow):
-    """Adwaita action row for a bar section with drag-drop support"""
+class SectionRow(Gtk.Box):
+    """Box for a bar section with drag-drop support"""
 
     def __init__(
         self, section_name, modules, on_select, on_change,
         all_sections, config=None
     ):
-        super().__init__()
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.section_name = section_name
         self.on_select = on_select
         self.on_change = on_change
@@ -115,35 +115,33 @@ class SectionRow(Adw.ActionRow):
         self._drop_index = -1
         self._drop_indicator = None
 
+        self.set_margin_top(6)
+        self.set_margin_bottom(6)
+
         display_name = section_name.replace('modules-', '').title()
-        self.set_title(display_name)
+        
+        label = Gtk.Label(label=display_name)
+        label.set_halign(Gtk.Align.START)
+        label.add_css_class('heading')
+        self.append(label)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         scroll.set_hexpand(True)
         scroll.set_min_content_height(48)
-        scroll.set_min_content_width(400)
         scroll.add_css_class('section-scroll')
-
-        scroll_controller = Gtk.EventControllerScroll()
-        scroll_controller.set_flags(
-            Gtk.EventControllerScrollFlags.VERTICAL |
-            Gtk.EventControllerScrollFlags.HORIZONTAL
-        )
-        scroll_controller.connect('scroll', self._on_scroll)
-        scroll.add_controller(scroll_controller)
 
         frame = Gtk.Frame()
         frame.add_css_class('section-frame')
 
         self.chips_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.chips_box.set_spacing(6)
+        self.chips_box.set_spacing(8)
         self.chips_box.set_halign(Gtk.Align.START)
         self.chips_box.set_valign(Gtk.Align.CENTER)
-        self.chips_box.set_margin_top(8)
-        self.chips_box.set_margin_bottom(8)
-        self.chips_box.set_margin_start(12)
-        self.chips_box.set_margin_end(12)
+        self.chips_box.set_margin_top(12)
+        self.chips_box.set_margin_bottom(12)
+        self.chips_box.set_margin_start(16)
+        self.chips_box.set_margin_end(16)
 
         self.placeholder = Gtk.Label(label='Drop modules here')
         self.placeholder.add_css_class('dim-label')
@@ -157,11 +155,7 @@ class SectionRow(Adw.ActionRow):
 
         frame.set_child(inner)
         scroll.set_child(frame)
-
-        suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        suffix_box.set_hexpand(True)
-        suffix_box.append(scroll)
-        self.add_suffix(suffix_box)
+        self.append(scroll)
 
         for name in modules:
             self._add_chip(name)
@@ -180,12 +174,6 @@ class SectionRow(Adw.ActionRow):
         self._frame = frame
         self._inner = inner
         self._scroll = scroll
-
-    def _on_scroll(self, controller, dx, dy):
-        """Convert vertical scroll to horizontal"""
-        adj = self._scroll.get_hadjustment()
-        adj.set_value(adj.get_value() + dy * 30)
-        return True
 
     def _add_chip(self, name, position=-1):
         chip = ModuleChip(
@@ -383,7 +371,9 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
     def __init__(self, on_add, sections, config=None):
         super().__init__()
         self.set_title('Add Module')
-        self.set_description('Click or drag modules to add them to the bar')
+        self.set_description(
+            'Click a module type to add it to a section'
+        )
         self.on_add = on_add
         self.sections = sections
         self.config = config
@@ -391,19 +381,21 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         mod.discover_modules()
         all_modules = sorted(mod._module_map.keys())
 
+        # Use FlowBox for wrapping without nested scrolling
         flowbox = Gtk.FlowBox()
         flowbox.set_valign(Gtk.Align.START)
         flowbox.set_homogeneous(False)
         flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        flowbox.set_max_children_per_line(8)
-        flowbox.set_min_children_per_line(3)
-        flowbox.set_margin_top(12)
-        flowbox.set_margin_bottom(12)
+        flowbox.set_max_children_per_line(10)
+        flowbox.set_column_spacing(8)
+        flowbox.set_row_spacing(8)
+        flowbox.set_margin_top(8)
+        flowbox.set_margin_bottom(8)
 
         for name in all_modules:
             btn = Gtk.Button(label=name)
-            btn.add_css_class('module-add-btn')
             btn.add_css_class('pill')
+            btn.set_tooltip_text(f"Add {name} module")
             btn.connect('clicked', lambda b, n=name: self._on_add_clicked(n))
 
             drag_source = Gtk.DragSource()
@@ -723,17 +715,31 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
             self.on_change(key, value, module_name)
 
 
-class ModulesTab(Adw.PreferencesGroup):
-    """Modules configuration using libadwaita preferences"""
+class ModulesTab(Gtk.Box):
+    """Modules configuration using split view layout"""
 
     def __init__(self, config, on_change):
-        super().__init__()
-        self.set_title('Module Configuration')
-        self.set_description('Arrange and configure bar modules')
-
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.config = config
         self.on_change = on_change
         self.sections = {}
+
+        # Left side: Layout and available modules
+        left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        left_box.set_spacing(12)
+        
+        left_scroll = Gtk.ScrolledWindow()
+        left_scroll.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        left_scroll.set_vexpand(True)
+        
+        left_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        left_content.set_margin_top(12)
+        left_content.set_margin_bottom(12)
+        left_content.set_margin_start(12)
+        left_content.set_margin_end(12)
+        left_content.set_spacing(18)
 
         layout_group = Adw.PreferencesGroup()
         layout_group.set_title('Bar Layout')
@@ -752,15 +758,43 @@ class ModulesTab(Adw.PreferencesGroup):
             self.sections[section_name] = section
             layout_group.add(section)
 
-        self.add(layout_group)
+        left_content.append(layout_group)
 
         available = AvailableModulesGroup(
             self._on_add_module, self.sections, config
         )
-        self.add(available)
+        left_content.append(available)
+
+        left_scroll.set_child(left_content)
+
+        # Right side: Module settings
+        right_scroll = Gtk.ScrolledWindow()
+        right_scroll.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        right_scroll.set_vexpand(True)
+
+        right_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        right_content.set_margin_top(12)
+        right_content.set_margin_bottom(12)
+        right_content.set_margin_start(12)
+        right_content.set_margin_end(12)
 
         self.settings_group = ModuleSettingsGroup()
-        self.add(self.settings_group)
+        right_content.append(self.settings_group)
+        right_scroll.set_child(right_content)
+
+        # Use Paned for resizable split
+        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        paned.set_start_child(left_scroll)
+        paned.set_end_child(right_scroll)
+        paned.set_resize_start_child(True)
+        paned.set_resize_end_child(True)
+        paned.set_shrink_start_child(False)
+        paned.set_shrink_end_child(False)
+        paned.set_position(450)
+
+        self.append(paned)
 
     def _on_module_select(self, module_name):
         self.settings_group.show_module_settings(
