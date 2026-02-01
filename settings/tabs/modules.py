@@ -779,6 +779,7 @@ class ModulesTab(Gtk.Box):
         right_content.set_margin_bottom(12)
         right_content.set_margin_start(12)
         right_content.set_margin_end(12)
+        right_content.set_size_request(400, -1)
 
         self.settings_group = ModuleSettingsGroup()
         right_content.append(self.settings_group)
@@ -789,7 +790,7 @@ class ModulesTab(Gtk.Box):
         paned.set_start_child(left_scroll)
         paned.set_end_child(right_scroll)
         paned.set_resize_start_child(True)
-        paned.set_resize_end_child(True)
+        paned.set_resize_end_child(False)
         paned.set_shrink_start_child(False)
         paned.set_shrink_end_child(False)
         paned.set_position(450)

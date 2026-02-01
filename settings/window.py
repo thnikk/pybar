@@ -157,7 +157,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         appearance_page.set_child(appearance_box)
         view_stack.add_titled_with_icon(
             appearance_page, 'appearance', 'Appearance',
-            'preferences-desktop-theme-symbolic'
+            'preferences-color-symbolic'
         )
 
         view_switcher = Adw.ViewSwitcher()
