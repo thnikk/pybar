@@ -199,7 +199,7 @@ class SectionRow(Gtk.Box):
         has_chips = len(self._get_chips()) > 0
         self.placeholder.set_visible(not has_chips)
 
-    def _get_chips(self):
+    def _get_chips(self, exclude_indicator=False):
         """Get all module chips"""
         chips = []
         child = self.chips_box.get_first_child()
@@ -208,61 +208,94 @@ class SectionRow(Gtk.Box):
                 chip_child = child.get_child()
                 if isinstance(chip_child, ModuleChip):
                     chips.append(chip_child)
+                elif exclude_indicator and isinstance(
+                    chip_child, DropIndicator
+                ):
+                    pass
             child = child.get_next_sibling()
         return chips
 
     def _get_drop_index(self, x, y):
         """Calculate drop index based on x, y coordinates"""
-        chips = self._get_chips()
+        chips = self._get_chips(exclude_indicator=True)
         if not chips:
             return 0
 
-        child_at_pos = self.chips_box.get_child_at_pos(x, y)
-        if not child_at_pos:
-            return len(chips)
-
-        point = Graphene.Point()
-        point.x = x
-        point.y = y
-
-        success, scroll_coords = self.chips_box.compute_point(
-            self._scroll, point
-        )
-        if not success:
-            return len(chips)
-
+        # First, find which row the cursor is on
+        cursor_row_chips = []
+        row_tolerance = 10  # pixels
+        
         for i, chip in enumerate(chips):
             child = chip.get_parent()
             if not child:
                 continue
-
-            success, chip_pos = child.compute_point(self._scroll, point)
+            
+            success, bounds = child.compute_bounds(self.chips_box)
             if not success:
                 continue
-
-            success, bounds = child.compute_bounds(child)
-            if not success:
-                continue
-
-            chip_width = bounds.get_width()
+            
+            chip_y = bounds.get_y()
             chip_height = bounds.get_height()
-
-            success, chip_origin = child.compute_point(self._scroll,
-                                                       Graphene.Point())
-            if not success:
-                continue
-
-            chip_left = chip_origin.x
-            chip_top = chip_origin.y
-            chip_center_x = chip_left + chip_width / 2
-            chip_center_y = chip_top + chip_height / 2
-
-            if child == child_at_pos:
-                if scroll_coords.x < chip_center_x:
-                    return i
-                return i + 1
-
-        return len(chips)
+            
+            # Check if cursor y is within this chip's row
+            if chip_y - row_tolerance <= y <= chip_y + chip_height + row_tolerance:
+                cursor_row_chips.append((i, chip, bounds))
+        
+        # If no chips in cursor row, find closest row
+        if not cursor_row_chips:
+            min_row_distance = float('inf')
+            target_y = None
+            
+            for chip in chips:
+                child = chip.get_parent()
+                if not child:
+                    continue
+                
+                success, bounds = child.compute_bounds(self.chips_box)
+                if not success:
+                    continue
+                
+                chip_y = bounds.get_y()
+                chip_height = bounds.get_height()
+                chip_center_y = chip_y + chip_height / 2
+                
+                row_distance = abs(y - chip_center_y)
+                if row_distance < min_row_distance:
+                    min_row_distance = row_distance
+                    target_y = chip_y
+            
+            # Get all chips at the target y position
+            for i, chip in enumerate(chips):
+                child = chip.get_parent()
+                if not child:
+                    continue
+                
+                success, bounds = child.compute_bounds(self.chips_box)
+                if not success:
+                    continue
+                
+                if abs(bounds.get_y() - target_y) < row_tolerance:
+                    cursor_row_chips.append((i, chip, bounds))
+        
+        if not cursor_row_chips:
+            return len(chips)
+        
+        # Now find the best position within the row
+        min_distance = float('inf')
+        best_index = cursor_row_chips[-1][0] + 1  # Default to end of row
+        
+        for i, chip, bounds in cursor_row_chips:
+            chip_center_x = bounds.get_x() + bounds.get_width() / 2
+            distance = abs(x - chip_center_x)
+            
+            if distance < min_distance:
+                min_distance = distance
+                if x < chip_center_x:
+                    best_index = i
+                else:
+                    best_index = i + 1
+        
+        return best_index
 
     def _auto_scroll(self, x):
         """Auto-scroll when dragging near edges"""
@@ -295,34 +328,57 @@ class SectionRow(Gtk.Box):
 
     def _update_drop_indicator(self):
         """Show drop indicator at current drop position"""
-        self._remove_drop_indicator()
-
         chips = self._get_chips()
 
-        self._drop_indicator = DropIndicator()
-
         if not chips:
-            self.chips_box.set_visible(True)
-            self.placeholder.set_visible(False)
-            self.chips_box.append(self._drop_indicator)
-        elif self._drop_index >= len(chips):
-            self.chips_box.append(self._drop_indicator)
+            if self._drop_indicator:
+                self._drop_indicator.set_visible(False)
+            return
+
+        # Create drop indicator as overlay if it doesn't exist
+        if not self._drop_indicator:
+            self._drop_indicator = Gtk.Box()
+            self._drop_indicator.add_css_class('drop-indicator-overlay')
+            self._drop_indicator.set_size_request(4, -1)
+            self._drop_indicator.set_halign(Gtk.Align.START)
+            self._drop_indicator.set_valign(Gtk.Align.START)
+            self._overlay.add_overlay(self._drop_indicator)
+        
+        self._drop_indicator.set_visible(True)
+        
+        # Calculate position based on drop index
+        if self._drop_index >= len(chips):
+            target_chip = chips[-1]
+            after_chip = True
         else:
-            self.chips_box.insert(self._drop_indicator, self._drop_index)
+            target_chip = chips[self._drop_index]
+            after_chip = False
+        
+        target_child = target_chip.get_parent()
+        if not target_child:
+            return
+        
+        # Get position of target chip relative to overlay
+        success, bounds = target_child.compute_bounds(self._overlay)
+        if not success:
+            return
+        
+        if after_chip:
+            x = bounds.get_x() + bounds.get_width() + 2
+        else:
+            x = bounds.get_x() - 5
+        
+        y = bounds.get_y()
+        height = bounds.get_height()
+        
+        self._drop_indicator.set_size_request(4, int(height))
+        self._drop_indicator.set_margin_start(int(x))
+        self._drop_indicator.set_margin_top(int(y))
 
     def _remove_drop_indicator(self):
         """Remove the drop indicator"""
         if self._drop_indicator:
-            parent = self._drop_indicator.get_parent()
-            if parent:
-                if isinstance(parent, Gtk.FlowBoxChild):
-                    parent_of_child = parent.get_parent()
-                    if parent_of_child:
-                        parent_of_child.remove(parent)
-                else:
-                    parent.remove(self._drop_indicator)
-            self._drop_indicator = None
-        self._update_placeholder()
+            self._drop_indicator.set_visible(False)
 
     def _on_drop(self, target, value, x, y):
         drop_index = self._drop_index

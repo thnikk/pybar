@@ -54,6 +54,12 @@ SETTINGS_CSS = """
     margin-right: 3px;
 }
 
+.drop-indicator-overlay {
+    background: @theme_selected_bg_color;
+    border-radius: 2px;
+    min-width: 4px;
+}
+
 .drag-indicator {
     border: 2px dashed alpha(@accent_color, 0.5);
     border-radius: 14px;
