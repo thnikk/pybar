@@ -22,7 +22,8 @@ import module
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
-from gi.repository import Gtk, Gio  # noqa
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Gio, Adw  # noqa
 
 
 class StreamToLogger:
@@ -108,12 +109,28 @@ def parse_args():
                         help="Allow multiple instances")
     parser.add_argument('-r', '--replace', action='store_true',
                         help="Replace existing instance")
+    parser.add_argument('-s', '--settings', action='store_true',
+                        help="Launch settings window")
     args, unknown = parser.parse_known_args()
     return args
 
 
+def launch_settings(config_path):
+    """Launch settings window"""
+    from settings.window import SettingsApplication
+    app = SettingsApplication(config_path)
+    app.run([])
+
+
 def main():
     """ Main function """
+    args = parse_args()
+
+    # Handle settings mode
+    if args.settings:
+        launch_settings(os.path.expanduser(args.config))
+        return
+
     log_file = setup_logging()
     logging.info(f"Starting pybar, logging to {log_file}")
 
@@ -122,7 +139,6 @@ def main():
     if os.path.exists(fonts_dir):
         c.register_fonts(fonts_dir)
 
-    args = parse_args()
     config = Config.load(args.config)
     c.state_manager.update('config', config)
 
@@ -143,7 +159,7 @@ def main():
     )
     app.config_path = args.config  # Store config path for settings window
     app.connect('activate', lambda app: on_activate(app, config))
-    
+
     # Use an empty list for argv to prevent GTK from parsing custom args
     app.run([])
 
