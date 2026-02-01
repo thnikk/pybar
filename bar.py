@@ -192,7 +192,7 @@ class Bar:
         menu_box.append(settings_btn)
 
         # Reload button
-        reload_btn = Gtk.Button(label='Reload')
+        reload_btn = Gtk.Button(label='Restart')
         reload_btn.get_style_context().add_class('flat')
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)
@@ -217,13 +217,25 @@ class Bar:
         launch_settings_window(config_path)
 
     def _reload_bar(self, btn, popover):
-        """ Reload the bar configuration """
+        """ Restart bar """
         popover.popdown()
-        # Trigger a config reload
-        import config as Config
-        new_config = Config.load(self.display.app.config_path)
-        c.state_manager.update('config', new_config)
-        c.state_manager.update('config_reload', True)
+        # Restart pybar with --replace flag
+        import subprocess
+        import sys
+        import os
+
+        main_script = os.path.abspath(os.path.join(
+            os.path.dirname(__file__),
+            'main.py'
+        ))
+
+        subprocess.Popen([
+            sys.executable,
+            main_script,
+            '--config',
+            self.display.app.config_path,
+            '--replace'
+        ])
 
     def css(self, file):
         """ Load CSS from file """
