@@ -91,11 +91,12 @@ entry.error {
 }
 
 button.restart-btn {
-    color: @destructive_color;
+    background: #4a9d5f;
+    color: white;
 }
 
 button.restart-btn:hover {
-    background: alpha(@destructive_color, 0.1);
+    background: #5cb370;
 }
 """
 from settings.tabs.general import GeneralTab
@@ -128,28 +129,27 @@ class SettingsWindow(Adw.ApplicationWindow):
         inspector_btn.connect('clicked', self._open_inspector)
         header.pack_start(inspector_btn)
 
+        self.restart_btn = Gtk.Button(label='Restart')
+        restart_icon = Gtk.Image.new_from_icon_name(
+            'view-refresh-symbolic'
+        )
+        self.restart_btn.set_child(restart_icon)
+        self.restart_btn.add_css_class('restart-btn')
+        self.restart_btn.set_tooltip_text('Restart pybar')
+        self.restart_btn.connect('clicked', self._on_restart)
+        header.pack_end(self.restart_btn)
+
         self.save_btn = Gtk.Button(label='Save')
         self.save_btn.add_css_class('suggested-action')
         self.save_btn.connect('clicked', self._on_save)
         self.save_btn.set_sensitive(False)
         header.pack_end(self.save_btn)
 
-        self.restart_btn = Gtk.Button(label='Restart')
-        restart_icon = Gtk.Image.new_from_icon_name(
-            'view-refresh-symbolic'
-        )
-        self.restart_btn.set_child(restart_icon)
-        self.restart_btn.add_css_class('flat')
-        self.restart_btn.add_css_class('restart-btn')
-        self.restart_btn.set_tooltip_text('Restart pybar')
-        self.restart_btn.connect('clicked', self._on_restart)
-        header.pack_end(self.restart_btn)
-
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
 
         view_stack = Adw.ViewStack()
-        
+
         general_page = Gtk.ScrolledWindow()
         general_page.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
@@ -208,7 +208,7 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         self.toast_overlay = Adw.ToastOverlay()
         self.toast_overlay.set_child(view_stack)
-        
+
         toolbar_view.set_content(self.toast_overlay)
         self.set_content(toolbar_view)
 
@@ -307,14 +307,14 @@ class SettingsWindow(Adw.ApplicationWindow):
             )
             dialog.set_default_response("save")
             dialog.set_close_response("cancel")
-            
+
             def on_response(dlg, response):
                 if response == "save":
                     self._on_save(None)
                     self.destroy()
                 elif response == "discard":
                     self.destroy()
-            
+
             dialog.connect('response', on_response)
             dialog.present()
             return True
