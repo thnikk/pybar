@@ -78,7 +78,7 @@ class IntegerEditor(FieldEditor):
         if default_value is None:
             default_value = 0
         self.adjustment = Gtk.Adjustment(
-            value=value if value is not None else default_value,
+            value=int(value) if value is not None else int(default_value),
             lower=min_val,
             upper=max_val,
             step_increment=1,
@@ -138,7 +138,7 @@ class FloatEditor(FieldEditor):
         if default_value is None:
             default_value = 0.0
         self.adjustment = Gtk.Adjustment(
-            value=value if value is not None else default_value,
+            value=float(value) if value is not None else float(default_value),
             lower=min_val,
             upper=max_val,
             step_increment=step,
