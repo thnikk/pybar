@@ -22,6 +22,7 @@ SETTINGS_CSS = """
     padding: 6px 12px;
     border-radius: 8px;
     min-height: 24px;
+    font-size: 16px;
     background: alpha(@theme_fg_color, 0.08);
     border: 1px solid alpha(@theme_fg_color, 0.15);
 }
