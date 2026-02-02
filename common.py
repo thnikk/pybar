@@ -34,8 +34,44 @@ def get_resource_path(relative_path):
 
 
 def register_fonts(font_dir):
-    """ Register fonts with fontconfig for the application """
+    """
+    Register fonts with fontconfig for the application.
+    For PyInstaller, copy fonts to permanent cache to avoid temp path issues.
+    """
+    import shutil
     from ctypes import CDLL, c_char_p, c_bool, c_void_p
+
+    # If running from PyInstaller temp dir, copy fonts to cache
+    if getattr(sys, 'frozen', False) and '_MEI' in font_dir:
+        cache_fonts_dir = os.path.expanduser('~/.cache/pybar/fonts')
+        try:
+            # Create cache directory
+            os.makedirs(cache_fonts_dir, exist_ok=True)
+
+            # Copy all font files from temp to cache
+            if os.path.exists(font_dir):
+                for font_file in os.listdir(font_dir):
+                    src = os.path.join(font_dir, font_file)
+                    dst = os.path.join(cache_fonts_dir, font_file)
+                    if os.path.isfile(src):
+                        # Only copy if doesn't exist or is different
+                        if not os.path.exists(dst) or \
+                           os.path.getmtime(src) > os.path.getmtime(dst):
+                            shutil.copy2(src, dst)
+
+            # Use cache directory instead of temp
+            font_dir = cache_fonts_dir
+            print_debug(
+                f"Copied fonts to permanent cache: {cache_fonts_dir}",
+                color='green'
+            )
+        except Exception as e:
+            print_debug(
+                f"Failed to copy fonts to cache: {e}",
+                color='red'
+            )
+            # Fall through to try original path anyway
+
     try:
         fontconfig = CDLL('libfontconfig.so.1')
         # FcConfigAppFontAddDir adds a directory to the application's font set

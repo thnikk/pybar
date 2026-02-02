@@ -32,6 +32,22 @@ class Display:
         self.monitors = self.get_monitors()
         self.plugs = self.get_plugs()
 
+        # Load CSS once and store as string for PyInstaller temp path safety
+        self.default_css_data = None
+        css_path = c.get_resource_path('style.css')
+        try:
+            with open(css_path, 'r') as f:
+                self.default_css_data = f.read()
+        except Exception as e:
+            c.print_debug(
+                f"Failed to load default CSS: {e}",
+                name='display', color='red'
+            )
+
+        # Watch for reload signal from settings
+        self.reload_file = os.path.expanduser('~/.cache/pybar/.reload')
+        GLib.timeout_add_seconds(1, self._check_reload_signal)
+
     def get_wm(self):
         try:
             run(['swaymsg', '-q'], check=True)
@@ -89,10 +105,12 @@ class Display:
                 return
         bar = Bar(self, monitor)
         bar.populate()
-        css_path = c.get_resource_path('style.css')
-        bar.css(css_path)
+        # Load default CSS from stored data
+        if self.default_css_data:
+            bar.css_from_data(self.default_css_data)
+        # Load custom CSS from path (user's config dir, not temp)
         try:
-            bar.css(self.config['style'])
+            bar.css_from_path(self.config['style'])
         except KeyError:
             pass
         bar.start()
@@ -115,6 +133,62 @@ class Display:
         """ Initialize all monitors """
         for monitor in self.monitors:
             self.draw_bar(monitor)
+
+    def reload(self):
+        """ Reload configuration and rebuild all bars """
+        import config as Config
+
+        # Stop all module workers
+        module.stop_all_workers()
+
+        # Destroy existing bars
+        for bar in self.bars.values():
+            bar.window.destroy()
+        self.bars.clear()
+
+        # Clear module instances
+        module.clear_instances()
+
+        # Reload configuration
+        self.config = Config.load(self.app.config_path)
+        c.state_manager.update('config', self.config)
+
+        # Reload CSS from new config
+        css_path = c.get_resource_path('style.css')
+        try:
+            with open(css_path, 'r') as f:
+                self.default_css_data = f.read()
+        except Exception as e:
+            c.print_debug(
+                f"Failed to reload default CSS: {e}",
+                name='display', color='red'
+            )
+
+        # Restart module workers with new config
+        unique = set(
+            self.config['modules-left'] +
+            self.config['modules-center'] +
+            self.config['modules-right']
+        )
+        for name in unique:
+            module_config = self.config['modules'].get(name, {})
+            module.start_worker(name, module_config)
+
+        # Redraw all bars
+        self.draw_all()
+
+    def _check_reload_signal(self):
+        """ Check if settings window has signaled a reload """
+        if os.path.exists(self.reload_file):
+            try:
+                os.remove(self.reload_file)
+                GLib.idle_add(self.reload)
+            except Exception as e:
+                c.print_debug(
+                    f"Failed to handle reload signal: {e}",
+                    name='display', color='red'
+                )
+        return True  # Continue checking
 
 
 class Bar:
@@ -201,7 +275,7 @@ class Bar:
         menu_box.append(settings_btn)
 
         # Reload button
-        reload_btn = c.icon_button(' ', 'Restart')
+        reload_btn = c.icon_button(' ', 'Reload')
         reload_btn.get_style_context().add_class('flat')
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)
@@ -226,41 +300,44 @@ class Bar:
         launch_settings_window(config_path)
 
     def _reload_bar(self, btn, popover):
-        """ Restart bar """
+        """ Reload bar configuration in-process """
         popover.popdown()
-        # Restart pybar with --replace flag
-        import subprocess
-        import sys
-        import os
+        # Reload configuration and rebuild bars without spawning new process
+        GLib.idle_add(self.display.reload)
 
-        main_script = os.path.abspath(os.path.join(
-            os.path.dirname(__file__),
-            'main.py'
-        ))
+    def css_from_data(self, css_data):
+        """ Load CSS from string data """
+        try:
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(css_data.encode('utf-8'))
+            display = Gdk.Display.get_default()
+            Gtk.StyleContext.add_provider_for_display(
+                display, css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+        except GLib.GError as e:
+            c.print_debug(
+                f"Failed to load CSS from data: {e}",
+                name='pybar', color="red"
+            )
 
-        subprocess.Popen([
-            sys.executable,
-            main_script,
-            '--config',
-            self.display.app.config_path,
-            '--replace'
-        ])
-
-    def css(self, file):
-        """ Load CSS from file """
+    def css_from_path(self, file):
+        """ Load CSS from file path """
         try:
             css_provider = Gtk.CssProvider()
             css_provider.load_from_path(os.path.expanduser(file))
             display = Gdk.Display.get_default()
             Gtk.StyleContext.add_provider_for_display(
-                display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+                display, css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
         except GLib.GError as e:
             filename = f"/{'/'.join(e.message.split('/')[1:]).split(':')[0]}"
             if '.config/pybar' not in filename:
                 c.print_debug(
                     f"Failed to load CSS from {filename}",
-                    name='pybar', color="red")
-            pass
+                    name='pybar', color="red"
+                )
 
     def modules(self, modules):
         """ Add modules to bar """

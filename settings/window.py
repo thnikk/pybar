@@ -136,7 +136,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         )
         self.restart_btn.set_child(restart_icon)
         self.restart_btn.add_css_class('restart-btn')
-        self.restart_btn.set_tooltip_text('Restart pybar')
+        self.restart_btn.set_tooltip_text('Reload pybar')
         self.restart_btn.connect('clicked', self._on_restart)
         header.pack_end(self.restart_btn)
 
@@ -262,25 +262,17 @@ class SettingsWindow(Adw.ApplicationWindow):
             self._show_toast(f'Save failed: {e}')
 
     def _on_restart(self, _):
-        """Restart pybar in place"""
-        import subprocess
-        import sys
+        """Signal pybar to reload configuration"""
         import os
-
-        main_script = os.path.abspath(os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            'main.py'
-        ))
-
-        subprocess.Popen([
-            sys.executable,
-            main_script,
-            '--config',
-            self.config_path,
-            '--replace'
-        ])
-
-        self._show_toast('Restarting pybar...')
+        # Create a reload signal file that the bar will watch
+        reload_file = os.path.expanduser('~/.cache/pybar/.reload')
+        try:
+            os.makedirs(os.path.dirname(reload_file), exist_ok=True)
+            with open(reload_file, 'w') as f:
+                f.write(str(os.getpid()))
+            self._show_toast('Pybar will reload configuration...')
+        except Exception as e:
+            self._show_toast(f'Failed to signal reload: {e}')
 
     def _show_toast(self, message):
         """Show a toast notification"""

@@ -17,6 +17,8 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 
 _instances = {}
 _module_map = {}
+_worker_threads = {}
+_worker_stop_flags = {}
 
 
 def discover_modules():
@@ -57,12 +59,19 @@ def get_instance(name, config):
 
 def start_worker(name, config):
     """Start a background worker for a module"""
+    # Stop existing worker if any
+    stop_worker(name)
+
+    # Create stop flag
+    _worker_stop_flags[name] = threading.Event()
+
     instance = get_instance(name, config)
     if instance:
         thread = threading.Thread(
             target=instance.run_worker,
             daemon=True
         )
+        _worker_threads[name] = thread
         thread.start()
         return
 
@@ -73,7 +82,31 @@ def start_worker(name, config):
             args=(name, config),
             daemon=True
         )
+        _worker_threads[name] = thread
         thread.start()
+
+
+def stop_worker(name):
+    """Stop a specific worker thread"""
+    if name in _worker_stop_flags:
+        _worker_stop_flags[name].set()
+    if name in _worker_threads:
+        # Don't wait for thread to finish, it's daemon anyway
+        del _worker_threads[name]
+    if name in _worker_stop_flags:
+        del _worker_stop_flags[name]
+
+
+def stop_all_workers():
+    """Stop all worker threads"""
+    for name in list(_worker_threads.keys()):
+        stop_worker(name)
+
+
+def clear_instances():
+    """Clear all module instances for reload"""
+    global _instances
+    _instances = {}
 
 
 def command_worker(name, config):
