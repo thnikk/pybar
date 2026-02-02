@@ -67,14 +67,9 @@ class Display:
 
     def on_monitors_changed(self, model, position, removed, added):
         """ Handle monitor changes by redrawing all bars """
-        # Destroy existing bars
-        for bar in self.bars.values():
-            bar.window.destroy()
-        self.bars.clear()
-        # Redraw all
-        self.monitors = self.get_monitors()
-        self.plugs = self.get_plugs()
-        self.draw_all()
+        # Schedule the redraw on the main loop to avoid issues
+        # when this is triggered before application startup completes
+        GLib.idle_add(self._redraw_bars)
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
@@ -102,6 +97,19 @@ class Display:
             pass
         bar.start()
         self.bars[plug] = bar
+
+    def _redraw_bars(self):
+        """ Redraw all bars (called from idle callback) """
+        # Destroy existing bars
+        for bar in self.bars.values():
+            bar.window.destroy()
+        self.bars.clear()
+        # Update monitor list
+        self.monitors = self.get_monitors()
+        self.plugs = self.get_plugs()
+        # Redraw all
+        self.draw_all()
+        return False  # Don't repeat the idle callback
 
     def draw_all(self):
         """ Initialize all monitors """
