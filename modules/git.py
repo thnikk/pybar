@@ -220,6 +220,14 @@ class Git(c.BaseModule):
             c.add_style(widget, 'stale')
 
         if not widget.get_active():
+            # Optimization: Don't rebuild popover if data hasn't changed
+            compare_data = data.copy()
+            compare_data.pop('timestamp', None)
+            
+            if getattr(widget, 'last_popover_data', None) == compare_data:
+                return
+
+            widget.last_popover_data = compare_data
             widget.set_widget(self.build_popover(data))
 
 

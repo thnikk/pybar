@@ -255,9 +255,14 @@ class Clock(c.BaseModule):
         widget.set_visible(True)
         if new != last:
             widget.set_label(new)
-            # Redraw calendar on new day
-            if last and new[-2:] != last[-2:]:
-                widget.set_widget(self.widget_content())
+        
+        # Redraw calendar on new day
+        current_day = data.get('day')
+        last_day = getattr(widget, 'last_day', None)
+        
+        if current_day != last_day:
+            widget.set_widget(self.widget_content())
+            widget.last_day = current_day
 
 
 module_map = {
