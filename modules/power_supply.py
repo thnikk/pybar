@@ -127,8 +127,9 @@ class PowerSupply(c.BaseModule):
         m.set_position(bar.position)
         m.popover_widgets = []
 
-        c.state_manager.subscribe(
+        sub_id = c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(m, data))
+        m._subscriptions.append(sub_id)
         return m
 
     def update_ui(self, widget, data):

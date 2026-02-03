@@ -487,22 +487,60 @@ class StateManager:
     def __init__(self):
         self.data = {}
         self.subscribers = {}
+        self._next_id = 0
+
+    def _generate_id(self):
+        """Generate unique subscription ID"""
+        self._next_id += 1
+        return self._next_id
 
     def update(self, name, new_data):
         self.data[name] = new_data
         if name in self.subscribers:
-            for callback in self.subscribers[name]:
-                GLib.idle_add(callback, new_data)
+            for sub_id, callback in self.subscribers[name].items():
+                try:
+                    GLib.idle_add(callback, new_data)
+                except Exception as e:
+                    print_debug(f"Callback failed for {name}: {e}", color='red')
 
     def subscribe(self, name, callback):
+        """Subscribe to updates for a name, returns subscription ID"""
+        sub_id = self._generate_id()
         if name not in self.subscribers:
-            self.subscribers[name] = []
-        self.subscribers[name].append(callback)
+            self.subscribers[name] = {}
+        self.subscribers[name][sub_id] = callback
         if name in self.data:
             GLib.idle_add(callback, self.data[name])
+        print_debug(f"Subscribe: {name} -> ID:{sub_id} (total: {len(self.subscribers[name])})")
+        return sub_id
+
+    def unsubscribe(self, sub_id):
+        """Unsubscribe using the subscription ID returned by subscribe()"""
+        for name, subs in self.subscribers.items():
+            if sub_id in subs:
+                del subs[sub_id]
+                print_debug(f"Unsubscribe: {name} -> ID:{sub_id} (remaining: {len(subs)})")
+                if not subs:
+                    del self.subscribers[name]
+                return True
+        return False
+
+    def clear(self):
+        """Clear all data and subscribers"""
+        total_subs = sum(len(subs) for subs in self.subscribers.values())
+        print_debug(f"Clearing StateManager: {len(self.data)} data items, {total_subs} subscriptions")
+        self.data.clear()
+        self.subscribers.clear()
 
     def get(self, name):
         return self.data.get(name)
+
+    def debug_info(self):
+        """Return debug information about subscriptions"""
+        info = {}
+        for name, subs in self.subscribers.items():
+            info[name] = len(subs)
+        return info
 
 
 state_manager = StateManager()
@@ -615,8 +653,9 @@ class BaseModule:
         """Create the GTK widget for the bar"""
         m = Module()
         m.set_position(bar.position)
-        state_manager.subscribe(
+        sub_id = state_manager.subscribe(
             self.name, lambda data: self.update_ui(m, data))
+        m._subscriptions.append(sub_id)
         return m
 
     def update_ui(self, widget, data):
@@ -647,6 +686,7 @@ class Module(Gtk.MenuButton):
         self.get_style_context().add_class('module')
         self.set_cursor_from_name("pointer")
         self.added_styles = []
+        self._subscriptions = []  # Track state manager subscriptions
 
         self.con = Gtk.Overlay()
         self.con.get_style_context().add_class('module-overlay')
@@ -689,11 +729,36 @@ class Module(Gtk.MenuButton):
 
         self.debug_window = None
 
-        state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
+        # Subscribe to debug state and track subscription
+        debug_sub = state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
+        self._subscriptions.append(debug_sub)
+
+        # Connect destroy signal for automatic cleanup
+        self.connect("destroy", self._on_destroy)
 
     def _on_debug_state_changed(self, state):
         if not state and self.debug_window:
             self.debug_window.close()
+
+    def cleanup(self):
+        """Clean up subscriptions and resources when widget is destroyed"""
+        for sub_id in self._subscriptions:
+            state_manager.unsubscribe(sub_id)
+        self._subscriptions.clear()
+
+        if hasattr(self, 'debug_window') and self.debug_window:
+            self.debug_window.destroy()
+            self.debug_window = None
+
+        if hasattr(self, 'popover_widgets'):
+            self.popover_widgets.clear()
+
+        if hasattr(self, 'bar_gpu_levels'):
+            self.bar_gpu_levels.clear()
+
+    def _on_destroy(self, widget):
+        """Called when widget is destroyed"""
+        self.cleanup()
 
     def set_label(self, text):
         """ Set text and toggle visibility """

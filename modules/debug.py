@@ -45,7 +45,8 @@ class Debug(c.BaseModule):
         current_state = c.state_manager.get('debug_popovers') or False
         toggle_btn.set_active(current_state)
 
-        c.state_manager.subscribe('debug_popovers', on_state_changed)
+        sub_id = c.state_manager.subscribe('debug_popovers', on_state_changed)
+        box._subscriptions = [sub_id]
         box.append(toggle_btn)
 
         return box

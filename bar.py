@@ -141,6 +141,9 @@ class Display:
         # Stop all module workers
         module.stop_all_workers()
 
+        # Clear state manager subscribers BEFORE destroying widgets
+        c.state_manager.clear()
+
         # Destroy existing bars
         for bar in self.bars.values():
             bar.window.destroy()
@@ -176,6 +179,10 @@ class Display:
 
         # Redraw all bars
         self.draw_all()
+
+        # Log subscription counts after reload
+        debug_info = c.state_manager.debug_info()
+        c.print_debug(f"After reload: {debug_info}")
 
     def _check_reload_signal(self):
         """ Check if settings window has signaled a reload """

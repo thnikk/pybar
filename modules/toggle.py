@@ -70,8 +70,9 @@ class Toggle(c.BaseModule):
         sw.connect('state-set', self.on_state_set)
         box.sw = sw
 
-        c.state_manager.subscribe(
+        sub_id = c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(box, data))
+        box._subscriptions = [sub_id]
         return box
 
     def update_ui(self, widget, data):

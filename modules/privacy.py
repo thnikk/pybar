@@ -321,8 +321,9 @@ class Privacy(c.BaseModule):
         m.add_indicator_style('green')
         m.set_visible(False)
 
-        c.state_manager.subscribe(
+        sub_id = c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(m, data))
+        m._subscriptions.append(sub_id)
         return m
 
     def update_ui(self, widget, data):

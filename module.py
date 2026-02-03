@@ -185,6 +185,8 @@ def module(bar, name, config):
     m.set_position(bar.position)
 
     def generic_update(data):
+        if not data:
+            return
         if 'text' in data:
             m.set_label(data['text'])
             m.set_visible(bool(data['text']))
@@ -198,5 +200,6 @@ def module(bar, name, config):
         if data.get('stale'):
             c.add_style(m, 'stale')
 
-    c.state_manager.subscribe(name, generic_update)
+    sub_id = c.state_manager.subscribe(name, generic_update)
+    m._subscriptions.append(sub_id)
     return m
