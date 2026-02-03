@@ -609,18 +609,25 @@ class TrayIcon(Gtk.Box):
         if not custom_icons:
             return None
 
-        item_id = self.item.properties.get("Id", "").lower()
-        item_title = self.item.properties.get("Title", "").lower()
-        service_name = self.item.service_name.lower()
-        proc_name = getattr(self.item, "proc_name", "").lower()
+        # Gather identifiers (consistent with add_item blacklist logic)
+        candidates = []
+        candidates.append(self.item.properties.get("Id", ""))
+        candidates.append(self.item.properties.get("Title", ""))
+        candidates.append(self.item.service_name)
+        candidates.append(getattr(self.item, "proc_name", ""))
+
+        tooltip = self.item.properties.get("ToolTip")
+        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
+            candidates.append(tooltip[2])  # Tooltip title
+
+        # Filter empty and lowercase
+        candidates = [c.lower() for c in candidates if c]
 
         for match_string, icon_char in custom_icons.items():
             match_string = match_string.lower()
-            if (match_string in item_id or
-                match_string in item_title or
-                match_string in service_name or
-                    match_string in proc_name):
-                return icon_char
+            for candidate in candidates:
+                if match_string in candidate:
+                    return icon_char
         return None
 
     def _get_global_coordinates(self, x_local, y_local):
@@ -942,6 +949,37 @@ class TrayModuleWidget(Gtk.Box):
 
     def add_item(self, item):
         full_name = f"{item.service_name}{item.object_path}"
+
+        # Gather all possible identifiers
+        identifiers = {
+            "proc": getattr(item, "proc_name", ""),
+            "id": item.properties.get("Id", ""),
+            "title": item.properties.get("Title", ""),
+            "tooltip": ""
+        }
+
+        # Extract tooltip title if available
+        tooltip = item.properties.get("ToolTip")
+        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
+            identifiers["tooltip"] = tooltip[2]
+
+        # Log identification info for user debugging
+        id_str = ", ".join(f"{k}='{v}'" for k, v in identifiers.items() if v)
+        debug_print(f"Tray Item Candidates: {id_str}")
+
+        # Check blacklist
+        blacklist = self.config.get("blacklist", [])
+        if blacklist:
+            # Normalize identifiers for case-insensitive comparison
+            check_values = [v.lower() for v in identifiers.values() if v]
+            
+            for entry in blacklist:
+                entry_lower = entry.lower()
+                for val in check_values:
+                    if entry_lower in val:
+                        debug_print(f"Blacklisted item matched '{entry}': {val} ({full_name})")
+                        return
+
         if full_name not in self.icons:
             icon = TrayIcon(item, self.icon_size, self)
             self.icons[full_name] = icon
@@ -993,6 +1031,13 @@ class Tray(c.BaseModule):
             'default': {},
             'label': 'Custom Icons',
             'description': 'Set custom icons for tray programs'
+        },
+        'blacklist': {
+            'type': 'list',
+            'default': [],
+            'label': 'Blacklist',
+            'description': 'List of partial process names to hide from tray',
+            'element_type': 'string'
         }
     }
 
