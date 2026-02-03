@@ -150,11 +150,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar_view.add_top_bar(header)
 
         view_stack = Adw.ViewStack()
+        view_stack.connect('notify::visible-child', self._on_tab_changed)
 
         general_page = Gtk.ScrolledWindow()
         general_page.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
         )
+        general_page.set_focusable(True)
+
         general_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         general_box.set_margin_top(24)
         general_box.set_margin_bottom(24)
@@ -172,6 +175,8 @@ class SettingsWindow(Adw.ApplicationWindow):
         modules_page.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
         )
+        modules_page.set_focusable(True)
+
         modules_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         # modules_box.set_margin_top(24)
         # modules_box.set_margin_bottom(24)
@@ -189,6 +194,8 @@ class SettingsWindow(Adw.ApplicationWindow):
         appearance_page.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
         )
+        appearance_page.set_focusable(True)
+
         appearance_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         appearance_box.set_margin_top(24)
         appearance_box.set_margin_bottom(24)
@@ -214,6 +221,12 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.set_content(toolbar_view)
 
         self.connect('close-request', self._on_close_request)
+
+    def _on_tab_changed(self, stack, pspec):
+        """Ensure the tab itself gets focus instead of an entry field"""
+        child = stack.get_visible_child()
+        if child:
+            child.grab_focus()
 
     def _on_change(self, key, value, module_name=None):
         """Handle setting change from any tab"""

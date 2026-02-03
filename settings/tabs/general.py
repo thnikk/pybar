@@ -19,6 +19,7 @@ class GeneralTab(Adw.PreferencesGroup):
         super().__init__()
         self.set_title('General Settings')
         self.set_description('Configure global bar behavior')
+        self.set_focusable(True)
 
         self.config = config
         self.on_change = on_change

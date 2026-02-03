@@ -17,6 +17,8 @@ class AppearanceTab(Gtk.Box):
 
     def __init__(self, config, on_change):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        self.set_focusable(True)
+        self.connect('map', lambda _: self.grab_focus())
 
         self.config = config
         self.on_change = on_change
@@ -24,6 +26,7 @@ class AppearanceTab(Gtk.Box):
         header = Adw.PreferencesGroup()
         header.set_title('Appearance')
         header.set_description('Customize the look and feel of the bar')
+        header.set_focusable(True)
         self.append(header)
 
         style_schema = {

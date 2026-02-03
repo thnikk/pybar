@@ -835,6 +835,7 @@ class ModulesTab(Gtk.Box):
 
     def __init__(self, config, on_change):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.set_focusable(True)
         self.config = config
         self.on_change = on_change
         self.sections = {}
