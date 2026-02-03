@@ -157,16 +157,12 @@ scrollbar slider { background: none; border: none; }
 .module levelbar block { border-radius: 3px; border: none; background: @gray; }
 .module levelbar block.filled { background-color: alpha(@white, 0.8); }
 
-scale trough { padding: 3px;  background: @black; border: none; }
-scale trough highlight {
-	border: none;
-	background: alpha(@blue, 1);
-}
+scale trough { background: @black; border: 1px solid transparent; min-height: 4px; }
+scale trough highlight { background: alpha(@blue, 1); border: 1px solid transparent; }
 
 scale trough slider {
 	background: #4b505b;
 	border: 1px solid @gray;
-	box-shadow: none;
 }
 
 switch {
@@ -304,7 +300,7 @@ popover contents, .popover-content {
 	border: 2px solid @blue;
 	border-radius: 20px;
 	padding: 10px;
-	box-shadow: 0px 0px 3px black;
+	box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
 }
 
 popover.pos-bottom.edge-left contents, .pos-bottom.edge-left .popover-content {
@@ -358,6 +354,7 @@ popover.background arrow {
 	font-size: 16px;
 	padding: 5px 10px;
 	opacity: 0.8;
+	box-shadow: none;
 }
 .music-button:hover {
 	opacity: 1;
