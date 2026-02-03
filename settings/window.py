@@ -5,6 +5,7 @@ Author: thnikk
 """
 import sys
 import os
+import copy
 
 sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -111,10 +112,9 @@ class SettingsWindow(Adw.ApplicationWindow):
     def __init__(self, app, config, config_path):
         super().__init__(application=app, title='Pybar Settings')
         self.set_default_size(800, 600)
-        self.config = config.copy()
+        self.config = copy.deepcopy(config)
+        self.original_config = copy.deepcopy(config)
         self.config_path = config_path
-        self.pending_changes = {}
-        self.module_changes = {}
 
         self._load_css()
 
@@ -219,15 +219,36 @@ class SettingsWindow(Adw.ApplicationWindow):
         """Handle setting change from any tab"""
         if key == '__layout__':
             for section, modules in value.items():
-                self.pending_changes[section] = modules
+                self.config[section] = modules
         elif module_name:
-            if module_name not in self.module_changes:
-                self.module_changes[module_name] = {}
-            self.module_changes[module_name][key] = value
-        else:
-            self.pending_changes[key] = value
+            if 'modules' not in self.config:
+                self.config['modules'] = {}
+            if module_name not in self.config['modules']:
+                self.config['modules'][module_name] = {}
 
-        self.save_btn.set_sensitive(True)
+            if value is None:
+                self.config['modules'][module_name].pop(key, None)
+            else:
+                self.config['modules'][module_name][key] = value
+        else:
+            if value is None:
+                self.config.pop(key, None)
+            else:
+                self.config[key] = value
+
+        # Cleanup unused modules that were added in this session
+        if 'modules' in self.config:
+            used_modules = set()
+            for s in ['modules-left', 'modules-center', 'modules-right']:
+                used_modules.update(self.config.get(s, []))
+
+            for m in list(self.config['modules'].keys()):
+                if m not in used_modules:
+                    orig_modules = self.original_config.get('modules', {})
+                    if m not in orig_modules:
+                        del self.config['modules'][m]
+
+        self.save_btn.set_sensitive(self.config != self.original_config)
 
     def _open_inspector(self, _):
         """Open GTK inspector for debugging"""
@@ -235,27 +256,9 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def _on_save(self, _):
         """Save configuration to disk"""
-        for key, value in self.pending_changes.items():
-            if value is None:
-                self.config.pop(key, None)
-            else:
-                self.config[key] = value
-
-        if 'modules' not in self.config:
-            self.config['modules'] = {}
-        for module_name, changes in self.module_changes.items():
-            if module_name not in self.config['modules']:
-                self.config['modules'][module_name] = {}
-            for key, value in changes.items():
-                if value is None:
-                    self.config['modules'][module_name].pop(key, None)
-                else:
-                    self.config['modules'][module_name][key] = value
-
         try:
             Config.save(self.config_path, self.config)
-            self.pending_changes.clear()
-            self.module_changes.clear()
+            self.original_config = copy.deepcopy(self.config)
             self.save_btn.set_sensitive(False)
             self._show_toast('Saved - restart pybar to apply changes')
         except Exception as e:
