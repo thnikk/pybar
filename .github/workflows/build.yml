@@ -70,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt update
-          apt install -y libgirepository1.0-dev libgtk-4-dev libatk1.0-dev openssl zip libgtk4-layer-shell-dev python3 python3-pip python3-venv git
+          apt install -y libgirepository2.0-dev libgtk-4-dev libatk1.0-dev openssl zip libgtk4-layer-shell-dev python3 python3-pip python3-venv git
 
       - name: Create virtual environment
         run: |
