@@ -75,22 +75,22 @@ jobs:
       - name: Create virtual environment
         run: |
           python3 -m venv venv
-          source venv/bin/activate
+          . venv/bin/activate
           python3 -m pip install --upgrade pip
 
       - name: Install Python dependencies
         run: |
-          source venv/bin/activate
+          . venv/bin/activate
           pip install -r requirements.txt
 
       - name: Install PyInstaller
         run: |
-          source venv/bin/activate
+          . venv/bin/activate
           pip install pyinstaller
 
       - name: Build binary
         run: |
-          source venv/bin/activate
+          . venv/bin/activate
           pyinstaller pybar.spec
 
       - name: Zip Artifact
