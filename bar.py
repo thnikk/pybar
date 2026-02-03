@@ -36,6 +36,9 @@ class Display:
         self.monitors = self.get_monitors()
         self.plugs = self.get_plugs()
 
+        # Track loaded CSS providers to prevent leaks
+        self.css_providers = []
+
         # Load CSS once and store as string for PyInstaller temp path safety
         self.default_css_data = None
         css_path = c.get_resource_path('style.css')
@@ -47,6 +50,9 @@ class Display:
                 f"Failed to load default CSS: {e}",
                 name='display', color='red'
             )
+
+        # Apply initial CSS
+        self.apply_css()
 
         # Track sleep state to prevent operations during suspend
         self.is_sleeping = False
@@ -62,6 +68,46 @@ class Display:
             return 'sway'
         except CalledProcessError:
             return 'hyprland'
+
+    def apply_css(self):
+        """Apply default and user CSS"""
+        self.clear_css()
+        
+        # Load default CSS
+        if self.default_css_data:
+            self._add_css_provider(self.default_css_data, from_string=True)
+            
+        # Load custom CSS
+        if 'style' in self.config:
+            self._add_css_provider(self.config['style'], from_string=False)
+
+    def _add_css_provider(self, data, from_string=False):
+        """Helper to create and attach a CSS provider"""
+        try:
+            css_provider = Gtk.CssProvider()
+            if from_string:
+                css_provider.load_from_data(data.encode('utf-8'))
+            else:
+                css_provider.load_from_path(os.path.expanduser(data))
+            
+            Gtk.StyleContext.add_provider_for_display(
+                self.display, css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+            self.css_providers.append(css_provider)
+        except GLib.GError as e:
+            c.print_debug(
+                f"Failed to load CSS: {e}",
+                name='display', color='red'
+            )
+
+    def clear_css(self):
+        """Remove all attached CSS providers"""
+        for provider in self.css_providers:
+            Gtk.StyleContext.remove_provider_for_display(
+                self.display, provider
+            )
+        self.css_providers.clear()
 
     def _setup_dbus_sleep_handler(self):
         """ Setup DBus listener for sleep/resume events """
@@ -208,14 +254,7 @@ class Display:
         try:
             bar = Bar(self, monitor)
             bar.populate()
-            # Load default CSS from stored data
-            if self.default_css_data:
-                bar.css_from_data(self.default_css_data)
-            # Load custom CSS from path (user's config dir, not temp)
-            try:
-                bar.css_from_path(self.config['style'])
-            except KeyError:
-                pass
+            # CSS is now handled globally by Display
             bar.start()
             self.bars[plug] = bar
             logging.info(f"Successfully created bar on {plug}")
@@ -293,6 +332,9 @@ class Display:
                 f"Failed to reload default CSS: {e}",
                 name='display', color='red'
             )
+        
+        # Re-apply CSS
+        self.apply_css()
 
         # Restart module workers with new config
         unique = set(
@@ -438,40 +480,6 @@ class Bar:
         popover.popdown()
         # Reload configuration and rebuild bars without spawning new process
         GLib.idle_add(self.display.reload)
-
-    def css_from_data(self, css_data):
-        """ Load CSS from string data """
-        try:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(css_data.encode('utf-8'))
-            display = Gdk.Display.get_default()
-            Gtk.StyleContext.add_provider_for_display(
-                display, css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_USER
-            )
-        except GLib.GError as e:
-            c.print_debug(
-                f"Failed to load CSS from data: {e}",
-                name='pybar', color="red"
-            )
-
-    def css_from_path(self, file):
-        """ Load CSS from file path """
-        try:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(os.path.expanduser(file))
-            display = Gdk.Display.get_default()
-            Gtk.StyleContext.add_provider_for_display(
-                display, css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_USER
-            )
-        except GLib.GError as e:
-            filename = f"/{'/'.join(e.message.split('/')[1:]).split(':')[0]}"
-            if '.config/pybar' not in filename:
-                c.print_debug(
-                    f"Failed to load CSS from {filename}",
-                    name='pybar', color="red"
-                )
 
     def modules(self, modules):
         """ Add modules to bar """
