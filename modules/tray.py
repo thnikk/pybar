@@ -670,8 +670,13 @@ class TrayIcon(Gtk.Box):
 
     def _on_click(self, gesture, _n_press, x, y):
         button = gesture.get_current_button()
+        
+        proc = getattr(self.item, "proc_name", "")
+        item_id = self.item.properties.get("Id", "")
+        title = self.item.properties.get("Title", "")
         debug_print(
-            f"TrayIcon._on_click: button {button} for {self.item.service_name}")
+            f"TrayIcon._on_click: button {button} for {self.item.service_name}\n"
+            f"  Details: proc='{proc}', id='{item_id}', title='{title}'")
 
         if self.popover_menu and self.popover_menu.get_visible():
             debug_print("  Hiding existing popover")
