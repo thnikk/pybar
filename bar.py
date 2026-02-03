@@ -9,6 +9,7 @@ CDLL('libgtk4-layer-shell.so')
 
 import gi
 import os
+import logging
 from subprocess import run, CalledProcessError
 import json
 import time
@@ -17,6 +18,9 @@ import module
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
 from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib  # noqa
+
+# Import DBus for sleep/resume handling
+from gi.repository import Gio
 
 
 class Display:
@@ -44,6 +48,10 @@ class Display:
                 name='display', color='red'
             )
 
+        # Track sleep state to prevent operations during suspend
+        self.is_sleeping = False
+        self._setup_dbus_sleep_handler()
+
         # Watch for reload signal from settings
         self.reload_file = os.path.expanduser('~/.cache/pybar/.reload')
         GLib.timeout_add_seconds(1, self._check_reload_signal)
@@ -55,31 +63,99 @@ class Display:
         except CalledProcessError:
             return 'hyprland'
 
-    def get_plugs(self):
-        """ Get plugs from swaymsg """
-        if self.wm == 'sway':
-            return [
-                output['name'] for output in
-                json.loads(run(
-                    ["swaymsg", "-t", "get_outputs"],
-                    check=True, capture_output=True
-                ).stdout.decode('utf-8'))
-                if output['active']
-            ]
-        else:
-            return [
-                output['name'] for output in
-                json.loads(run(
-                    ['hyprctl', '-j', 'monitors'],
-                    check=True, capture_output=True
-                ).stdout.decode('utf-8'))
-                if not output['disabled']
-            ]
+    def _setup_dbus_sleep_handler(self):
+        """ Setup DBus listener for sleep/resume events """
+        try:
+            # Connect to systemd-logind's PrepareForSleep signal
+            self.dbus_proxy = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SYSTEM,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                'org.freedesktop.login1',
+                '/org/freedesktop/login1',
+                'org.freedesktop.login1.Manager',
+                None
+            )
+            if self.dbus_proxy:
+                self.dbus_proxy.connect(
+                    'g-signal::PrepareForSleep',
+                    self._on_prepare_for_sleep
+                )
+                logging.info("DBus sleep handler registered successfully")
+        except Exception as e:
+            logging.error(f"Failed to setup DBus sleep handler: {e}")
+
+    def _on_prepare_for_sleep(self, proxy, sender_name, signal_name, parameters):
+        """ Handle PrepareForSleep signal from logind """
+        if len(parameters) > 0:
+            entering = parameters[0]
+            if entering:
+                logging.info("System entering sleep - pausing bar operations")
+                self.is_sleeping = True
+                # Optionally: hide bars during sleep
+                # for bar in self.bars.values():
+                #     if hasattr(bar.window, 'set_visible'):
+                #         bar.window.set_visible(False)
+            else:
+                logging.info("System waking from sleep - reloading bars")
+                self.is_sleeping = False
+                # Schedule reload on main loop after wake
+                GLib.idle_add(self._on_wake_from_sleep)
+
+    def _on_wake_from_sleep(self):
+        """ Reload bars after waking from sleep """
+        try:
+            # Give the display a moment to stabilize
+            GLib.timeout_add_seconds(1, self._safe_reload_after_sleep)
+        except Exception as e:
+            logging.error(f"Error during wake handling: {e}")
+
+    def _safe_reload_after_sleep(self):
+        """ Safely reload all bars after sleep """
+        try:
+            # Reinitialize display connection if needed
+            self.display = Gdk.Display.get_default()
+            if self.display is None:
+                logging.error("Failed to get GDK display after sleep")
+                return False
+
+            # Force refresh of monitor list
+            self.monitors = self.get_monitors()
+            self.plugs = self.get_plugs()
+
+            # Redraw all bars safely
+            self._redraw_bars()
+
+            logging.info("Successfully reloaded bars after sleep")
+            return False
+        except Exception as e:
+            logging.error(f"Error reloading bars after sleep: {e}", exc_info=True)
+            return False
 
     def get_monitors(self):
         """ Get monitor objects from gdk """
         monitors = self.display.get_monitors()
         return [monitors.get_item(i) for i in range(monitors.get_n_items())]
+
+    def get_plugs(self):
+        """ Get monitor plug names for Wayland outputs """
+        plugs = []
+        for monitor in self.monitors:
+            # Try to get the connector name (e.g., eDP-1, HDMI-A-1)
+            name = None
+            try:
+                name = monitor.get_connector()
+            except AttributeError:
+                pass
+
+            if not name:
+                name = monitor.get_model()
+
+            if not name:
+                name = f"monitor_{len(plugs)}"
+
+            plugs.append(name)
+        return plugs
 
     def on_monitors_changed(self, model, position, removed, added):
         """ Handle monitor changes by redrawing all bars """
@@ -89,45 +165,96 @@ class Display:
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
+        # Skip if system is sleeping
+        if self.is_sleeping:
+            logging.debug("Skipping bar creation during sleep")
+            return
+
+        # Validate monitor is still valid
+        if monitor and hasattr(monitor, 'is_valid') and not monitor.is_valid():
+            logging.warning(f"Monitor is invalid, skipping: {monitor}")
+            return
+
         try_count = 0
-        while True:
+        plug = None
+        while try_count < 3:
             try:
+                # Check if monitor is in our list
+                if monitor not in self.monitors:
+                    logging.warning(f"Monitor not in active monitors list: {monitor}")
+                    return
+
                 index = self.monitors.index(monitor)
                 plug = self.plugs[index]
                 break
-            except IndexError:
+            except (IndexError, ValueError) as e:
+                logging.warning(f"Failed to find monitor index (attempt {try_count}): {e}")
+                try_count += 1
                 if try_count >= 3:
+                    logging.error("Max retries reached for monitor lookup")
                     return
                 time.sleep(1)
-                try_count += 1
+
+        if plug is None:
+            logging.error("Failed to determine monitor plug name")
+            return
+
+        # Check against outputs filter
         if 'outputs' in list(self.config):
             if plug not in self.config['outputs']:
+                logging.debug(f"Skipping bar for output {plug} (not in config)")
                 return
-        bar = Bar(self, monitor)
-        bar.populate()
-        # Load default CSS from stored data
-        if self.default_css_data:
-            bar.css_from_data(self.default_css_data)
-        # Load custom CSS from path (user's config dir, not temp)
+
         try:
-            bar.css_from_path(self.config['style'])
-        except KeyError:
-            pass
-        bar.start()
-        self.bars[plug] = bar
+            bar = Bar(self, monitor)
+            bar.populate()
+            # Load default CSS from stored data
+            if self.default_css_data:
+                bar.css_from_data(self.default_css_data)
+            # Load custom CSS from path (user's config dir, not temp)
+            try:
+                bar.css_from_path(self.config['style'])
+            except KeyError:
+                pass
+            bar.start()
+            self.bars[plug] = bar
+            logging.info(f"Successfully created bar on {plug}")
+        except Exception as e:
+            logging.error(f"Failed to create bar on {plug}: {e}", exc_info=True)
 
     def _redraw_bars(self):
         """ Redraw all bars (called from idle callback) """
-        # Destroy existing bars
-        for bar in self.bars.values():
-            bar.window.destroy()
-        self.bars.clear()
-        # Update monitor list
-        self.monitors = self.get_monitors()
-        self.plugs = self.get_plugs()
-        # Redraw all
-        self.draw_all()
-        return False  # Don't repeat the idle callback
+        # Skip if system is sleeping
+        if self.is_sleeping:
+            logging.debug("Skipping bar redraw during sleep")
+            return False
+
+        try:
+            # Destroy existing bars safely
+            for plug, bar in list(self.bars.items()):
+                try:
+                    if bar and hasattr(bar, 'window') and bar.window:
+                        bar.window.destroy()
+                except Exception as e:
+                    logging.warning(f"Error destroying bar {plug}: {e}")
+            self.bars.clear()
+
+            # Reinitialize display connection if needed
+            self.display = Gdk.Display.get_default()
+            if self.display is None:
+                logging.error("Failed to get GDK display during redraw")
+                return False
+
+            # Update monitor list with error handling
+            self.monitors = self.get_monitors()
+            self.plugs = self.get_plugs()
+
+            # Redraw all
+            self.draw_all()
+            return False
+        except Exception as e:
+            logging.error(f"Error during bar redraw: {e}", exc_info=True)
+            return False
 
     def draw_all(self):
         """ Initialize all monitors """
