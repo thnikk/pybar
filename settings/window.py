@@ -115,6 +115,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.config = copy.deepcopy(config)
         self.original_config = copy.deepcopy(config)
         self.config_path = config_path
+        self._loading = False
 
         self._load_css()
 
@@ -145,6 +146,14 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.save_btn.connect('clicked', self._on_save)
         self.save_btn.set_sensitive(False)
         header.pack_end(self.save_btn)
+
+        self.restore_btn = Gtk.Button()
+        restore_icon = Gtk.Image.new_from_icon_name('edit-undo-symbolic')
+        self.restore_btn.set_child(restore_icon)
+        self.restore_btn.set_tooltip_text('Restore original settings')
+        self.restore_btn.connect('clicked', self._on_restore)
+        self.restore_btn.set_sensitive(False)
+        header.pack_end(self.restore_btn)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
@@ -230,6 +239,9 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def _on_change(self, key, value, module_name=None):
         """Handle setting change from any tab"""
+        if self._loading:
+            return
+
         if key == '__layout__':
             for section, modules in value.items():
                 self.config[section] = modules
@@ -261,7 +273,13 @@ class SettingsWindow(Adw.ApplicationWindow):
                     if m not in orig_modules:
                         del self.config['modules'][m]
 
-        self.save_btn.set_sensitive(self.config != self.original_config)
+        self._update_button_sensitivity()
+
+    def _update_button_sensitivity(self):
+        """Update sensitivity of Save and Restore buttons"""
+        changed = self.config != self.original_config
+        self.save_btn.set_sensitive(changed)
+        self.restore_btn.set_sensitive(changed)
 
     def _open_inspector(self, _):
         """Open GTK inspector for debugging"""
@@ -270,12 +288,28 @@ class SettingsWindow(Adw.ApplicationWindow):
     def _on_save(self, _):
         """Save configuration to disk"""
         try:
+            self._loading = True
             Config.save(self.config_path, self.config)
             self.original_config = copy.deepcopy(self.config)
-            self.save_btn.set_sensitive(False)
+            self._update_button_sensitivity()
             self._show_toast('Saved - restart pybar to apply changes')
         except Exception as e:
             self._show_toast(f'Save failed: {e}')
+        finally:
+            self._loading = False
+
+    def _on_restore(self, _):
+        """Restore configuration from original state"""
+        try:
+            self._loading = True
+            self.config = copy.deepcopy(self.original_config)
+            self.general_tab.refresh(self.config)
+            self.modules_tab.refresh(self.config)
+            self.appearance_tab.refresh(self.config)
+            self._update_button_sensitivity()
+            self._show_toast('Settings restored')
+        finally:
+            self._loading = False
 
     def _on_restart(self, _):
         """Signal pybar to reload configuration"""

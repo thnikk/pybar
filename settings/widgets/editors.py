@@ -43,6 +43,10 @@ class FieldEditor(Gtk.Box):
         """Override to return current value"""
         raise NotImplementedError
 
+    def set_value(self, value):
+        """Override to update current value in UI"""
+        raise NotImplementedError
+
     def _emit_change(self):
         """Call the change callback"""
         if self.on_change:
@@ -63,6 +67,9 @@ class StringEditor(FieldEditor):
     def get_value(self):
         text = self.entry.get_text()
         return text if text else None
+
+    def set_value(self, value):
+        self.entry.set_text(str(value) if value is not None else '')
 
 
 class IntegerEditor(FieldEditor):
@@ -124,6 +131,18 @@ class IntegerEditor(FieldEditor):
             return None
         return int(self.spin.get_value())
 
+    def set_value(self, value):
+        if hasattr(self, 'nullable') and self.nullable:
+            self._is_null = value is None
+            self.spin.set_sensitive(not self._is_null)
+            self.clear_btn.set_label('Set' if self._is_null else 'Clear')
+
+        if value is not None:
+            self.spin.set_value(float(value))
+        else:
+            default_value = self.schema_field.get('default', 0)
+            self.spin.set_value(float(default_value if default_value is not None else 0))
+
 
 class FloatEditor(FieldEditor):
     """Editor for float fields"""
@@ -162,6 +181,13 @@ class FloatEditor(FieldEditor):
     def get_value(self):
         return float(self.spin.get_value())
 
+    def set_value(self, value):
+        if value is not None:
+            self.spin.set_value(float(value))
+        else:
+            default_value = self.schema_field.get('default', 0.0)
+            self.spin.set_value(float(default_value if default_value is not None else 0.0))
+
 
 class BooleanEditor(FieldEditor):
     """Editor for boolean fields"""
@@ -176,6 +202,9 @@ class BooleanEditor(FieldEditor):
 
     def get_value(self):
         return self.switch.get_active()
+
+    def set_value(self, value):
+        self.switch.set_active(bool(value) if value is not None else False)
 
 
 class ChoiceEditor(FieldEditor):
@@ -210,6 +239,12 @@ class ChoiceEditor(FieldEditor):
         if 0 <= idx < len(self.choices):
             return self.choices[idx]
         return None
+
+    def set_value(self, value):
+        if value in self.choices:
+            self.dropdown.set_selected(self.choices.index(value))
+        elif self.choices:
+            self.dropdown.set_selected(0)
 
 
 class FileEditor(FieldEditor):
@@ -249,6 +284,9 @@ class FileEditor(FieldEditor):
     def get_value(self):
         text = self.entry.get_text()
         return text if text else None
+
+    def set_value(self, value):
+        self.entry.set_text(str(value) if value else '')
 
 
 class DictEditor(FieldEditor):
@@ -461,6 +499,14 @@ class DictEditor(FieldEditor):
                 result[key] = row.value_editor.get_value()
             return result if result else None
 
+    def set_value(self, value):
+        while child := self.rows_box.get_first_child():
+            self.rows_box.remove(child)
+        self.rows.clear()
+        if value and isinstance(value, dict):
+            for k, v in value.items():
+                self._add_row(k, v)
+
 
 class ListEditor(FieldEditor):
     """Editor for list fields with dynamic items"""
@@ -595,6 +641,10 @@ class ListEditor(FieldEditor):
 
     def get_value(self):
         return self.values if self.values else None
+
+    def set_value(self, value):
+        self.values = list(value) if isinstance(value, list) else []
+        self._refresh_list()
 
 
 

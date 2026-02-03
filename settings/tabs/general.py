@@ -40,6 +40,14 @@ class GeneralTab(Adw.PreferencesGroup):
         if self.on_change:
             self.on_change(key, value, None)
 
+    def refresh(self, config):
+        """Update editors with new config values"""
+        self.config = config
+        for key, editor in self.editors.items():
+            schema_field = GLOBAL_SCHEMA.get(key, {})
+            value = config.get(key, schema_field.get('default'))
+            editor.set_value(value)
+
     def get_values(self):
         """Get all current values"""
         return {

@@ -434,6 +434,16 @@ class SectionRow(Gtk.Box):
                 return True
         return False
 
+    def refresh(self, modules, config=None):
+        """Clear and re-add module chips"""
+        if config:
+            self.config = config
+        while child := self.chips_box.get_first_child():
+            self.chips_box.remove(child)
+        for name in modules:
+            self._add_chip(name)
+        self._update_placeholder()
+
     def get_modules(self):
         return [chip.name for chip in self._get_chips()]
 
@@ -829,6 +839,26 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         if self.on_change:
             self.on_change(key, value, module_name)
 
+    def reset(self):
+        """Revert to initial placeholder"""
+        self.selected_module = None
+        for row in self._current_rows:
+            self._content_box.remove(row)
+        self._current_rows.clear()
+
+        placeholder_row = Adw.ActionRow()
+        placeholder_label = Gtk.Label(
+            label='Click a module to configure its settings'
+        )
+        placeholder_label.set_opacity(0.5)
+        placeholder_label.set_vexpand(True)
+        placeholder_label.set_valign(Gtk.Align.CENTER)
+        placeholder_label.set_margin_top(24)
+        placeholder_label.set_margin_bottom(24)
+        placeholder_row.set_child(placeholder_label)
+        self._content_box.append(placeholder_row)
+        self._current_rows.append(placeholder_row)
+
 
 class ModulesTab(Gtk.Box):
     """Modules configuration using split view layout"""
@@ -931,6 +961,14 @@ class ModulesTab(Gtk.Box):
         if center:
             center._add_chip(module_name)
             center._emit_change()
+
+    def refresh(self, config):
+        """Update all sections and reset settings view"""
+        self.config = config
+        for section_name, section in self.sections.items():
+            modules = config.get(section_name, [])
+            section.refresh(modules, config)
+        self.settings_group.reset()
 
     def get_layout(self):
         return {

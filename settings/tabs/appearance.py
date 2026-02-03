@@ -97,6 +97,12 @@ class AppearanceTab(Gtk.Box):
         if self.on_change:
             self.on_change(key, value, None)
 
+    def refresh(self, config):
+        """Update editors with new config values"""
+        self.config = config
+        self.style_editor.set_value(config.get('style', ''))
+        self.outputs_editor.set_value(config.get('outputs', []))
+
     def get_values(self):
         """Get current values"""
         return {
