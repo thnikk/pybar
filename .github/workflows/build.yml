@@ -66,8 +66,8 @@ jobs:
     steps:
       - name: Install Ubuntu dependencies
         run: |
-          sudo apt update
-          sudo apt install -y libgirepository1.0-dev libgtk-4-dev libatk1.0-dev openssl zip gtk4-layer-shell
+          apt update
+          apt install -y libgirepository1.0-dev libgtk-4-dev libatk1.0-dev openssl zip gtk4-layer-shell
 
       - name: Checkout
         uses: actions/checkout@v4
