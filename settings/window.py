@@ -17,6 +17,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Gdk, Gio, Adw
 
 import config as Config
+from settings.schema import GLOBAL_SCHEMA
 
 SETTINGS_CSS = """
 .module-chip {
@@ -244,25 +245,63 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         if key == '__layout__':
             for section, modules in value.items():
-                self.config[section] = modules
+                orig_modules = self.original_config.get(section)
+                if modules == orig_modules:
+                    if section in self.original_config:
+                        self.config[section] = modules
+                    else:
+                        self.config.pop(section, None)
+                else:
+                    self.config[section] = modules
         elif module_name:
             if 'modules' not in self.config:
                 self.config['modules'] = {}
             if module_name not in self.config['modules']:
                 self.config['modules'][module_name] = {}
 
-            if value is None:
-                self.config['modules'][module_name].pop(key, None)
+            # Check against original module config
+            orig_modules = self.original_config.get('modules', {})
+            orig_module_conf = orig_modules.get(module_name, {})
+            
+            if value == orig_module_conf.get(key):
+                if key in orig_module_conf:
+                    self.config['modules'][module_name][key] = value
+                else:
+                    self.config['modules'][module_name].pop(key, None)
             else:
-                self.config['modules'][module_name][key] = value
-        else:
-            if value is None:
-                self.config.pop(key, None)
-            else:
-                self.config[key] = value
+                if value is None:
+                    self.config['modules'][module_name].pop(key, None)
+                else:
+                    self.config['modules'][module_name][key] = value
 
-        # Cleanup unused modules that were added in this session
+            # Cleanup module entry if it matches original state or is empty
+            if not self.config['modules'][module_name]:
+                if module_name not in orig_modules:
+                    del self.config['modules'][module_name]
+        else:
+            # Global setting
+            schema_field = GLOBAL_SCHEMA.get(key, {})
+            default = schema_field.get('default')
+            orig_val = self.original_config.get(key, default)
+            
+            # Ensure we compare as strings if they look like strings
+            val_comp = str(value) if value is not None else None
+            orig_comp = str(orig_val) if orig_val is not None else None
+            
+            if val_comp == orig_comp:
+                if key in self.original_config:
+                    self.config[key] = value
+                else:
+                    self.config.pop(key, None)
+            else:
+                if value is None:
+                    self.config.pop(key, None)
+                else:
+                    self.config[key] = value
+
+        # Final cleanup for empty 'modules' dict
         if 'modules' in self.config:
+            # Ensure any completely unused modules are removed
             used_modules = set()
             for s in ['modules-left', 'modules-center', 'modules-right']:
                 used_modules.update(self.config.get(s, []))
@@ -273,11 +312,20 @@ class SettingsWindow(Adw.ApplicationWindow):
                     if m not in orig_modules:
                         del self.config['modules'][m]
 
+            # If modules dict is now empty and wasn't there originally, remove it
+            if not self.config['modules'] and 'modules' not in self.original_config:
+                del self.config['modules']
+
         self._update_button_sensitivity()
 
     def _update_button_sensitivity(self):
         """Update sensitivity of Save and Restore buttons"""
-        changed = self.config != self.original_config
+        # Create clean copies for comparison (ignore None and ensure same types)
+        def clean(d):
+            if not isinstance(d, dict): return d
+            return {k: clean(v) for k, v in d.items() if v is not None}
+            
+        changed = clean(self.config) != clean(self.original_config)
         self.save_btn.set_sensitive(changed)
         self.restore_btn.set_sensitive(changed)
 

@@ -60,6 +60,21 @@ GLOBAL_SCHEMA = {
         'default': 'pybar',
         'label': 'Window Namespace',
         'description': 'WM namespace for window rules'
+    },
+    'style': {
+        'type': FieldType.FILE,
+        'default': '',
+        'label': 'Custom Style File',
+        'description': 'Path to custom CSS file for styling the bar'
+    },
+    'outputs': {
+        'type': FieldType.LIST,
+        'item_type': FieldType.STRING,
+        'default': [],
+        'label': 'Outputs',
+        'description': 'List of monitor outputs to display on',
+        'unique': True,
+        'sortable': False
     }
 }
 

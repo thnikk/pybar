@@ -8,7 +8,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gdk
 
-from settings.schema import FieldType
+from settings.schema import FieldType, GLOBAL_SCHEMA
 from settings.widgets.editors import create_editor
 
 
@@ -29,33 +29,21 @@ class AppearanceTab(Gtk.Box):
         header.set_focusable(True)
         self.append(header)
 
-        style_schema = {
-            'type': FieldType.FILE,
-            'default': '',
-            'label': 'Custom Style File',
-            'description': 'Path to custom CSS file for styling the bar'
-        }
+        style_schema = GLOBAL_SCHEMA['style']
         self.style_editor = create_editor(
             'style', style_schema,
-            config.get('style', ''),
+            config.get('style', style_schema['default']),
             self._on_field_change
         )
         self.append(self.style_editor)
 
-        outputs_schema = {
-            'type': FieldType.LIST,
-            'item_type': FieldType.STRING,
-            'default': [],
-            'label': 'Outputs',
-            'description': 'List of monitor outputs to display on',
-            'choices': self._get_monitors(),
-            'choices_label': 'Add monitor...',
-            'unique': True,
-            'sortable': False
-        }
+        outputs_schema = GLOBAL_SCHEMA['outputs']
+        outputs_schema['choices'] = self._get_monitors()
+        outputs_schema['choices_label'] = 'Add monitor...'
+        
         self.outputs_editor = create_editor(
             'outputs', outputs_schema,
-            config.get('outputs', []),
+            config.get('outputs', outputs_schema['default']),
             self._on_field_change
         )
         self.append(self.outputs_editor)
