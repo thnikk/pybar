@@ -528,6 +528,8 @@ class BaseModule:
 
     def run_worker(self):
         """Standard worker loop with caching"""
+        import module
+        stop_event = module._worker_stop_flags.get(self.name)
         first_run = True
         while True:
             data = None
@@ -601,8 +603,13 @@ class BaseModule:
             first_run = False
             if self.interval <= 0:
                 break
+
             sleep_time = max(0, self.interval - execution_time)
-            time.sleep(sleep_time)
+            if stop_event:
+                if stop_event.wait(timeout=sleep_time):
+                    break
+            else:
+                time.sleep(sleep_time)
 
     def create_widget(self, bar):
         """Create the GTK widget for the bar"""

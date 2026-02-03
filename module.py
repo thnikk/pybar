@@ -93,8 +93,8 @@ def stop_worker(name):
     if name in _worker_threads:
         # Don't wait for thread to finish, it's daemon anyway
         del _worker_threads[name]
-    if name in _worker_stop_flags:
-        del _worker_stop_flags[name]
+    # Keep stop flag for a bit so worker can see it
+    # It will be cleaned up when a new worker starts
 
 
 def stop_all_workers():
@@ -111,6 +111,7 @@ def clear_instances():
 
 def command_worker(name, config):
     """Worker for waybar-style command modules"""
+    stop_event = _worker_stop_flags.get(name)
     interval = config.get('interval', 60)
     module_type = config.get('type', name)
     is_hass = module_type.startswith('hass') or name.startswith('hass')
@@ -164,7 +165,11 @@ def command_worker(name, config):
             c.state_manager.update(name, data)
 
         first_run = False
-        time.sleep(interval)
+        if stop_event:
+            if stop_event.wait(timeout=interval):
+                break
+        else:
+            time.sleep(interval)
 
 
 def module(bar, name, config):
