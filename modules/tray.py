@@ -929,6 +929,10 @@ class TrayModuleWidget(Gtk.Box):
 
         self.icons = {}
         TrayHost.get_instance().add_module(self)
+        self.connect("destroy", self._on_destroy)
+
+    def _on_destroy(self, _widget):
+        TrayHost.get_instance().remove_module(self)
 
     def _on_toggle(self, _btn):
         revealed = not self.revealer.get_reveal_child()
@@ -971,6 +975,19 @@ class TrayModuleWidget(Gtk.Box):
         # Log identification info for user debugging
         id_str = ", ".join(f"{k}='{v}'" for k, v in identifiers.items() if v)
         debug_print(f"Tray Item Candidates: {id_str}")
+
+        # Check for minimum requirements (ghost icon protection)
+        has_id = bool(identifiers["id"])
+        has_title = bool(identifiers["title"])
+        has_proc = bool(identifiers["proc"])
+        
+        icon_name = item.properties.get("IconName")
+        icon_pixmap = item.properties.get("IconPixmap")
+        has_icon = bool(icon_name or icon_pixmap)
+
+        if not (has_id or has_title or has_proc or has_icon):
+            debug_print(f"Skipping empty item: {full_name}")
+            return
 
         # Check blacklist
         blacklist = self.config.get("blacklist", [])
