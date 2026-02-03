@@ -5,7 +5,8 @@ Author: thnikk
 """
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw  # noqa
 
 from settings.schema import FieldType
 
@@ -466,98 +467,135 @@ class ListEditor(FieldEditor):
 
     def __init__(self, key, schema_field, value, on_change, show_label=True):
         super().__init__(key, schema_field, value, on_change, show_label)
-        self.rows = []
         self.item_type = schema_field.get('item_type', FieldType.STRING)
+        self.choices = schema_field.get('choices', [])
+        self.unique = schema_field.get('unique', False)
+        self.sortable = schema_field.get('sortable', True)
 
-        # scroll = Gtk.ScrolledWindow()
-        # scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        # scroll.set_min_content_height(150)
-        # scroll.set_vexpand(True)
+        self.values = list(value) if isinstance(value, list) else []
 
-        self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        self.append(self.rows_box)
-        # scroll.set_child(self.rows_box)
-        # self.append(scroll)
+        self.list_box = Gtk.ListBox()
+        self.list_box.add_css_class('boxed-list')
+        self.list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.append(self.list_box)
 
-        add_btn = Gtk.Button(label='+ Add Item')
-        add_btn.get_style_context().add_class('flat')
-        add_btn.connect('clicked', self._on_add_item)
-        self.append(add_btn)
+        # Add Controls
+        add_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        add_box.set_margin_top(6)
 
-        if value and isinstance(value, list):
-            for item in value:
-                self._add_item(item)
+        if self.choices:
+            label = schema_field.get('choices_label', 'Add...')
+            strings = [label] + [str(c) for c in self.choices]
+            self.dropdown = Gtk.DropDown.new_from_strings(strings)
+            self.dropdown.connect('notify::selected', self._on_choice_selected)
+            add_box.append(self.dropdown)
 
-    def _add_item(self, value=''):
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        self.entry = Gtk.Entry(placeholder_text="Enter value...")
+        self.entry.set_hexpand(True)
+        self.entry.connect('activate', lambda _: self._on_manual_add())
+        add_box.append(self.entry)
 
-        item_schema = {'type': self.item_type}
-        row.item_editor = create_editor(
-            f'{self.key}_item_{len(self.rows)}',
-            item_schema,
-            value,
-            lambda k, v: self._emit_change(),
-            show_label=False
-        )
-        row.item_editor.set_hexpand(True)
+        add_btn = Gtk.Button(icon_name="list-add-symbolic")
+        add_btn.add_css_class("flat")
+        add_btn.connect('clicked', lambda _: self._on_manual_add())
+        add_box.append(add_btn)
 
-        up_btn = Gtk.Button(label='▲')
-        up_btn.get_style_context().add_class('flat')
-        up_btn.connect('clicked', lambda _: self._move_item_up(row))
+        self.append(add_box)
+        self._refresh_list()
 
-        down_btn = Gtk.Button(label='▼')
-        down_btn.get_style_context().add_class('flat')
-        down_btn.connect('clicked', lambda _: self._move_item_down(row))
+    def _refresh_list(self):
+        """Rebuild the list box rows"""
+        while child := self.list_box.get_first_child():
+            self.list_box.remove(child)
 
-        delete_btn = Gtk.Button(label='-')
-        delete_btn.get_style_context().add_class('flat')
-        delete_btn.connect('clicked', lambda _: self._remove_item(row))
+        for i, val in enumerate(self.values):
+            row = Adw.ActionRow()
+            if self.item_type == FieldType.STRING:
+                row.set_title(str(val))
+            else:
+                item_editor = create_editor(
+                    f'{self.key}_item_{i}',
+                    {'type': self.item_type},
+                    val,
+                    lambda k, v, idx=i: self._on_item_change(idx, v),
+                    show_label=False
+                )
+                row.set_child(item_editor)
 
-        row.append(row.item_editor)
-        row.append(up_btn)
-        row.append(down_btn)
-        row.append(delete_btn)
+            suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
 
-        self.rows_box.append(row)
-        self.rows.append(row)
+            if self.sortable:
+                up_btn = Gtk.Button(icon_name="go-up-symbolic")
+                up_btn.add_css_class("flat")
+                up_btn.connect('clicked', lambda _, idx=i: self._move_item(idx, -1))
+                suffix_box.append(up_btn)
 
-    def _remove_item(self, row):
-        if row in self.rows:
-            self.rows_box.remove(row)
-            self.rows.remove(row)
+                down_btn = Gtk.Button(icon_name="go-down-symbolic")
+                down_btn.add_css_class("flat")
+                down_btn.connect('clicked', lambda _, idx=i: self._move_item(idx, 1))
+                suffix_box.append(down_btn)
+
+            delete_btn = Gtk.Button(icon_name="list-remove-symbolic")
+            delete_btn.add_css_class("flat")
+            delete_btn.connect('clicked', lambda _, idx=i: self._remove_item(idx))
+            suffix_box.append(delete_btn)
+
+            row.add_suffix(suffix_box)
+            self.list_box.append(row)
+
+        self.list_box.set_visible(len(self.values) > 0)
+
+    def _on_item_change(self, index, value):
+        if 0 <= index < len(self.values):
+            self.values[index] = value
             self._emit_change()
 
-    def _move_item_up(self, row):
-        index = self.rows.index(row)
-        if index > 0:
-            prev_row = self.rows[index - 1]
-            self.rows_box.remove(row)
-            self.rows_box.insert_child_after(row, prev_row)
-            self.rows.remove(row)
-            self.rows.insert(index - 1, row)
-            self._emit_change()
+    def _on_choice_selected(self, dropdown, _):
+        idx = dropdown.get_selected()
+        if idx > 0:
+            val = self.choices[idx - 1]
+            if self._add_value(val):
+                dropdown.set_selected(0)
 
-    def _move_item_down(self, row):
-        index = self.rows.index(row)
-        if index < len(self.rows) - 1:
-            next_row = self.rows[index + 1]
-            self.rows_box.remove(next_row)
-            self.rows_box.insert_child_after(next_row, row)
-            self.rows.remove(next_row)
-            self.rows.insert(index, next_row)
-            self._emit_change()
+    def _on_manual_add(self):
+        val = self.entry.get_text().strip()
+        if val:
+            # Type conversion if needed
+            if self.item_type == FieldType.INTEGER:
+                try: val = int(val)
+                except ValueError: return
+            elif self.item_type == FieldType.FLOAT:
+                try: val = float(val)
+                except ValueError: return
+                
+            if self._add_value(val):
+                self.entry.set_text("")
 
-    def _on_add_item(self, _):
-        self._add_item('')
+    def _add_value(self, val):
+        if self.unique and val in self.values:
+            return False
+        self.values.append(val)
+        self._refresh_list()
         self._emit_change()
+        return True
+
+    def _remove_item(self, index):
+        if 0 <= index < len(self.values):
+            self.values.pop(index)
+            self._refresh_list()
+            self._emit_change()
+
+    def _move_item(self, index, delta):
+        new_idx = index + delta
+        if 0 <= new_idx < len(self.values):
+            self.values[index], self.values[new_idx] = \
+                self.values[new_idx], self.values[index]
+            self._refresh_list()
+            self._emit_change()
 
     def get_value(self):
-        result = []
-        for row in self.rows:
-            value = row.item_editor.get_value()
-            result.append(value)
-        return result if result else None
+        return self.values if self.values else None
+
 
 
 def create_editor(key, schema_field, value, on_change, show_label=True):

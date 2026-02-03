@@ -6,7 +6,7 @@ Author: thnikk
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, Gdk
 
 from settings.schema import FieldType
 from settings.widgets.editors import create_editor
@@ -44,7 +44,11 @@ class AppearanceTab(Gtk.Box):
             'item_type': FieldType.STRING,
             'default': [],
             'label': 'Outputs',
-            'description': 'List of monitor outputs to display on'
+            'description': 'List of monitor outputs to display on',
+            'choices': self._get_monitors(),
+            'choices_label': 'Add monitor...',
+            'unique': True,
+            'sortable': False
         }
         self.outputs_editor = create_editor(
             'outputs', outputs_schema,
@@ -52,6 +56,38 @@ class AppearanceTab(Gtk.Box):
             self._on_field_change
         )
         self.append(self.outputs_editor)
+
+    def _get_monitors(self):
+        """Get names of currently connected monitors"""
+        display = Gdk.Display.get_default()
+        if not display:
+            return []
+
+        monitors = display.get_monitors()
+        names = []
+        for i in range(monitors.get_n_items()):
+            monitor = monitors.get_item(i)
+            name = None
+
+            # Try to get the connector name (e.g., eDP-1, HDMI-A-1)
+            try:
+                name = monitor.get_connector()
+            except (AttributeError, TypeError):
+                pass
+
+            if not name:
+                try:
+                    name = monitor.get_model()
+                except (AttributeError, TypeError):
+                    pass
+
+            if not name:
+                name = f"monitor_{i}"
+
+            if name not in names:
+                names.append(name)
+
+        return sorted(names)
 
     def _on_field_change(self, key, value):
         """Handle field value changes"""
