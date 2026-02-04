@@ -13,6 +13,7 @@ import logging
 from subprocess import run, CalledProcessError
 import json
 import time
+import gc
 import common as c
 import module
 gi.require_version('Gtk', '4.0')
@@ -272,8 +273,10 @@ class Display:
             # Destroy existing bars safely
             for plug, bar in list(self.bars.items()):
                 try:
-                    if bar and hasattr(bar, 'window') and bar.window:
-                        bar.window.destroy()
+                    if bar:
+                        bar.cleanup_modules()
+                        if hasattr(bar, 'window') and bar.window:
+                            bar.window.destroy()
                 except Exception as e:
                     logging.warning(f"Error destroying bar {plug}: {e}")
             self.bars.clear()
@@ -312,6 +315,7 @@ class Display:
 
         # Destroy existing bars
         for bar in self.bars.values():
+            bar.cleanup_modules()
             bar.window.destroy()
         self.bars.clear()
 
@@ -348,6 +352,15 @@ class Display:
 
         # Redraw all bars
         self.draw_all()
+
+        # Force garbage collection to clean up destroyed widgets
+        gc.collect()
+        gc.collect() # Double collection to handle complex cycles
+        
+        objs = gc.get_objects()
+        modules = len([o for o in objs if isinstance(o, c.Module)])
+        widgets = len([o for o in objs if isinstance(o, c.Widget)])
+        c.print_debug(f"GC Stats - Modules: {modules}, Widgets: {widgets}")
 
         # Log subscription counts after reload
         debug_info = c.state_manager.debug_info()
@@ -396,6 +409,18 @@ class Bar:
         right_click.set_button(3)  # Right click
         right_click.connect('pressed', self._on_right_click)
         self.bar.add_controller(right_click)
+
+    def cleanup_modules(self):
+        """ Manually cleanup all modules to prevent leaks """
+        count = 0
+        for section in [self.left, self.center, self.right]:
+            child = section.get_first_child()
+            while child:
+                if hasattr(child, 'cleanup'):
+                    child.cleanup()
+                    count += 1
+                child = child.get_next_sibling()
+        c.print_debug(f"Cleaned up {count} modules")
 
     def populate(self):
         """ Populate bar with modules """

@@ -931,8 +931,19 @@ class TrayModuleWidget(Gtk.Box):
         TrayHost.get_instance().add_module(self)
         self.connect("destroy", self._on_destroy)
 
-    def _on_destroy(self, _widget):
+    def cleanup(self):
+        """Cleanup resources"""
         TrayHost.get_instance().remove_module(self)
+        self.icons.clear()
+        # Clean up icons
+        child = self.icons_box.get_first_child()
+        while child:
+            next_child = child.get_next_sibling()
+            self.icons_box.remove(child)
+            child = next_child
+
+    def _on_destroy(self, _widget):
+        self.cleanup()
 
     def _on_toggle(self, _btn):
         revealed = not self.revealer.get_reveal_child()

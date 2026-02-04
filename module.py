@@ -91,10 +91,13 @@ def stop_worker(name):
     if name in _worker_stop_flags:
         _worker_stop_flags[name].set()
     if name in _worker_threads:
-        # Don't wait for thread to finish, it's daemon anyway
+        thread = _worker_threads[name]
+        # Wait briefly for thread to stop (or use a timeout)
+        thread.join(timeout=1.0)
         del _worker_threads[name]
-    # Keep stop flag for a bit so worker can see it
-    # It will be cleaned up when a new worker starts
+    # Clean up stop flag
+    if name in _worker_stop_flags:
+        del _worker_stop_flags[name]
 
 
 def stop_all_workers():
@@ -102,10 +105,18 @@ def stop_all_workers():
     for name in list(_worker_threads.keys()):
         stop_worker(name)
 
+    # Force cleanup of Volume/Pulse threads that might hang
+    # (Note: we can't easily kill threads in Python, but we can try to
+    # unblock them if they are in a known blocking call, or rely on them
+    # checking the flag more often. For PulseAudio, it's tricky without
+    # an external event)
+
 
 def clear_instances():
     """Clear all module instances for reload"""
     global _instances
+    for instance in _instances.values():
+        instance.cleanup()
     _instances = {}
 
 

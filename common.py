@@ -683,6 +683,8 @@ class Module(Gtk.MenuButton):
     def __init__(self, icon=True, text=True):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
+        self._cleaned_up = False
+
         self.get_style_context().add_class('module')
         self.set_cursor_from_name("pointer")
         self.added_styles = []
@@ -721,40 +723,44 @@ class Module(Gtk.MenuButton):
             self.text.set_margin_start(0)
             self.box.append(self.text)
 
-        # Add right-click controller for detach
-        right_click = Gtk.GestureClick()
-        right_click.set_button(3)
-        right_click.connect("pressed", self._on_right_click)
-        self.add_controller(right_click)
-
-        self.debug_window = None
-
-        # Subscribe to debug state and track subscription
-        debug_sub = state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
-        self._subscriptions.append(debug_sub)
-
         # Connect destroy signal for automatic cleanup
         self.connect("destroy", self._on_destroy)
 
-    def _on_debug_state_changed(self, state):
-        if not state and self.debug_window:
-            self.debug_window.close()
+    def _cleanup_popover(self):
+        """Cleanup current popover if it exists"""
+        popover = self.get_popover()
+        if popover:
+            # First set to None to release the reference held by MenuButton
+            self.set_popover(None)
+            
+            # Then destroy the widget to ensure GTK resources are freed
+            # Check if it has a destroy method (it should be our Widget/Popover class)
+            if hasattr(popover, 'destroy'):
+                popover.destroy()
+            elif hasattr(popover, 'unparent'):
+                popover.unparent()
 
     def cleanup(self):
         """Clean up subscriptions and resources when widget is destroyed"""
+        
+        # Ensure cleanup runs only once
+        if getattr(self, '_cleaned_up', False):
+            return
+        self._cleaned_up = True
+
         for sub_id in self._subscriptions:
+
             state_manager.unsubscribe(sub_id)
         self._subscriptions.clear()
-
-        if hasattr(self, 'debug_window') and self.debug_window:
-            self.debug_window.destroy()
-            self.debug_window = None
 
         if hasattr(self, 'popover_widgets'):
             self.popover_widgets.clear()
 
         if hasattr(self, 'bar_gpu_levels'):
             self.bar_gpu_levels.clear()
+
+        # Clean up the popover widget
+        self._cleanup_popover()
 
     def _on_destroy(self, widget):
         """Called when widget is destroyed"""
@@ -882,6 +888,9 @@ class Module(Gtk.MenuButton):
 
     def set_widget(self, box):
         """ Set widget """
+        # Clean up existing popover first
+        self._cleanup_popover()
+
         widget = Widget()
         widget.box.append(box)
         widget.draw()
@@ -897,74 +906,6 @@ class Module(Gtk.MenuButton):
         }
         self.set_direction(directions.get(position, Gtk.ArrowType.UP))
         return self
-
-    def _on_right_click(self, gesture, n_press, x, y):
-        if not state_manager.get("debug_popovers"):
-            return
-
-        popover = self.get_popover()
-        if not popover or not isinstance(popover, Widget):
-            return
-
-        # Claim sequence to prevent other handlers
-        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-
-        self.detach_widget(popover)
-
-    def detach_widget(self, popover):
-        if self.debug_window:
-            self.debug_window.present()
-            return
-
-        # Get the content box
-        # popover.box is the VBox from Widget
-        # We want to move its children (content)
-        content = popover.box.get_first_child()
-        if not content:
-            return
-
-        # Hide popover first to avoid state confusion
-        popover.popdown()
-
-        # Store ref
-        self.detached_content = content
-
-        # Unparent content (remove from popover.box)
-        content.unparent()
-
-        # Wrap in styled box to match popover theme
-        wrapper = Gtk.Box()
-        wrapper.get_style_context().add_class("popover-content")
-        wrapper.append(content)
-
-        # Create window
-        self.debug_window = Gtk.Window(title="Debug Module")
-        self.debug_window.set_default_size(300, 200)
-        self.debug_window.set_child(wrapper)
-
-        def on_close(win):
-            self.restore_widget(popover)
-            self.debug_window = None
-            self.detached_content = None
-            return False  # Destroy window
-
-        self.debug_window.connect("close-request", on_close)
-        self.debug_window.present()
-
-    def restore_widget(self, popover):
-        """ Restore widget to popover """
-        if not hasattr(self, 'detached_content') or not self.detached_content:
-            return
-
-        content = self.detached_content
-
-        # Unparent the box from wherever it is (window or wrapper)
-        parent = content.get_parent()
-        if parent:
-            parent.remove(content)
-
-        # Re-attach to popover.box
-        popover.box.append(content)
 
 
 def handle_popover_edge(popover):
@@ -1017,6 +958,7 @@ class Widget(Gtk.Popover):
         self.set_position(Gtk.PositionType.TOP)
 
         # Check config for autohide behavior
+
         config = state_manager.get('config') or {}
         autohide = config.get('popover-autohide', True)
         self.set_autohide(autohide)
@@ -1024,6 +966,9 @@ class Widget(Gtk.Popover):
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
         self.connect("unmap", self._on_unmap)
+
+    def __del__(self):
+        print(f"DEBUG: Widget Finalized {id(self)}")
 
     def _on_map(self, _):
         """ Check if we are close to the screen edge and flatten corners """
