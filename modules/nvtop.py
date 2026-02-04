@@ -327,15 +327,18 @@ class NVTop(c.BaseModule):
 
         # Rebuild or update popover
         try:
-            if not widget.get_active():
-                # Optimization: Don't rebuild popover if data hasn't changed
-                compare_data = data.copy()
-                compare_data.pop('timestamp', None)
-                
-                if getattr(widget, 'last_popover_data', None) == compare_data:
-                    return
+            # Optimization: Don't update if data hasn't changed
+            compare_data = data.copy()
+            compare_data.pop('timestamp', None)
 
-                widget.last_popover_data = compare_data
+            if (widget.get_popover() and
+                    getattr(widget, 'last_popover_data', None) == compare_data):
+                return
+
+            widget.last_popover_data = compare_data
+
+            if (not widget.get_popover() or
+                    len(widget.popover_widgets) != len(devices)):
                 widget.set_widget(self.build_popover(widget, data))
             else:
                 for i, device_widgets in enumerate(widget.popover_widgets):
