@@ -306,23 +306,37 @@ class Display:
     def reload(self):
         """ Reload configuration and rebuild all bars """
         import config as Config
+        import sys
 
-        # Stop all module workers
-        module.stop_all_workers()
+        # Track module changes
+        before_modules = set(sys.modules.keys())
+        before_count = len(before_modules)
+
+        # Log current bar state
+        c.print_debug(
+            f"Reload: Currently have {len(self.bars)} bars: "
+            f"{list(self.bars.keys())}"
+        )
 
         # Clear state manager subscribers BEFORE destroying widgets
         c.state_manager.clear()
 
-        # Destroy existing bars
-        for bar in self.bars.values():
+        # Destroy existing bars and cleanup modules
+        for plug, bar in list(self.bars.items()):
+            c.print_debug(f"Destroying bar on {plug}")
             bar.cleanup_modules()
             bar.window.destroy()
         self.bars.clear()
 
-        # Clear module instances
+        # Stop all module workers
+        module.stop_all_workers()
+
+        # Clear module instances (also cleans sys.modules)
         module.clear_instances()
 
-        # Reload configuration
+        # Reload configuration (this imports config module fresh)
+        if 'config' in sys.modules:
+            del sys.modules['config']
         self.config = Config.load(self.app.config_path)
         c.state_manager.update('config', self.config)
 
@@ -350,17 +364,75 @@ class Display:
             module_config = self.config['modules'].get(name, {})
             module.start_worker(name, module_config)
 
+        # Check current state BEFORE creating new bars
+        objs_before = gc.get_objects()
+        modules_before = len([o for o in objs_before if isinstance(o, c.Module)])
+        widgets_before = len([o for o in objs_before if isinstance(o, c.Widget)])
+        c.print_debug(
+            f"Before redraw: Module objs: {modules_before}, "
+            f"Widgets: {widgets_before}"
+        )
+
         # Redraw all bars
         self.draw_all()
 
+        # Process all pending GTK events to ensure cleanup callbacks run
+        # Do this multiple times to handle callbacks that schedule more work
+        for _ in range(10):
+            while GLib.MainContext.default().pending():
+                GLib.MainContext.default().iteration(False)
+            # Small sleep to let any final callbacks queue
+            import time
+            time.sleep(0.01)
+
+        # Enable gc debugging to find uncollectable objects
+        gc.set_debug(gc.DEBUG_SAVEALL)
+
         # Force garbage collection to clean up destroyed widgets
-        gc.collect()
-        gc.collect() # Double collection to handle complex cycles
-        
+        collected_1 = gc.collect()
+        collected_2 = gc.collect()  # Double collection for cycles
+        collected_3 = gc.collect()  # Third pass to be thorough
+
+        # Check for uncollectable garbage
+        if gc.garbage:
+            c.print_debug(
+                f"WARNING: {len(gc.garbage)} uncollectable objects",
+                color='red'
+            )
+            # Sample the types to understand what's leaking
+            type_counts = {}
+            for obj in gc.garbage[:100]:  # Sample first 100
+                obj_type = type(obj).__name__
+                type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
+            c.print_debug(
+                f"Uncollectable types (sample): {type_counts}"
+            )
+            # Clear the garbage list after inspection
+            gc.garbage.clear()
+
+        gc.set_debug(0)
+
         objs = gc.get_objects()
-        modules = len([o for o in objs if isinstance(o, c.Module)])
+        modules_obj = len([o for o in objs if isinstance(o, c.Module)])
         widgets = len([o for o in objs if isinstance(o, c.Widget)])
-        c.print_debug(f"GC Stats - Modules: {modules}, Widgets: {widgets}")
+
+        # Track which modules were added
+        after_modules = set(sys.modules.keys())
+        after_count = len(after_modules)
+        added_modules = after_modules - before_modules
+        removed_modules = before_modules - after_modules
+
+        c.print_debug(
+            f"GC Stats - Collected: {collected_1}/{collected_2}/"
+            f"{collected_3}, Module objs: {modules_obj}, "
+            f"Widgets: {widgets}"
+        )
+        c.print_debug(
+            f"sys.modules: {before_count} -> {after_count} "
+            f"(+{len(added_modules)} -{len(removed_modules)})"
+        )
+        if added_modules:
+            c.print_debug(f"Added modules: {sorted(added_modules)}")
 
         # Log subscription counts after reload
         debug_info = c.state_manager.debug_info()
@@ -413,13 +485,41 @@ class Bar:
     def cleanup_modules(self):
         """ Manually cleanup all modules to prevent leaks """
         count = 0
+        widgets_to_cleanup = []
+
+        # First, collect all module widgets
         for section in [self.left, self.center, self.right]:
             child = section.get_first_child()
             while child:
-                if hasattr(child, 'cleanup'):
-                    child.cleanup()
-                    count += 1
+                widgets_to_cleanup.append(child)
                 child = child.get_next_sibling()
+
+        # Now cleanup and remove them
+        for widget in widgets_to_cleanup:
+            # Call cleanup BEFORE removing from parent
+            if hasattr(widget, 'cleanup'):
+                widget.cleanup()
+                count += 1
+
+            # Find which section it's in and remove
+            parent = widget.get_parent()
+            if parent:
+                parent.remove(widget)
+
+            # Disconnect all signals to break reference cycles
+            try:
+                c.GObject.signal_handlers_destroy(widget)
+            except Exception:
+                pass
+
+            # Actually destroy the widget to free GTK resources
+            if hasattr(widget, 'unparent'):
+                widget.unparent()
+
+            # Run disposal if available
+            if hasattr(widget, 'run_dispose'):
+                widget.run_dispose()
+
         c.print_debug(f"Cleaned up {count} modules")
 
     def populate(self):

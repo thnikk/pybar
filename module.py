@@ -42,7 +42,12 @@ def discover_modules():
 
 def get_instance(name, config):
     """Get or create a module instance"""
+    # Check if instance already exists
     if name in _instances:
+        c.print_debug(
+            f"Reusing existing instance for {name}",
+            color='yellow'
+        )
         return _instances[name]
 
     if not _module_map:
@@ -53,6 +58,7 @@ def get_instance(name, config):
         cls = _module_map[module_type]
         instance = cls(name, config)
         _instances[name] = instance
+        c.print_debug(f"Created new instance for {name}")
         return instance
     return None
 
@@ -114,10 +120,50 @@ def stop_all_workers():
 
 def clear_instances():
     """Clear all module instances for reload"""
-    global _instances
-    for instance in _instances.values():
-        instance.cleanup()
-    _instances = {}
+    global _instances, _module_map
+    import sys
+
+    instance_count = len(_instances)
+    c.print_debug(
+        f"Clearing {instance_count} module instances: "
+        f"{list(_instances.keys())}"
+    )
+
+    for name, instance in list(_instances.items()):
+        if hasattr(instance, 'cleanup'):
+            try:
+                instance.cleanup()
+            except Exception as e:
+                c.print_debug(
+                    f"Failed to cleanup {name}: {e}",
+                    color='red'
+                )
+
+    # Clear the dict
+    _instances.clear()
+
+    # Verify it's empty
+    if _instances:
+        c.print_debug(
+            f"WARNING: _instances not empty after clear: {_instances}",
+            color='red'
+        )
+
+    # Clear module map to force re-discovery on next use
+    _module_map = {}
+
+    # Remove all dynamically loaded modules from sys.modules
+    modules_to_remove = [
+        key for key in sys.modules.keys()
+        if key.startswith('modules.') and key != 'modules'
+    ]
+    for key in modules_to_remove:
+        del sys.modules[key]
+
+    c.print_debug(
+        f"Cleared {instance_count} instances, "
+        f"{len(modules_to_remove)} module imports"
+    )
 
 
 def command_worker(name, config):
@@ -195,22 +241,29 @@ def module(bar, name, config):
     m = c.Module()
     m.set_position(bar.position)
 
-    def generic_update(data):
-        if not data:
-            return
-        if 'text' in data:
-            m.set_label(data['text'])
-            m.set_visible(bool(data['text']))
-        if 'icon' in data:
-            m.set_icon(data['icon'])
-        if 'tooltip' in data:
-            m.set_tooltip_text(str(data['tooltip']))
-        m.reset_style()
-        if 'class' in data:
-            c.add_style(m, data['class'])
-        if data.get('stale'):
-            c.add_style(m, 'stale')
-
-    sub_id = c.state_manager.subscribe(name, generic_update)
+    # Create a class to hold the callback to avoid closure issues
+    class GenericCallback:
+        def __init__(self, widget):
+            self.widget = widget
+        
+        def __call__(self, data):
+            if not data:
+                return
+            if 'text' in data:
+                self.widget.set_label(data['text'])
+                self.widget.set_visible(bool(data['text']))
+            if 'icon' in data:
+                self.widget.set_icon(data['icon'])
+            if 'tooltip' in data:
+                self.widget.set_tooltip_text(str(data['tooltip']))
+            self.widget.reset_style()
+            if 'class' in data:
+                c.add_style(self.widget, data['class'])
+            if data.get('stale'):
+                c.add_style(self.widget, 'stale')
+    
+    callback = GenericCallback(m)
+    sub_id = c.state_manager.subscribe(name, callback)
     m._subscriptions.append(sub_id)
+    m._update_callback = callback  # Store to allow cleanup
     return m
