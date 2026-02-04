@@ -152,8 +152,9 @@ class Display:
     def _on_wake_from_sleep(self):
         """ Reload bars after waking from sleep """
         try:
-            # Give the display a moment to stabilize
-            GLib.timeout_add_seconds(1, self._safe_reload_after_sleep)
+            # Give the display more time to stabilize after suspend
+            # Display info may not be immediately available
+            GLib.timeout_add_seconds(2, self._safe_reload_after_sleep)
         except Exception as e:
             logging.error(f"Error during wake handling: {e}")
 
@@ -185,9 +186,22 @@ class Display:
         return [monitors.get_item(i) for i in range(monitors.get_n_items())]
 
     def get_plugs(self):
-        """ Get monitor plug names for Wayland outputs """
+        """
+        Get monitor plug names for Wayland outputs.
+        Tries multiple methods and retries to get proper connector names.
+        """
         plugs = []
         for monitor in self.monitors:
+            name = self._get_monitor_name(monitor, len(plugs))
+            plugs.append(name)
+        return plugs
+
+    def _get_monitor_name(self, monitor, index, max_retries=3):
+        """
+        Get monitor name with retry logic.
+        After suspend, connector info may not be immediately available.
+        """
+        for attempt in range(max_retries):
             # Try to get the connector name (e.g., eDP-1, HDMI-A-1)
             name = None
             try:
@@ -195,20 +209,49 @@ class Display:
             except AttributeError:
                 pass
 
-            if not name:
-                name = monitor.get_model()
+            if name:
+                logging.debug(
+                    f"Got connector name '{name}' for monitor {index}"
+                )
+                return name
 
+            # Try model as fallback
             if not name:
-                name = f"monitor_{len(plugs)}"
+                try:
+                    name = monitor.get_model()
+                    if name:
+                        logging.debug(
+                            f"Using model name '{name}' for monitor {index}"
+                        )
+                        return name
+                except AttributeError:
+                    pass
 
-            plugs.append(name)
-        return plugs
+            # If we still don't have a name and haven't exhausted retries
+            if attempt < max_retries - 1:
+                logging.debug(
+                    f"Connector not available for monitor {index}, "
+                    f"retrying... (attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(0.2)
+
+        # Last resort: use generic name but log warning
+        fallback = f"monitor_{index}"
+        logging.warning(
+            f"Could not get connector name for monitor {index}, "
+            f"using fallback '{fallback}'. "
+            f"This may cause issues with outputs filter."
+        )
+        return fallback
 
     def on_monitors_changed(self, model, position, removed, added):
-        """ Handle monitor changes by redrawing all bars """
-        # Schedule the redraw on the main loop to avoid issues
-        # when this is triggered before application startup completes
-        GLib.idle_add(self._redraw_bars)
+        """
+        Handle monitor changes by redrawing all bars.
+        Delay to allow monitor info to become available.
+        """
+        # Give monitors time to report connector info after hotplug
+        # Monitor objects may not have connector names immediately
+        GLib.timeout_add(500, self._redraw_bars)
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
