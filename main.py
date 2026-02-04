@@ -76,6 +76,9 @@ def on_activate(app, config):
         return
     app.started = True
 
+    # Hold application to prevent exit when no monitors are connected
+    app.hold()
+
     # Get a set of all used modules
     unique = set(
         config['modules-left'] +
