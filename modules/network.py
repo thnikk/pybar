@@ -243,7 +243,8 @@ class Network(c.BaseModule):
 
     def build_popover(self, widget, data):
         """ Build popover for network """
-        widget.popover_widgets = {}
+        widget.device_widgets = {}
+        widget.wifi_widgets = {}
 
         main_box = c.box('v', spacing=20, style='small-widget')
         main_box.append(c.label('Network', style='heading'))
@@ -268,7 +269,7 @@ class Network(c.BaseModule):
                     'GENERAL.TYPE', 'unknown'), style='title', ha='start'))
             device_box = c.box('v', style='box')
 
-            widget.popover_widgets[dev_name] = {}
+            widget.device_widgets[dev_name] = {}
 
             items = []
             for long, short in names.items():
@@ -285,7 +286,7 @@ class Network(c.BaseModule):
                 device_box.append(line)
 
                 if long == 'IP4.ADDRESS[1]':
-                    widget.popover_widgets[dev_name]['ip_label'] = val_label
+                    widget.device_widgets[dev_name]['ip_label'] = val_label
 
                 if i != len(items) - 1:
                     device_box.append(c.sep('h'))
@@ -308,6 +309,7 @@ class Network(c.BaseModule):
 
             for i, net in enumerate(data['wifi_networks']):
                 item_con = c.box('v')
+                widget.wifi_widgets[net['SSID']] = {'row': item_con}
 
                 # SSID Row
                 ssid_btn = c.button()
@@ -318,6 +320,7 @@ class Network(c.BaseModule):
                 ssid_label = c.label(net['SSID'], ha='start', he=True)
                 signal_label = c.label(
                     f"{net['SIGNAL']}%", style='gray', ha='end')
+                widget.wifi_widgets[net['SSID']]['signal'] = signal_label
 
                 ssid_content.append(indicator)
                 ssid_content.append(ssid_label)
@@ -428,27 +431,52 @@ class Network(c.BaseModule):
         widget.set_visible(bool(data.get('text')))
         widget.set_tooltip_text(data.get('tooltip', ''))
 
-        if not widget.get_active():
-            # Optimization: Don't rebuild popover if data hasn't changed
-            compare_data = data.copy()
-            compare_data.pop('timestamp', None)
+        # Optimization: Don't update if data hasn't changed
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
+        
+        if (widget.get_popover() and
+                getattr(widget, 'last_popover_data', None) == compare_data):
+            return
+
+        widget.last_popover_data = compare_data
+
+        needs_rebuild = False
+        if not widget.get_popover():
+            needs_rebuild = True
+        else:
+            # Check devices
+            curr_devs = set(getattr(widget, 'device_widgets', {}).keys())
+            new_devs = set()
+            for d in data.get('devices', []):
+                 if 'connected' in d.get('GENERAL.STATE', '').lower():
+                      new_devs.add(d.get('GENERAL.DEVICE', 'unknown'))
             
-            if getattr(widget, 'last_popover_data', None) == compare_data:
-                return
-                
-            widget.last_popover_data = compare_data
+            # Check wifi
+            curr_wifi = set(getattr(widget, 'wifi_widgets', {}).keys())
+            new_wifi = set(n['SSID'] for n in data.get('wifi_networks', []))
+            
+            if curr_devs != new_devs or curr_wifi != new_wifi:
+                needs_rebuild = True
+        
+        if needs_rebuild:
             widget.set_widget(self.build_popover(widget, data))
         else:
-            # Live update IP labels if they exist
+            # Update Devices
             devices = {d['GENERAL.DEVICE']: d for d in data.get('devices', [])}
-            for dev_name, widgets in getattr(
-                widget, 'popover_widgets', {}
-            ).items():
+            for dev_name, widgets in getattr(widget, 'device_widgets', {}).items():
                 if dev_name in devices:
                     dev = devices[dev_name]
                     if 'ip_label' in widgets:
-                        ip = dev.get('IP4.ADDRESS[1]', 'None')
-                        widgets['ip_label'].set_text(ip)
+                         widgets['ip_label'].set_text(dev.get('IP4.ADDRESS[1]', 'None'))
+            
+            # Update Wifi
+            wifi_map = {n['SSID']: n for n in data.get('wifi_networks', [])}
+            for ssid, widgets in getattr(widget, 'wifi_widgets', {}).items():
+                if ssid in wifi_map:
+                    net = wifi_map[ssid]
+                    if 'signal' in widgets:
+                        widgets['signal'].set_text(f"{net['SIGNAL']}%")
 
 
 module_map = {

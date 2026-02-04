@@ -66,7 +66,7 @@ class Docker(c.BaseModule):
         except Exception:
             return {}
 
-    def build_popover(self, data):
+    def build_popover(self, widget, data):
         container = c.box('v', spacing=10, style='small-widget')
         container.append(
             c.label(
@@ -92,6 +92,7 @@ class Docker(c.BaseModule):
             btn_box.append(btn)
         container.append(btn_box)
 
+        widget.popover_widgets = {'log_view': log_view}
         return container
 
     def create_widget(self, bar):
@@ -114,16 +115,23 @@ class Docker(c.BaseModule):
             widget.set_icon('')
             widget.reset_style()
 
-        if not widget.get_active():
-            # Optimization: Don't rebuild popover if data hasn't changed
-            compare_data = data.copy()
-            compare_data.pop('timestamp', None)
-            
-            if getattr(widget, 'last_popover_data', None) == compare_data:
-                return
+        # Optimization: Don't update if data hasn't changed
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
 
-            widget.last_popover_data = compare_data
-            widget.set_widget(self.build_popover(data))
+        if (widget.get_popover() and
+                getattr(widget, 'last_popover_data', None) == compare_data):
+            return
+
+        widget.last_popover_data = compare_data
+
+        if not widget.get_popover():
+            widget.set_widget(self.build_popover(widget, data))
+        else:
+            if hasattr(widget, 'popover_widgets'):
+                buffer = widget.popover_widgets['log_view'].get_buffer()
+                if buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False) != data['logs']:
+                    buffer.set_text(data['logs'])
 
 
 module_map = {

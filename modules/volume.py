@@ -219,6 +219,7 @@ class Volume(c.BaseModule):
     def build_device_row(self, section, device):
         """ Build a row for a single pulse device """
         row = c.box('v', spacing=5, style='inner-box')
+        controls = {}
 
         top = c.box('h', spacing=10)
 
@@ -226,10 +227,12 @@ class Volume(c.BaseModule):
         mute_switch = Gtk.Switch()
         mute_switch.set_active(not device.get('mute', False))
         mute_switch.set_valign(Gtk.Align.CENTER)
-        mute_switch.connect(
+        handler_id = mute_switch.connect(
             'state-set', lambda _s, state: self.toggle_mute(
                 section, device['index'], state))
         top.append(mute_switch)
+        controls['mute'] = mute_switch
+        controls['mute_handler'] = handler_id
 
         # Label
         label_text = device.get('proplist', {}).get(
@@ -246,17 +249,20 @@ class Volume(c.BaseModule):
 
         # Volume slider - disable scroll to allow container to scroll
         slider = c.slider(round(device.get('volume', 0) * 100), scrollable=False)
-        slider.connect(
+        handler_id = slider.connect(
             'value-changed', lambda s: self.set_dev_volume(
                 section, device['index'], s.get_value()))
         if device.get('mute'):
             c.add_style(slider, 'muted')
         row.append(slider)
+        controls['volume'] = slider
+        controls['volume_handler'] = handler_id
 
-        return row
+        return row, controls
 
-    def build_popover_content(self, data):
+    def build_popover_content(self, widget, data):
         """ Build popover for volume """
+        widget.popover_widgets = {'Outputs': {}, 'Inputs': {}, 'Programs': {}}
         main_box = c.box('v', spacing=20, style='small-widget')
         main_box.append(c.label('Volume', style='heading'))
 
@@ -282,7 +288,8 @@ class Volume(c.BaseModule):
                         'description', ''):
                     continue
 
-                dev_row = self.build_device_row(name, device)
+                dev_row, controls = self.build_device_row(name, device)
+                widget.popover_widgets[name][device['index']] = controls
                 devices_box.append(dev_row)
                 if i != len(devices) - 1:
                     devices_box.append(c.sep('h'))
@@ -357,17 +364,67 @@ class Volume(c.BaseModule):
             if not found:
                 widget.set_icon('')
 
-        # Update popover content
-        if not widget.get_active():
-            # Optimization: Don't rebuild popover if data hasn't changed
-            compare_data = data.copy()
-            compare_data.pop('timestamp', None)
-            
-            if getattr(widget, 'last_popover_data', None) == compare_data:
-                return
+        # Optimization: Don't update if data hasn't changed
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
 
-            widget.last_popover_data = compare_data
-            widget.set_widget(self.build_popover_content(data))
+        if (widget.get_popover() and
+                getattr(widget, 'last_popover_data', None) == compare_data):
+            return
+
+        widget.last_popover_data = compare_data
+
+        # Check if we need to rebuild
+        needs_rebuild = False
+        if not widget.get_popover() or not hasattr(widget, 'popover_widgets'):
+            needs_rebuild = True
+        else:
+            # Check structure match
+            for section in ['Outputs', 'Inputs', 'Programs']:
+                current_indices = set(widget.popover_widgets[section].keys())
+                new_indices = set()
+                devices = data.get(section.lower(), [])
+                for d in devices:
+                    # Logic to skip monitors matched build logic
+                    if section != 'Programs' and 'Monitor of' in d.get(
+                            'description', ''):
+                        continue
+                    new_indices.add(d['index'])
+
+                if current_indices != new_indices:
+                    needs_rebuild = True
+                    break
+
+        if needs_rebuild:
+            widget.set_widget(self.build_popover_content(widget, data))
+        else:
+            # Update in place
+            for section in ['Outputs', 'Inputs', 'Programs']:
+                devices = data.get(section.lower(), [])
+                for d in devices:
+                    idx = d['index']
+                    if idx in widget.popover_widgets[section]:
+                        ctrls = widget.popover_widgets[section][idx]
+                        
+                        # Update mute
+                        if ctrls['mute'].get_active() != (not d['mute']):
+                            ctrls['mute'].handler_block(ctrls['mute_handler'])
+                            ctrls['mute'].set_active(not d['mute'])
+                            ctrls['mute'].handler_unblock(ctrls['mute_handler'])
+                        
+                        # Update volume
+                        new_vol = round(d['volume'] * 100)
+                        if abs(ctrls['volume'].get_value() - new_vol) > 1:
+                            ctrls['volume'].handler_block(ctrls['volume_handler'])
+                            ctrls['volume'].set_value(new_vol)
+                            ctrls['volume'].handler_unblock(
+                                ctrls['volume_handler'])
+                        
+                        # Update style for muted
+                        if d['mute']:
+                            c.add_style(ctrls['volume'], 'muted')
+                        else:
+                            c.del_style(ctrls['volume'], 'muted')
 
 
 module_map = {
