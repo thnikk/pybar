@@ -676,16 +676,21 @@ class BaseModule:
 
     def create_widget(self, bar):
         """Create the GTK widget for the bar"""
+        import weakref
+        
         m = Module()
         m.set_position(bar.position)
         
-        # Create a proper callback function to avoid lambda closure leaks
+        # Use weak reference to widget to break circular reference
+        widget_ref = weakref.ref(m)
+        
         def update_callback(data):
-            self.update_ui(m, data)
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
         
         sub_id = state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
-        # Store callback on widget so it can be explicitly cleared
         m._update_callback = update_callback
         return m
 

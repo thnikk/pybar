@@ -331,6 +331,14 @@ class Display:
         # Stop all module workers
         module.stop_all_workers()
 
+        # Reset tray singleton to cleanup DBus services
+        try:
+            from modules.tray import TrayHost
+            TrayHost.reset_instance()
+            c.print_debug("Reset TrayHost singleton")
+        except Exception as e:
+            c.print_debug(f"Failed to reset TrayHost: {e}", color='red')
+
         # Clear module instances (also cleans sys.modules)
         module.clear_instances()
 
@@ -366,12 +374,29 @@ class Display:
 
         # Check current state BEFORE creating new bars
         objs_before = gc.get_objects()
-        modules_before = len([o for o in objs_before if isinstance(o, c.Module)])
+        surviving_modules = [o for o in objs_before if isinstance(o, c.Module)]
         widgets_before = len([o for o in objs_before if isinstance(o, c.Widget)])
-        c.print_debug(
-            f"Before redraw: Module objs: {modules_before}, "
-            f"Widgets: {widgets_before}"
-        )
+        
+        # Try to identify which modules are surviving
+        if surviving_modules:
+            c.print_debug(
+                f"WARNING: {len(surviving_modules)} Module objects "
+                f"surviving GC:"
+            )
+            for mod in surviving_modules:
+                # Try to get identifying info
+                mod_id = id(mod)
+                has_subs = len(getattr(mod, '_subscriptions', []))
+                parent = mod.get_parent() if hasattr(mod, 'get_parent') else None
+                c.print_debug(
+                    f"  - Module {mod_id}: {has_subs} subscriptions, "
+                    f"cleaned={getattr(mod, '_cleaned_up', False)}, "
+                    f"has_parent={parent is not None}"
+                )
+        else:
+            c.print_debug(
+                f"Before redraw: Module objs: 0, Widgets: {widgets_before}"
+            )
 
         # Redraw all bars
         self.draw_all()

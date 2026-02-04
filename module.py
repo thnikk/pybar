@@ -238,32 +238,32 @@ def module(bar, name, config):
         return instance.create_widget(bar)
 
     # Generic fallback
+    import weakref
+    
     m = c.Module()
     m.set_position(bar.position)
 
-    # Create a class to hold the callback to avoid closure issues
-    class GenericCallback:
-        def __init__(self, widget):
-            self.widget = widget
-        
-        def __call__(self, data):
-            if not data:
-                return
-            if 'text' in data:
-                self.widget.set_label(data['text'])
-                self.widget.set_visible(bool(data['text']))
-            if 'icon' in data:
-                self.widget.set_icon(data['icon'])
-            if 'tooltip' in data:
-                self.widget.set_tooltip_text(str(data['tooltip']))
-            self.widget.reset_style()
-            if 'class' in data:
-                c.add_style(self.widget, data['class'])
-            if data.get('stale'):
-                c.add_style(self.widget, 'stale')
+    # Use weak reference to widget to break circular reference
+    widget_ref = weakref.ref(m)
     
-    callback = GenericCallback(m)
-    sub_id = c.state_manager.subscribe(name, callback)
+    def generic_update(data):
+        widget = widget_ref()
+        if widget is None or not data:
+            return
+        if 'text' in data:
+            widget.set_label(data['text'])
+            widget.set_visible(bool(data['text']))
+        if 'icon' in data:
+            widget.set_icon(data['icon'])
+        if 'tooltip' in data:
+            widget.set_tooltip_text(str(data['tooltip']))
+        widget.reset_style()
+        if 'class' in data:
+            c.add_style(widget, data['class'])
+        if data.get('stale'):
+            c.add_style(widget, 'stale')
+    
+    sub_id = c.state_manager.subscribe(name, generic_update)
     m._subscriptions.append(sub_id)
-    m._update_callback = callback  # Store to allow cleanup
+    m._update_callback = generic_update
     return m
