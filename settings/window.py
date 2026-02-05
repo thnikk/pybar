@@ -14,7 +14,7 @@ sys.path.insert(
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Gdk, Gio, Adw
+from gi.repository import Gtk, Gdk, Gio, Adw, GLib
 
 import config as Config
 from settings.schema import GLOBAL_SCHEMA
@@ -100,6 +100,11 @@ button.restart-btn {
 
 button.restart-btn:hover {
     background: #5cb370;
+}
+
+button.restart-btn.reloading {
+    background: #888888;
+    color: #cccccc;
 }
 """
 from settings.tabs.general import GeneralTab
@@ -361,16 +366,54 @@ class SettingsWindow(Adw.ApplicationWindow):
 
     def _on_restart(self, _):
         """Signal pybar to reload configuration"""
-        import os
         # Create a reload signal file that the bar will watch
         reload_file = os.path.expanduser('~/.cache/pybar/.reload')
+        reload_done_file = os.path.expanduser('~/.cache/pybar/.reload_done')
+
+        # Clean up any old done signal
+        if os.path.exists(reload_done_file):
+            try:
+                os.remove(reload_done_file)
+            except Exception:
+                pass
+
         try:
             os.makedirs(os.path.dirname(reload_file), exist_ok=True)
             with open(reload_file, 'w') as f:
                 f.write(str(os.getpid()))
+
+            # Show feedback
+            self.restart_btn.set_sensitive(False)
+            self.restart_btn.add_css_class('reloading')
+
+            spinner = Gtk.Spinner()
+            spinner.start()
+            self._restart_btn_original_child = self.restart_btn.get_child()
+            self.restart_btn.set_child(spinner)
+
+            # Start checking for completion
+            GLib.timeout_add(100, self._check_reload_done, reload_done_file)
+
             self._show_toast('Pybar will reload configuration...')
         except Exception as e:
             self._show_toast(f'Failed to signal reload: {e}')
+
+    def _check_reload_done(self, done_file):
+        """Check if pybar has finished reloading"""
+        if os.path.exists(done_file):
+            try:
+                os.remove(done_file)
+            except Exception:
+                pass
+
+            # Revert feedback
+            self.restart_btn.set_sensitive(True)
+            self.restart_btn.remove_css_class('reloading')
+            self.restart_btn.set_child(self._restart_btn_original_child)
+
+            self._show_toast('Reload complete')
+            return False  # Stop timeout
+        return True  # Continue checking
 
     def _show_toast(self, message):
         """Show a toast notification"""

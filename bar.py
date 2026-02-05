@@ -61,6 +61,9 @@ class Display:
 
         # Watch for reload signal from settings
         self.reload_file = os.path.expanduser('~/.cache/pybar/.reload')
+        self.reload_done_file = os.path.expanduser(
+            '~/.cache/pybar/.reload_done'
+        )
         GLib.timeout_add_seconds(1, self._check_reload_signal)
 
     def get_wm(self):
@@ -505,6 +508,16 @@ class Display:
         # Log subscription counts after reload
         debug_info = c.state_manager.debug_info()
         c.print_debug(f"After reload: {debug_info}")
+
+        # Signal completion to settings window
+        try:
+            with open(self.reload_done_file, 'w') as f:
+                f.write('done')
+        except Exception as e:
+            c.print_debug(
+                f"Failed to signal reload completion: {e}",
+                name='display', color='red'
+            )
 
     def _check_reload_signal(self):
         """ Check if settings window has signaled a reload """
