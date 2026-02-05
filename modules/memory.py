@@ -208,6 +208,12 @@ class Memory(c.BaseModule):
         if not pid:
             return
 
+        # Turn button grey and show spinner
+        btn.set_sensitive(False)
+        spinner = Gtk.Spinner()
+        spinner.start()
+        btn.set_child(spinner)
+
         def run_pkexec(p_id):
             import subprocess
             try:
@@ -439,6 +445,9 @@ class Memory(c.BaseModule):
                     kill_btn = pw[f'p_kill_{i}']
                     if show_kill:
                         kill_btn._target_pid = p['pid']
+                        if not kill_btn.get_sensitive():
+                            kill_btn.set_sensitive(True)
+                            kill_btn.set_label('')
 
                     pw[f'p_row_{i}'].set_visible(True)
                 else:
