@@ -50,8 +50,8 @@ class MPRIS(c.BaseModule):
             'type': 'list',
             'default': [],
             'label': 'Players',
-            'description': 'Comma-separated list of player names to show '
-                           '(e.g. "spotify,firefox"). Empty for any player.'
+            'description': 'List of player names to show.'
+                           'Empty for any player.'
         },
         'art_size': {
             'type': 'integer',
@@ -620,7 +620,5 @@ class MPRIS(c.BaseModule):
 
 
 module_map = {
-    'mpris': MPRIS,
-    'mpd': MPRIS,
-    'music': MPRIS
+    'mpris': MPRIS
 }
