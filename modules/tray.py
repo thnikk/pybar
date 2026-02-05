@@ -420,16 +420,66 @@ class TrayHost:
             cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset_instance(cls):
+        """Reset the singleton instance (for reload)"""
+        if cls._instance:
+            cls._instance.cleanup()
+            cls._instance = None
+
     def __init__(self):
         self.modules = []
         self._items = []
         self.session_bus = SessionMessageBus()
         self.host_id = f"pybar-{os.getpid()}"
         self.debug = False
+        self.watcher_interface = None
 
         # Try to register watcher if not present
         self.watcher_proxy = None
         self._setup_watcher()
+
+    def cleanup(self):
+        """Cleanup DBus registrations and connections"""
+        debug_print("TrayHost cleanup starting")
+        
+        # Disconnect all items
+        for item in self._items[:]:
+            if item.item_observer:
+                item.item_observer.disconnect()
+            if item.item_proxy:
+                disconnect_proxy(item.item_proxy)
+        self._items.clear()
+        
+        # Unregister DBus services
+        try:
+            if hasattr(self, 'watcher_interface') and self.watcher_interface:
+                self.session_bus.unpublish_object(WATCHER_OBJECT_PATH)
+                self.watcher_interface = None
+        except Exception as e:
+            debug_print(f"Failed to unpublish watcher: {e}")
+        
+        try:
+            self.session_bus.unregister_service(WATCHER_SERVICE_NAME)
+        except Exception as e:
+            debug_print(f"Failed to unregister watcher service: {e}")
+        
+        try:
+            host_service_name = HOST_SERVICE_NAME_TEMPLATE.format(
+                os.getpid(), self.host_id)
+            self.session_bus.unregister_service(host_service_name)
+        except Exception as e:
+            debug_print(f"Failed to unregister host service: {e}")
+        
+        # Disconnect observers
+        if hasattr(self, 'watcher_observer') and self.watcher_observer:
+            self.watcher_observer.disconnect()
+        
+        if self.watcher_proxy:
+            disconnect_proxy(self.watcher_proxy)
+            self.watcher_proxy = None
+        
+        debug_print("TrayHost cleanup complete")
 
     def add_module(self, module):
         self.modules.append(module)
@@ -931,8 +981,19 @@ class TrayModuleWidget(Gtk.Box):
         TrayHost.get_instance().add_module(self)
         self.connect("destroy", self._on_destroy)
 
-    def _on_destroy(self, _widget):
+    def cleanup(self):
+        """Cleanup resources"""
         TrayHost.get_instance().remove_module(self)
+        self.icons.clear()
+        # Clean up icons
+        child = self.icons_box.get_first_child()
+        while child:
+            next_child = child.get_next_sibling()
+            self.icons_box.remove(child)
+            child = next_child
+
+    def _on_destroy(self, _widget):
+        self.cleanup()
 
     def _on_toggle(self, _btn):
         revealed = not self.revealer.get_reveal_child()

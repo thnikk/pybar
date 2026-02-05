@@ -497,11 +497,18 @@ class StateManager:
     def update(self, name, new_data):
         self.data[name] = new_data
         if name in self.subscribers:
-            for sub_id, callback in self.subscribers[name].items():
+            # Make a copy to avoid issues if dict changes during iteration
+            for sub_id, callback in list(self.subscribers[name].items()):
                 try:
-                    GLib.idle_add(callback, new_data)
+                    # Use idle_add with priority to ensure cleanup happens
+                    GLib.idle_add(
+                        callback, new_data,
+                        priority=GLib.PRIORITY_DEFAULT_IDLE
+                    )
                 except Exception as e:
-                    print_debug(f"Callback failed for {name}: {e}", color='red')
+                    print_debug(
+                        f"Callback failed for {name}: {e}", color='red'
+                    )
 
     def subscribe(self, name, callback):
         """Subscribe to updates for a name, returns subscription ID"""
@@ -516,10 +523,13 @@ class StateManager:
 
     def unsubscribe(self, sub_id):
         """Unsubscribe using the subscription ID returned by subscribe()"""
-        for name, subs in self.subscribers.items():
+        for name, subs in list(self.subscribers.items()):
             if sub_id in subs:
                 del subs[sub_id]
-                print_debug(f"Unsubscribe: {name} -> ID:{sub_id} (remaining: {len(subs)})")
+                print_debug(
+                    f"Unsubscribe: {name} -> ID:{sub_id} "
+                    f"(remaining: {len(subs)})"
+                )
                 if not subs:
                     del self.subscribers[name]
                 return True
@@ -528,7 +538,18 @@ class StateManager:
     def clear(self):
         """Clear all data and subscribers"""
         total_subs = sum(len(subs) for subs in self.subscribers.values())
-        print_debug(f"Clearing StateManager: {len(self.data)} data items, {total_subs} subscriptions")
+        print_debug(
+            f"Clearing StateManager: {len(self.data)} data items, "
+            f"{total_subs} subscriptions"
+        )
+        # Log details before clearing
+        for name, subs in self.subscribers.items():
+            if len(subs) > 1:
+                print_debug(
+                    f"  WARNING: {name} has {len(subs)} subscriptions "
+                    f"(expected 1)",
+                    color='yellow'
+                )
         self.data.clear()
         self.subscribers.clear()
 
@@ -559,6 +580,10 @@ class BaseModule:
         self.empty_is_error = getattr(
             self.__class__, 'EMPTY_IS_ERROR', True
         )
+
+    def cleanup(self):
+        """Override in subclass if cleanup is needed"""
+        pass
 
     def fetch_data(self):
         """Override this to fetch data for the module"""
@@ -651,11 +676,22 @@ class BaseModule:
 
     def create_widget(self, bar):
         """Create the GTK widget for the bar"""
+        import weakref
+        
         m = Module()
         m.set_position(bar.position)
-        sub_id = state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        
+        # Use weak reference to widget to break circular reference
+        widget_ref = weakref.ref(m)
+        
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+        
+        sub_id = state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
+        m._update_callback = update_callback
         return m
 
     def update_ui(self, widget, data):
@@ -683,6 +719,8 @@ class Module(Gtk.MenuButton):
     def __init__(self, icon=True, text=True):
         super().__init__()
         self.set_direction(Gtk.ArrowType.UP)
+        self._cleaned_up = False
+
         self.get_style_context().add_class('module')
         self.set_cursor_from_name("pointer")
         self.added_styles = []
@@ -721,40 +759,85 @@ class Module(Gtk.MenuButton):
             self.text.set_margin_start(0)
             self.box.append(self.text)
 
-        # Add right-click controller for detach
-        right_click = Gtk.GestureClick()
-        right_click.set_button(3)
-        right_click.connect("pressed", self._on_right_click)
-        self.add_controller(right_click)
-
-        self.debug_window = None
-
-        # Subscribe to debug state and track subscription
-        debug_sub = state_manager.subscribe("debug_popovers", self._on_debug_state_changed)
-        self._subscriptions.append(debug_sub)
-
         # Connect destroy signal for automatic cleanup
         self.connect("destroy", self._on_destroy)
 
-    def _on_debug_state_changed(self, state):
-        if not state and self.debug_window:
-            self.debug_window.close()
+    def _cleanup_popover(self):
+        """Cleanup current popover if it exists"""
+        popover = self.get_popover()
+        if popover:
+            # Ensure popover is not visible
+            if hasattr(popover, 'popdown'):
+                popover.popdown()
+
+            # First set to None to release MenuButton reference
+            self.set_popover(None)
+
+            # Then destroy to ensure GTK resources are freed
+            if hasattr(popover, 'destroy'):
+                popover.destroy()
+            elif hasattr(popover, 'unparent'):
+                popover.unparent()
 
     def cleanup(self):
-        """Clean up subscriptions and resources when widget is destroyed"""
+        """Clean up subscriptions and resources when destroyed"""
+
+        # Ensure cleanup runs only once
+        if getattr(self, '_cleaned_up', False):
+            print_debug(
+                f"Module {id(self)} cleanup called twice!",
+                color='yellow'
+            )
+            return
+        self._cleaned_up = True
+
+        print_debug(f"Cleaning up Module {id(self)} with "
+                    f"{len(self._subscriptions)} subscriptions")
+
+        # Disconnect the destroy signal handler first
+        try:
+            GObject.signal_handlers_destroy(self)
+        except Exception:
+            pass
+
+        # Unsubscribe from state manager
         for sub_id in self._subscriptions:
             state_manager.unsubscribe(sub_id)
         self._subscriptions.clear()
 
-        if hasattr(self, 'debug_window') and self.debug_window:
-            self.debug_window.destroy()
-            self.debug_window = None
-
+        # Clear any widget lists
         if hasattr(self, 'popover_widgets'):
             self.popover_widgets.clear()
 
         if hasattr(self, 'bar_gpu_levels'):
             self.bar_gpu_levels.clear()
+
+        # Clean up the popover widget FIRST
+        self._cleanup_popover()
+
+        # Clear box contents and break references
+        if self.box:
+            child = self.box.get_first_child()
+            while child:
+                next_child = child.get_next_sibling()
+                self.box.remove(child)
+                # Disconnect all signals from child
+                try:
+                    GObject.signal_handlers_destroy(child)
+                except Exception:
+                    pass
+                child = next_child
+
+        # Break references to internal widgets
+        self.icon = None
+        self.text = None
+        self.box = None
+        self.con = None
+        self.indicator = None
+        
+        # Clear callback reference to break closure
+        if hasattr(self, '_update_callback'):
+            self._update_callback = None
 
     def _on_destroy(self, widget):
         """Called when widget is destroyed"""
@@ -882,6 +965,9 @@ class Module(Gtk.MenuButton):
 
     def set_widget(self, box):
         """ Set widget """
+        # Clean up existing popover first
+        self._cleanup_popover()
+
         widget = Widget()
         widget.box.append(box)
         widget.draw()
@@ -897,74 +983,6 @@ class Module(Gtk.MenuButton):
         }
         self.set_direction(directions.get(position, Gtk.ArrowType.UP))
         return self
-
-    def _on_right_click(self, gesture, n_press, x, y):
-        if not state_manager.get("debug_popovers"):
-            return
-
-        popover = self.get_popover()
-        if not popover or not isinstance(popover, Widget):
-            return
-
-        # Claim sequence to prevent other handlers
-        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-
-        self.detach_widget(popover)
-
-    def detach_widget(self, popover):
-        if self.debug_window:
-            self.debug_window.present()
-            return
-
-        # Get the content box
-        # popover.box is the VBox from Widget
-        # We want to move its children (content)
-        content = popover.box.get_first_child()
-        if not content:
-            return
-
-        # Hide popover first to avoid state confusion
-        popover.popdown()
-
-        # Store ref
-        self.detached_content = content
-
-        # Unparent content (remove from popover.box)
-        content.unparent()
-
-        # Wrap in styled box to match popover theme
-        wrapper = Gtk.Box()
-        wrapper.get_style_context().add_class("popover-content")
-        wrapper.append(content)
-
-        # Create window
-        self.debug_window = Gtk.Window(title="Debug Module")
-        self.debug_window.set_default_size(300, 200)
-        self.debug_window.set_child(wrapper)
-
-        def on_close(win):
-            self.restore_widget(popover)
-            self.debug_window = None
-            self.detached_content = None
-            return False  # Destroy window
-
-        self.debug_window.connect("close-request", on_close)
-        self.debug_window.present()
-
-    def restore_widget(self, popover):
-        """ Restore widget to popover """
-        if not hasattr(self, 'detached_content') or not self.detached_content:
-            return
-
-        content = self.detached_content
-
-        # Unparent the box from wherever it is (window or wrapper)
-        parent = content.get_parent()
-        if parent:
-            parent.remove(content)
-
-        # Re-attach to popover.box
-        popover.box.append(content)
 
 
 def handle_popover_edge(popover):
@@ -1017,13 +1035,53 @@ class Widget(Gtk.Popover):
         self.set_position(Gtk.PositionType.TOP)
 
         # Check config for autohide behavior
+
         config = state_manager.get('config') or {}
         autohide = config.get('popover-autohide', True)
         self.set_autohide(autohide)
 
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        self.box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
         self.connect("unmap", self._on_unmap)
+        self._destroyed = False
+
+    def destroy(self):
+        """Ensure proper cleanup of widget resources"""
+        if self._destroyed:
+            return
+        self._destroyed = True
+
+        # Popdown first to ensure it's not visible
+        self.popdown()
+
+        # Disconnect all signals first to break reference cycles
+        try:
+            GObject.signal_handlers_destroy(self)
+        except Exception:
+            pass
+
+        # Clear box contents recursively
+        if self.box:
+            child = self.box.get_first_child()
+            while child:
+                next_child = child.get_next_sibling()
+                self.box.remove(child)
+                # Disconnect child signals
+                try:
+                    GObject.signal_handlers_destroy(child)
+                except Exception:
+                    pass
+                # Recursively destroy child widgets
+                if hasattr(child, 'unparent'):
+                    child.unparent()
+                child = next_child
+
+        # Break reference to box
+        self.box = None
+
+        # Unparent to release GTK resources
+        self.unparent()
 
     def _on_map(self, _):
         """ Check if we are close to the screen edge and flatten corners """

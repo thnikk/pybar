@@ -173,6 +173,14 @@ class Workspaces(c.BaseModule):
         sub_id = c.state_manager.subscribe(
             self.name, lambda data: self.update_ui(box, data))
         box._subscriptions = [sub_id]
+
+        def cleanup():
+            """Clean up subscriptions"""
+            for sub in box._subscriptions:
+                c.state_manager.unsubscribe(sub)
+            box._subscriptions.clear()
+        
+        box.cleanup = cleanup
         return box
 
     def update_ui(self, widget, data):

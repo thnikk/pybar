@@ -42,7 +42,12 @@ def discover_modules():
 
 def get_instance(name, config):
     """Get or create a module instance"""
+    # Check if instance already exists
     if name in _instances:
+        c.print_debug(
+            f"Reusing existing instance for {name}",
+            color='yellow'
+        )
         return _instances[name]
 
     if not _module_map:
@@ -53,6 +58,7 @@ def get_instance(name, config):
         cls = _module_map[module_type]
         instance = cls(name, config)
         _instances[name] = instance
+        c.print_debug(f"Created new instance for {name}")
         return instance
     return None
 
@@ -91,10 +97,13 @@ def stop_worker(name):
     if name in _worker_stop_flags:
         _worker_stop_flags[name].set()
     if name in _worker_threads:
-        # Don't wait for thread to finish, it's daemon anyway
+        thread = _worker_threads[name]
+        # Wait briefly for thread to stop (or use a timeout)
+        thread.join(timeout=1.0)
         del _worker_threads[name]
-    # Keep stop flag for a bit so worker can see it
-    # It will be cleaned up when a new worker starts
+    # Clean up stop flag
+    if name in _worker_stop_flags:
+        del _worker_stop_flags[name]
 
 
 def stop_all_workers():
@@ -102,11 +111,59 @@ def stop_all_workers():
     for name in list(_worker_threads.keys()):
         stop_worker(name)
 
+    # Force cleanup of Volume/Pulse threads that might hang
+    # (Note: we can't easily kill threads in Python, but we can try to
+    # unblock them if they are in a known blocking call, or rely on them
+    # checking the flag more often. For PulseAudio, it's tricky without
+    # an external event)
+
 
 def clear_instances():
     """Clear all module instances for reload"""
-    global _instances
-    _instances = {}
+    global _instances, _module_map
+    import sys
+
+    instance_count = len(_instances)
+    c.print_debug(
+        f"Clearing {instance_count} module instances: "
+        f"{list(_instances.keys())}"
+    )
+
+    for name, instance in list(_instances.items()):
+        if hasattr(instance, 'cleanup'):
+            try:
+                instance.cleanup()
+            except Exception as e:
+                c.print_debug(
+                    f"Failed to cleanup {name}: {e}",
+                    color='red'
+                )
+
+    # Clear the dict
+    _instances.clear()
+
+    # Verify it's empty
+    if _instances:
+        c.print_debug(
+            f"WARNING: _instances not empty after clear: {_instances}",
+            color='red'
+        )
+
+    # Clear module map to force re-discovery on next use
+    _module_map = {}
+
+    # Remove all dynamically loaded modules from sys.modules
+    modules_to_remove = [
+        key for key in sys.modules.keys()
+        if key.startswith('modules.') and key != 'modules'
+    ]
+    for key in modules_to_remove:
+        del sys.modules[key]
+
+    c.print_debug(
+        f"Cleared {instance_count} instances, "
+        f"{len(modules_to_remove)} module imports"
+    )
 
 
 def command_worker(name, config):
@@ -181,25 +238,32 @@ def module(bar, name, config):
         return instance.create_widget(bar)
 
     # Generic fallback
+    import weakref
+    
     m = c.Module()
     m.set_position(bar.position)
 
+    # Use weak reference to widget to break circular reference
+    widget_ref = weakref.ref(m)
+    
     def generic_update(data):
-        if not data:
+        widget = widget_ref()
+        if widget is None or not data:
             return
         if 'text' in data:
-            m.set_label(data['text'])
-            m.set_visible(bool(data['text']))
+            widget.set_label(data['text'])
+            widget.set_visible(bool(data['text']))
         if 'icon' in data:
-            m.set_icon(data['icon'])
+            widget.set_icon(data['icon'])
         if 'tooltip' in data:
-            m.set_tooltip_text(str(data['tooltip']))
-        m.reset_style()
+            widget.set_tooltip_text(str(data['tooltip']))
+        widget.reset_style()
         if 'class' in data:
-            c.add_style(m, data['class'])
+            c.add_style(widget, data['class'])
         if data.get('stale'):
-            c.add_style(m, 'stale')
-
+            c.add_style(widget, 'stale')
+    
     sub_id = c.state_manager.subscribe(name, generic_update)
     m._subscriptions.append(sub_id)
+    m._update_callback = generic_update
     return m

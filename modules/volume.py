@@ -106,7 +106,20 @@ class Volume(c.BaseModule):
                     pulse.event_callback_set(event_callback)
 
                     while True:
-                        pulse.event_listen()
+                        try:
+                            # Use timeout to allow checking stop flag
+                            pulse.event_listen(timeout=1)
+                        except pulsectl.PulseLoopStop:
+                            break
+                        except Exception:
+                            pass
+                            
+                        # Check stop flag
+                        import module
+                        stop_event = module._worker_stop_flags.get(self.name)
+                        if stop_event and stop_event.is_set():
+                            break
+
                         update()
             except Exception as e:
                 c.print_debug(f"Volume worker error: {e}", color='red')
@@ -262,6 +275,8 @@ class Volume(c.BaseModule):
 
     def build_popover_content(self, widget, data):
         """ Build popover for volume """
+        if hasattr(widget, 'popover_widgets'):
+            widget.popover_widgets.clear()
         widget.popover_widgets = {'Outputs': {}, 'Inputs': {}, 'Programs': {}}
         main_box = c.box('v', spacing=20, style='small-widget')
         main_box.append(c.label('Volume', style='heading'))
