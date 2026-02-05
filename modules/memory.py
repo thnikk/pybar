@@ -228,6 +228,19 @@ class Memory(c.BaseModule):
         except Exception as e:
             c.print_debug(f"Failed to kill process {pid}: {e}", self.name)
 
+    def _on_row_enter(self, controller, x, y, data):
+        """ Show kill button on hover """
+        row, revealer = data
+        if self.config.get("show_kill_button", False):
+            row.add_css_class("hovered")
+            revealer.set_reveal_child(True)
+
+    def _on_row_leave(self, controller, data):
+        """ Hide kill button when not hovering """
+        row, revealer = data
+        row.remove_css_class("hovered")
+        revealer.set_reveal_child(False)
+
     def build_popover(self, widget, data):
         """ Build popover for memory """
         widget.popover_widgets = {}
@@ -285,7 +298,11 @@ class Memory(c.BaseModule):
         proc_list = c.box('v', style='box')
 
         for i in range(10):
-            row = c.box('h', spacing=10, style='inner-box')
+            row = c.box('h', style='p-row')
+
+            # Info side
+            info = c.box('h', spacing=10, style='inner-box')
+            info.set_hexpand(True)
 
             # Indicator (Pill shape)
             ind = Gtk.Box()
@@ -294,7 +311,7 @@ class Memory(c.BaseModule):
             ind._provider = Gtk.CssProvider()
             ind.get_style_context().add_provider(
                 ind._provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            row.append(ind)
+            info.append(ind)
 
             # Name
             name = c.label("name", ha='start', length=12)
@@ -302,33 +319,58 @@ class Memory(c.BaseModule):
             name.set_max_width_chars(12)
             name.set_ellipsize(c.Pango.EllipsizeMode.END)
             name.set_xalign(0)
-            row.append(name)
+            info.append(name)
 
             # Command
             cmd = c.label("cmd", ha='start', he=True, length=20)
             cmd.set_xalign(0)
-            row.append(cmd)
+            info.append(cmd)
 
             # Memory
             mem = c.label("mem", ha='end')
             mem.get_style_context().add_class('dim-label')
-            row.append(mem)
+            info.append(mem)
+            
+            row.append(info)
 
-            # Kill button
+            # Action side (Swipe)
+            rev = Gtk.Revealer()
+            rev.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT)
+            rev.set_transition_duration(250)
+            rev.set_valign(Gtk.Align.FILL)
+
+            action_box = c.box('h', style='p-action')
+            action_box.set_valign(Gtk.Align.FILL)
+            
+            p_sep = c.sep('v', style='p-sep')
+            p_sep.set_valign(Gtk.Align.FILL)
+            action_box.append(p_sep)
+
             kill_btn = c.button('', style='kill-btn')
-            kill_btn.set_visible(False)
+            kill_btn.set_valign(Gtk.Align.FILL)
             kill_btn.connect('clicked', self._on_kill_btn_clicked)
-            row.append(kill_btn)
+            action_box.append(kill_btn)
+
+            rev.set_child(action_box)
+            row.append(rev)
+
+            # Hover controller
+            motion = Gtk.EventControllerMotion.new()
+            motion.connect("enter", self._on_row_enter, (row, rev))
+            motion.connect("leave", self._on_row_leave, (row, rev))
+            row.add_controller(motion)
 
             proc_list.append(row)
             if i < 9:
                 proc_list.append(c.sep('h'))
 
             widget.popover_widgets[f'p_row_{i}'] = row
+            widget.popover_widgets[f'p_info_{i}'] = info
             widget.popover_widgets[f'p_ind_{i}'] = ind
             widget.popover_widgets[f'p_name_{i}'] = name
             widget.popover_widgets[f'p_cmd_{i}'] = cmd
             widget.popover_widgets[f'p_mem_{i}'] = mem
+            widget.popover_widgets[f'p_rev_{i}'] = rev
             widget.popover_widgets[f'p_kill_{i}'] = kill_btn
 
         scroll.set_child(proc_list)
@@ -395,9 +437,6 @@ class Memory(c.BaseModule):
                     kill_btn = pw[f'p_kill_{i}']
                     if show_kill:
                         kill_btn._target_pid = p['pid']
-                        kill_btn.set_visible(True)
-                    else:
-                        kill_btn.set_visible(False)
 
                     pw[f'p_row_{i}'].set_visible(True)
                 else:

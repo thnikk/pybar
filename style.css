@@ -577,16 +577,36 @@ scrolledwindow undershoot.bottom {
 }
 
 /* Kill process button */
-.kill-btn {
+.p-row {
+	padding: 0 !important;
+	margin: 0;
+}
+
+.p-action {
+	background: transparent;
+	transition: background 200ms ease;
+}
+
+.p-row.hovered .p-action {
 	background: @red;
+}
+
+.kill-btn {
+	background: transparent;
 	color: @white;
 	border: none;
 	box-shadow: none;
-	opacity: 0.8;
-	padding: 2px 8px;
-	transition: opacity 200ms ease;
+	padding: 0 15px;
+	border-radius: 0;
 }
 
 .kill-btn:hover {
-	opacity: 1.0;
+	background: rgba(0, 0, 0, 0.1);
+}
+
+.p-sep {
+	min-width: 1px;
+	background: @gray;
+	margin: 0;
+	padding: 0;
 }
