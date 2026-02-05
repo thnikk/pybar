@@ -1,13 +1,96 @@
 #!/usr/bin/python3 -u
 """
-Description: Memory module refactored for unified state
+Description: Memory module with grouping and colorized process breakdown
 Author: thnikk
 """
 import common as c
 import psutil
 import gi
+import math
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+from gi.repository import Gtk, Gdk  # noqa
+
+
+class MemoryBar(Gtk.DrawingArea):
+    """ Custom drawing area for memory usage breakdown """
+    def __init__(self, height=12, radius=6):
+        super().__init__()
+        self.set_content_height(height)
+        self.radius = radius
+        self.percent = 0
+        self.procs = []
+        self.set_draw_func(self.on_draw)
+        self.set_has_tooltip(True)
+        self.connect("query-tooltip", self.on_query_tooltip)
+
+    def update(self, percent, procs=None):
+        self.percent = percent
+        self.procs = procs or []
+        self.queue_draw()
+
+    def on_query_tooltip(self, widget, x, y, keyboard_mode, tooltip):
+        if not self.procs:
+            return False
+
+        width = self.get_width()
+        current_x = 0
+        for p in self.procs:
+            if 'rgb' in p:
+                w = (p['percent'] / 100) * width
+                if current_x <= x <= current_x + w:
+                    tooltip.set_text(p.get('cmd', p.get('name', '')))
+                    return True
+                current_x += w
+        
+        # Check "Other" memory
+        top_percent = sum(p['percent'] for p in self.procs)
+        other_percent = max(0, self.percent - top_percent)
+        if other_percent > 0:
+            w = (other_percent / 100) * width
+            if current_x <= x <= current_x + w:
+                tooltip.set_text("Other Processes")
+                return True
+
+        return False
+
+    def on_draw(self, area, cr, width, height):
+        cr.save()
+        # Rounded clipping
+        r = self.radius
+        cr.new_sub_path()
+        cr.arc(r, r, r, math.pi, 3 * math.pi / 2)
+        cr.arc(width - r, r, r, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(width - r, height - r, r, 0, math.pi / 2)
+        cr.arc(r, height - r, r, math.pi / 2, math.pi)
+        cr.close_path()
+        cr.clip()
+
+        # Background
+        cr.set_source_rgba(0.5, 0.5, 0.5, 0.1)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+
+        current_x = 0
+        # 1. Draw process segments
+        for p in self.procs:
+            if 'rgb' in p:
+                w = (p['percent'] / 100) * width
+                if w < 1:
+                    continue
+                cr.set_source_rgb(*p['rgb'])
+                cr.rectangle(current_x, 0, w, height)
+                cr.fill()
+                current_x += w
+
+        # 2. Draw remaining used memory in white
+        top_percent = sum(p['percent'] for p in self.procs)
+        other_percent = max(0, self.percent - top_percent)
+        if other_percent > 0:
+            w = (other_percent / 100) * width
+            cr.set_source_rgb(1.0, 1.0, 1.0)
+            cr.rectangle(current_x, 0, w, height)
+            cr.fill()
+        cr.restore()
 
 
 class Memory(c.BaseModule):
@@ -20,8 +103,31 @@ class Memory(c.BaseModule):
             'description': 'How often to update memory stats (seconds)',
             'min': 1,
             'max': 60
+        },
+        'group_processes': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Group Processes',
+            'description': 'Group child process memory into parent processes'
+        },
+        'colorize_processes': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Colorize Processes',
+            'description': 'Show color breakdown for top processes'
+        },
+        'show_kill_button': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Show Kill Button',
+            'description': 'Show a button to terminate top processes'
         }
     }
+
+    COLORS = [
+        '#f28fad', '#f8bd96', '#fae3b0', '#abe9b3', '#89dceb',
+        '#89b4fa', '#b4befe', '#cba6f7', '#f5c2e7', '#f2cdcd'
+    ]
 
     def fetch_data(self):
         """ Get memory usage """
@@ -30,36 +136,109 @@ class Memory(c.BaseModule):
 
         total = round(mem.total / (1024.0 ** 3), 1)
         used = round(mem.used / (1024.0 ** 3), 1)
+        total_bytes = mem.total
 
         total_swap = round(swap.total / (1024.0 ** 3), 1)
         used_swap = round(swap.used / (1024.0 ** 3), 1)
 
-        # Get top 10 processes
         procs = []
         try:
-            for p in sorted(
-                psutil.process_iter(['name', 'cmdline', 'memory_info']),
-                key=lambda p: p.info['memory_info'].rss,
-                reverse=True
-            )[:10]:
-                try:
-                    mem_bytes = p.info['memory_info'].rss
-                    if mem_bytes > 1024 ** 3:
-                        mem_str = f"{mem_bytes / (1024 ** 3):.1f} GB"
-                    else:
-                        mem_str = f"{mem_bytes / (1024 ** 2):.0f} MB"
+            if self.config.get('group_processes', True):
+                all_procs = {}
+                for p in psutil.process_iter(
+                        ['name', 'ppid', 'exe', 'cmdline', 'memory_info']):
+                    try:
+                        info = p.info
+                        info['pid'] = p.pid
+                        info['rss'] = (info['memory_info'].rss
+                                       if info['memory_info'] else 0)
+                        info['cmd'] = " ".join(info['cmdline'] or [])
+                        all_procs[p.pid] = info
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
 
-                    cmd = " ".join(p.info['cmdline'] or [])
-                    if not cmd:
-                        cmd = p.info['name']
+                repr_cache = {}
 
-                    procs.append({
-                        "name": p.info['name'],
-                        "cmd": cmd,
-                        "mem": mem_str
-                    })
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
+                def get_repr(pid, depth=0):
+                    if pid in repr_cache:
+                        return repr_cache[pid]
+                    if depth > 10:
+                        return pid
+                    curr = all_procs.get(pid)
+                    if not curr:
+                        return pid
+                    ppid = curr['ppid']
+                    parent = all_procs.get(ppid)
+                    if not parent or ppid <= 1:
+                        return pid
+                    
+                    shared_exe = (curr['exe'] and parent['exe'] and
+                                  curr['exe'] == parent['exe'])
+                    name_in_cmd = (parent['name'].lower() in
+                                   curr['cmd'].lower())
+                    if shared_exe or name_in_cmd:
+                        res = get_repr(ppid, depth + 1)
+                        repr_cache[pid] = res
+                        return res
+                    repr_cache[pid] = pid
+                    return pid
+
+                aggregates = {}
+                for pid in all_procs:
+                    r_pid = get_repr(pid)
+                    if r_pid not in aggregates:
+                        root = all_procs[r_pid]
+                        aggregates[r_pid] = {
+                            'pid': r_pid,
+                            'name': root['name'],
+                            'cmd': root['cmd'] or root['name'],
+                            'rss': 0
+                        }
+                    aggregates[r_pid]['rss'] += all_procs[pid]['rss']
+
+                top_items = sorted(aggregates.values(),
+                                   key=lambda x: x['rss'],
+                                   reverse=True)[:10]
+            else:
+                top_items = []
+                for p in sorted(
+                    psutil.process_iter(['name', 'cmdline', 'memory_info']),
+                    key=lambda p: p.info['memory_info'].rss,
+                    reverse=True
+                )[:10]:
+                    try:
+                        top_items.append({
+                            'pid': p.pid,
+                            'name': p.info['name'],
+                            'cmd': " ".join(p.info['cmdline'] or []) or p.info['name'],
+                            'rss': p.info['memory_info'].rss
+                        })
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+
+            for i, g in enumerate(top_items):
+                mem_bytes = g['rss']
+                mem_str = (f"{mem_bytes / (1024 ** 3):.1f} GB"
+                           if mem_bytes > 1024 ** 3
+                           else f"{mem_bytes / (1024 ** 2):.0f} MB")
+                
+                proc_data = {
+                    "pid": g['pid'],
+                    "name": g['name'], 
+                    "cmd": g['cmd'], 
+                    "mem": mem_str,
+                    "percent": (mem_bytes / total_bytes) * 100
+                }
+                
+                if self.config.get('colorize_processes', True):
+                    color_hex = self.COLORS[i % len(self.COLORS)]
+                    proc_data["color"] = color_hex
+                    h = color_hex.lstrip('#')
+                    proc_data["rgb"] = tuple(
+                        int(h[j:j+2], 16)/255.0 for j in (0, 2, 4))
+                
+                procs.append(proc_data)
+
         except Exception as e:
             c.print_debug(f"Failed to fetch processes: {e}", self.name)
 
@@ -73,6 +252,33 @@ class Memory(c.BaseModule):
             "text": f"{round(used)}",
             "procs": procs
         }
+
+    def _on_kill_btn_clicked(self, btn):
+        """ Handler for the kill button """
+        pid = getattr(btn, '_target_pid', None)
+        if not pid:
+            return
+
+        def run_pkexec(p_id):
+            import subprocess
+            try:
+                subprocess.run(['pkexec', 'kill', '-15', str(p_id)], check=True)
+                c.print_debug(f"Terminated process {p_id} with pkexec", self.name)
+            except Exception as e:
+                c.print_debug(f"pkexec kill failed: {e}", self.name)
+
+        try:
+            p = psutil.Process(pid)
+            p.terminate()
+            c.print_debug(f"Terminated process {pid}", self.name)
+        except psutil.AccessDenied:
+            import threading
+            c.print_debug(
+                f"Access denied for {pid}, prompting for root", self.name)
+            threading.Thread(
+                target=run_pkexec, args=(pid,), daemon=True).start()
+        except Exception as e:
+            c.print_debug(f"Failed to kill process {pid}: {e}", self.name)
 
     def build_popover(self, widget, data):
         """ Build popover for memory """
@@ -93,13 +299,13 @@ class Memory(c.BaseModule):
             f"{data['used']}GB / {data['total']}GB", ha='end', he=True)
         ram_top.append(ram_val)
         ram_row.append(ram_top)
-        ram_level = Gtk.LevelBar.new_for_interval(0, 100)
-        ram_level.set_min_value(0)
-        ram_level.set_max_value(100)
-        ram_level.set_value(data['percent'])
-        ram_row.append(ram_level)
-        usage_box.append(ram_row)
+        
+        ram_bar = MemoryBar()
+        ram_bar.update(data['percent'], data.get('procs', []))
+        ram_row.append(ram_bar)
+        widget.popover_widgets['ram_bar'] = ram_bar
 
+        usage_box.append(ram_row)
         usage_box.append(c.sep('h'))
 
         # Swap row
@@ -111,11 +317,12 @@ class Memory(c.BaseModule):
             ha='end', he=True)
         swap_top.append(swap_val)
         swap_row.append(swap_top)
-        swap_level = Gtk.LevelBar.new_for_interval(0, 100)
-        swap_level.set_min_value(0)
-        swap_level.set_max_value(100)
-        swap_level.set_value(data['swap_percent'])
-        swap_row.append(swap_level)
+
+        swap_bar = MemoryBar()
+        swap_bar.update(data['swap_percent'])
+        swap_row.append(swap_bar)
+        widget.popover_widgets['swap_bar'] = swap_bar
+        
         usage_box.append(swap_row)
 
         usage_section.append(usage_box)
@@ -129,103 +336,124 @@ class Memory(c.BaseModule):
         scroll.set_overflow(Gtk.Overflow.HIDDEN)
         proc_list = c.box('v', style='box')
 
-        # Create 10 rows
         for i in range(10):
             row = c.box('h', spacing=10, style='inner-box')
 
+            # Indicator (Pill shape)
+            ind = Gtk.Box()
+            ind.set_size_request(6, 16)
+            ind.set_visible(False)
+            ind._provider = Gtk.CssProvider()
+            ind.get_style_context().add_provider(
+                ind._provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            row.append(ind)
+
             # Name
             name = c.label("name", ha='start', length=12)
-            name.set_width_chars(12)  # Force fixed width
+            name.set_width_chars(12)
             name.set_max_width_chars(12)
             name.set_ellipsize(c.Pango.EllipsizeMode.END)
-            name.set_xalign(0) # Left justify
+            name.set_xalign(0)
             row.append(name)
 
-            # Command (truncated)
+            # Command
             cmd = c.label("cmd", ha='start', he=True, length=20)
-            cmd.set_xalign(0) # Left justify
+            cmd.set_xalign(0)
             row.append(cmd)
 
             # Memory
             mem = c.label("mem", ha='end')
             mem.get_style_context().add_class('dim-label')
-            mem.set_xalign(0) # Left justify
             row.append(mem)
 
+            # Kill button
+            kill_btn = c.button('', style='kill-btn')
+            kill_btn.set_visible(False)
+            kill_btn.connect('clicked', self._on_kill_btn_clicked)
+            row.append(kill_btn)
+
             proc_list.append(row)
-            
             if i < 9:
                 proc_list.append(c.sep('h'))
 
             widget.popover_widgets[f'p_row_{i}'] = row
+            widget.popover_widgets[f'p_ind_{i}'] = ind
             widget.popover_widgets[f'p_name_{i}'] = name
             widget.popover_widgets[f'p_cmd_{i}'] = cmd
             widget.popover_widgets[f'p_mem_{i}'] = mem
+            widget.popover_widgets[f'p_kill_{i}'] = kill_btn
 
         scroll.set_child(proc_list)
         proc_section.append(scroll)
         main_box.append(proc_section)
 
         widget.popover_widgets.update({
-            'ram_val': ram_val, 'ram_lvl': ram_level,
-            'swap_val': swap_val, 'swap_lvl': swap_level
+            'ram_val': ram_val,
+            'swap_val': swap_val
         })
         return main_box
 
     def create_widget(self, bar):
-        m = c.Module()
-        m.set_position(bar.position)
+        # Use base class create_widget to benefit from weakref-protected subscription
+        m = super().create_widget(bar)
         m.set_icon('')
-
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
-        m._subscriptions.append(sub_id)
         return m
 
     def update_ui(self, widget, data):
         if not data:
             return
         widget.set_label(data.get('text', ''))
-        widget.set_visible(True)
-
-        # Optimization: Don't update if data hasn't changed
+        
         compare_data = data.copy()
         compare_data.pop('timestamp', None)
-
         if (widget.get_popover() and
                 getattr(widget, 'last_popover_data', None) == compare_data):
             return
-
         widget.last_popover_data = compare_data
 
         if not widget.get_popover():
             widget.set_widget(self.build_popover(widget, data))
         
-        # Update values
         if hasattr(widget, 'popover_widgets'):
-            # Usage
-            widget.popover_widgets['ram_val'].set_text(
-                f"{data['used']}GB / {data['total']}GB")
-            widget.popover_widgets['ram_lvl'].set_value(data['percent'])
-            widget.popover_widgets['swap_val'].set_text(
-                f"{data['swap_used']}GB / {data['swap_total']}GB")
-            widget.popover_widgets['swap_lvl'].set_value(
-                data['swap_percent'])
+            pw = widget.popover_widgets
+            pw['ram_val'].set_text(f"{data['used']}GB / {data['total']}GB")
+            if 'ram_bar' in pw:
+                pw['ram_bar'].update(data['percent'], data.get('procs', []))
 
-            # Processes
+            pw['swap_val'].set_text(
+                f"{data['swap_used']}GB / {data['total_swap'] if 'total_swap' in data else data['swap_total']}GB")
+            if 'swap_bar' in pw:
+                pw['swap_bar'].update(data['swap_percent'])
+
             procs = data.get('procs', [])
+            show_kill = self.config.get('show_kill_button', False)
+            
             for i in range(10):
                 if i < len(procs):
                     p = procs[i]
-                    widget.popover_widgets[f'p_name_{i}'].set_text(p['name'])
-                    widget.popover_widgets[f'p_cmd_{i}'].set_text(p['cmd'])
-                    widget.popover_widgets[f'p_cmd_{i}'].set_tooltip_text(p['cmd'])
-                    widget.popover_widgets[f'p_mem_{i}'].set_text(p['mem'])
-                    widget.popover_widgets[f'p_row_{i}'].set_visible(True)
+                    pw[f'p_name_{i}'].set_text(p['name'])
+                    pw[f'p_cmd_{i}'].set_text(p['cmd'])
+                    pw[f'p_cmd_{i}'].set_tooltip_text(p['cmd'])
+                    pw[f'p_mem_{i}'].set_text(p['mem'])
+                    
+                    ind = pw[f'p_ind_{i}']
+                    if 'color' in p:
+                        css = f"box {{ background-color: {p['color']}; border-radius: 999px; }}"
+                        ind._provider.load_from_data(css.encode())
+                        ind.set_visible(True)
+                    else:
+                        ind.set_visible(False)
+                    
+                    kill_btn = pw[f'p_kill_{i}']
+                    if show_kill:
+                        kill_btn._target_pid = p['pid']
+                        kill_btn.set_visible(True)
+                    else:
+                        kill_btn.set_visible(False)
+
+                    pw[f'p_row_{i}'].set_visible(True)
                 else:
-                    widget.popover_widgets[f'p_row_{i}'].set_visible(False)
+                    pw[f'p_row_{i}'].set_visible(False)
 
 
-module_map = {
-    'memory': Memory
-}
+module_map = {'memory': Memory}
