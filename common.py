@@ -485,14 +485,41 @@ class Graph(Gtk.DrawingArea):
 
 class PillBar(Gtk.DrawingArea):
     """ Custom drawing area for a stacked bar breakdown """
-    def __init__(self, height=12, radius=6):
+    def __init__(self, height=12, radius=6, wrap_width=None, hover_delay=0):
         super().__init__()
         self.set_content_height(height)
         self.radius = radius
+        self.hover_delay = hover_delay
         self.segments = []  # List of {'percent': float, 'color': tuple}
         self.set_draw_func(self.on_draw)
         self.set_has_tooltip(True)
         self.connect("query-tooltip", self.on_query_tooltip)
+
+        # Immediate hover alternative
+        self.hover_popover = HoverPopover(self, wrap_width=wrap_width)
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("motion", self.on_motion)
+        motion.connect("leave", self.on_leave)
+        self.add_controller(motion)
+
+    def on_motion(self, controller, x, y):
+        if not self.segments:
+            return
+
+        width = self.get_width()
+        current_x = 0
+        for s in self.segments:
+            w = (s['percent'] / 100) * width
+            if current_x <= x <= current_x + w:
+                if s.get('tooltip'):
+                    self.hover_popover.show_text(
+                        s['tooltip'], x, y, offset=y, delay=self.hover_delay)
+                    return
+            current_x += w
+        self.hover_popover.popdown()
+
+    def on_leave(self, controller):
+        self.hover_popover.popdown()
 
     def update(self, segments):
         self.segments = segments or []
@@ -1165,6 +1192,97 @@ class Widget(Gtk.Popover):
     def draw(self):
         self.box.set_visible(True)
         self.set_child(self.box)
+
+
+class HoverPopover(Gtk.Popover):
+    """ Lightweight immediate tooltip alternative """
+    def __init__(self, parent, wrap_width=None):
+        super().__init__()
+        self.set_parent(parent)
+        self.set_autohide(False)
+        self.set_position(Gtk.PositionType.TOP)
+        self.get_style_context().add_class('hover-popover')
+        self.label = Gtk.Label()
+        if wrap_width:
+            self.label.set_wrap(True)
+            self.label.set_max_width_chars(wrap_width)
+            self.label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.set_child(self.label)
+        self.set_has_arrow(False)
+        self._timeout_id = None
+        self._pending_text = None
+
+    def popdown(self):
+        if self._timeout_id:
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
+        self._pending_text = None
+        super().popdown()
+
+    def show_text(self, text, x, y, offset=0, delay=0):
+        if not text:
+            self.popdown()
+            return
+
+        if self.get_visible() and self.label.get_text() == text:
+            # Update position immediately if already showing same text
+            rect = Gdk.Rectangle()
+            rect.x, rect.y, rect.width, rect.height = int(x), int(y - offset), 1, 1
+            self.set_pointing_to(rect)
+            return
+
+        if self._pending_text == text:
+            # Already waiting to show this exact text, just update coords
+            self._pending_coords = (x, y, offset)
+            return
+
+        if self._timeout_id:
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
+
+        self._pending_text = text
+        self._pending_coords = (x, y, offset)
+
+        def do_show():
+            px, py, poff = self._pending_coords
+            self.label.set_text(self._pending_text)
+            rect = Gdk.Rectangle()
+            rect.x, rect.y, rect.width, rect.height = int(px), int(py - poff), 1, 1
+            self.set_pointing_to(rect)
+            self.popup()
+            self._timeout_id = None
+            self._pending_text = None
+            return False
+
+        if delay <= 0 or self.get_visible():
+            do_show()
+        else:
+            self._timeout_id = GLib.timeout_add(delay, do_show)
+
+
+def set_hover_popover(widget, text_provider, delay=500, wrap_width=None):
+    """
+    Attach a HoverPopover to a widget.
+    text_provider can be a string or a callable that returns a string.
+    """
+    popover = HoverPopover(widget, wrap_width=wrap_width)
+    motion = Gtk.EventControllerMotion.new()
+
+    def on_motion(controller, x, y):
+        text = text_provider() if callable(text_provider) else text_provider
+        if text:
+            popover.show_text(text, x, y, offset=y, delay=delay)
+        else:
+            popover.popdown()
+
+    def on_leave(controller):
+        popover.popdown()
+
+    motion.connect("motion", on_motion)
+    motion.connect("leave", on_leave)
+    widget.add_controller(motion)
+    widget.set_has_tooltip(False)
+    return popover
 
 
 def print_debug(msg, name=None, color=None) -> None:

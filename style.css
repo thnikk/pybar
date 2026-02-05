@@ -576,6 +576,19 @@ scrolledwindow undershoot.bottom {
 	background: rgba(0, 0, 0, 0.2);
 }
 
+popover.hover-popover contents {
+	background: alpha(@black, 0.9);
+	padding: 4px 8px;
+	border-radius: 8px;
+	border: 1px solid rgba(255,255,255,0.1);
+	box-shadow: none;
+}
+
+popover.hover-popover label {
+	font-size: 16px;
+	color: @white;
+}
+
 /* Kill process button */
 .p-row {
 	padding: 0 !important;
