@@ -483,6 +483,66 @@ class Graph(Gtk.DrawingArea):
                         current_y += line_extents[i+1].height + 4
 
 
+class PillBar(Gtk.DrawingArea):
+    """ Custom drawing area for a stacked bar breakdown """
+    def __init__(self, height=12, radius=6):
+        super().__init__()
+        self.set_content_height(height)
+        self.radius = radius
+        self.segments = []  # List of {'percent': float, 'color': tuple}
+        self.set_draw_func(self.on_draw)
+        self.set_has_tooltip(True)
+        self.connect("query-tooltip", self.on_query_tooltip)
+
+    def update(self, segments):
+        self.segments = segments or []
+        self.queue_draw()
+
+    def on_query_tooltip(self, widget, x, y, keyboard_mode, tooltip):
+        if not self.segments:
+            return False
+
+        width = self.get_width()
+        current_x = 0
+        for s in self.segments:
+            w = (s['percent'] / 100) * width
+            if current_x <= x <= current_x + w:
+                if s.get('tooltip'):
+                    tooltip.set_text(s['tooltip'])
+                    return True
+            current_x += w
+        return False
+
+    def on_draw(self, area, cr, width, height):
+        cr.save()
+        # Rounded clipping
+        r = self.radius
+        cr.new_sub_path()
+        cr.arc(r, r, r, math.pi, 3 * math.pi / 2)
+        cr.arc(width - r, r, r, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(width - r, height - r, r, 0, math.pi / 2)
+        cr.arc(r, height - r, r, math.pi / 2, math.pi)
+        cr.close_path()
+        cr.clip()
+
+        # Background
+        cr.set_source_rgba(0.5, 0.5, 0.5, 0.1)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+
+        current_x = 0
+        for s in self.segments:
+            w = (s['percent'] / 100) * width
+            if w < 0.5:
+                current_x += w
+                continue
+            cr.set_source_rgb(*s['color'])
+            cr.rectangle(current_x, 0, w, height)
+            cr.fill()
+            current_x += w
+        cr.restore()
+
+
 class StateManager:
     def __init__(self):
         self.data = {}
@@ -951,12 +1011,12 @@ class Module(Gtk.MenuButton):
         """ Remove style from indicator and hide if empty """
         if isinstance(style_class, str):
             if style_class in self.indicator_added_styles:
-                self.indicator.get_style_context().remove_class(style_class)
+                self.indicator.get_style_context().add_class(style_class)
                 self.indicator_added_styles.remove(style_class)
         elif isinstance(style_class, list):
             for item in style_class:
                 if item in self.indicator_added_styles:
-                    self.indicator.get_style_context().remove_class(item)
+                    self.indicator.get_style_context().add_class(item)
                     self.indicator_added_styles.remove(item)
         if not self.indicator_added_styles:
             self.box.set_vexpand(False)
@@ -1248,7 +1308,7 @@ def slider(value, min=0, max=100, style=None, scrollable=True):
 
 def level(min=0, max=100, value=0, style=None):
     """ Create level bar """
-    widget = Gtk.LevelBar.new_with_offsets(min, max)
+    widget = Gtk.LevelBar.new_for_interval(min, max)
     widget.set_value(value)
     if style:
         widget.get_style_context().add_class(style)

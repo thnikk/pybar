@@ -6,91 +6,39 @@ Author: thnikk
 import common as c
 import psutil
 import gi
-import math
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gdk  # noqa
+from gi.repository import Gtk  # noqa
 
 
-class MemoryBar(Gtk.DrawingArea):
+class MemoryBar(c.PillBar):
     """ Custom drawing area for memory usage breakdown """
     def __init__(self, height=12, radius=6):
-        super().__init__()
-        self.set_content_height(height)
-        self.radius = radius
-        self.percent = 0
-        self.procs = []
-        self.set_draw_func(self.on_draw)
-        self.set_has_tooltip(True)
-        self.connect("query-tooltip", self.on_query_tooltip)
+        super().__init__(height=height, radius=radius)
 
     def update(self, percent, procs=None):
-        self.percent = percent
-        self.procs = procs or []
-        self.queue_draw()
-
-    def on_query_tooltip(self, widget, x, y, keyboard_mode, tooltip):
-        if not self.procs:
-            return False
-
-        width = self.get_width()
-        current_x = 0
-        for p in self.procs:
-            if 'rgb' in p:
-                w = (p['percent'] / 100) * width
-                if current_x <= x <= current_x + w:
-                    tooltip.set_text(p.get('cmd', p.get('name', '')))
-                    return True
-                current_x += w
+        procs = procs or []
+        segments = []
         
-        # Check "Other" memory
-        top_percent = sum(p['percent'] for p in self.procs)
-        other_percent = max(0, self.percent - top_percent)
-        if other_percent > 0:
-            w = (other_percent / 100) * width
-            if current_x <= x <= current_x + w:
-                tooltip.set_text("Other Processes")
-                return True
-
-        return False
-
-    def on_draw(self, area, cr, width, height):
-        cr.save()
-        # Rounded clipping
-        r = self.radius
-        cr.new_sub_path()
-        cr.arc(r, r, r, math.pi, 3 * math.pi / 2)
-        cr.arc(width - r, r, r, 3 * math.pi / 2, 2 * math.pi)
-        cr.arc(width - r, height - r, r, 0, math.pi / 2)
-        cr.arc(r, height - r, r, math.pi / 2, math.pi)
-        cr.close_path()
-        cr.clip()
-
-        # Background
-        cr.set_source_rgba(0.5, 0.5, 0.5, 0.1)
-        cr.rectangle(0, 0, width, height)
-        cr.fill()
-
-        current_x = 0
-        # 1. Draw process segments
-        for p in self.procs:
+        # 1. Add process segments
+        for p in procs:
             if 'rgb' in p:
-                w = (p['percent'] / 100) * width
-                if w < 1:
-                    continue
-                cr.set_source_rgb(*p['rgb'])
-                cr.rectangle(current_x, 0, w, height)
-                cr.fill()
-                current_x += w
+                segments.append({
+                    'percent': p['percent'],
+                    'color': p['rgb'],
+                    'tooltip': p.get('cmd', p.get('name', ''))
+                })
 
-        # 2. Draw remaining used memory in white
-        top_percent = sum(p['percent'] for p in self.procs)
-        other_percent = max(0, self.percent - top_percent)
+        # 2. Add remaining used memory in white
+        top_percent = sum(p['percent'] for p in procs)
+        other_percent = max(0, percent - top_percent)
         if other_percent > 0:
-            w = (other_percent / 100) * width
-            cr.set_source_rgb(1.0, 1.0, 1.0)
-            cr.rectangle(current_x, 0, w, height)
-            cr.fill()
-        cr.restore()
+            segments.append({
+                'percent': other_percent,
+                'color': (1.0, 1.0, 1.0),
+                'tooltip': "Other Processes"
+            })
+            
+        super().update(segments)
 
 
 class Memory(c.BaseModule):
