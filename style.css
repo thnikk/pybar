@@ -599,7 +599,7 @@ popover.hover-popover label {
 
 /* Kill process button */
 .p-row {
-	padding: 0 !important;
+	padding: 0;
 	margin: 0;
 }
 
