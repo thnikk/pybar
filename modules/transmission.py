@@ -7,6 +7,8 @@ import common as c
 import gi
 import shutil
 import subprocess
+import threading
+import time
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
@@ -39,6 +41,12 @@ class Transmission(c.BaseModule):
             'description': 'How often to check torrent status (seconds)',
             'min': 10,
             'max': 300
+        },
+        'hide_empty': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Hide When Empty',
+            'description': 'Hide the module when no torrents are active'
         }
     }
 
@@ -98,20 +106,73 @@ class Transmission(c.BaseModule):
             return
         t_id = getattr(btn, '_torrent_id', None)
         action = getattr(btn, '_action', 'stop')
+        row = getattr(btn, '_row', None)
+        ibox = getattr(btn, '_ibox', None)
+        sec = getattr(btn, '_sec', None)
+
         if t_id is None:
             return
 
-        try:
-            client = Client(
-                host=self.config.get("host", "localhost"),
-                port=self.config.get("port", 9091)
-            )
-            if action == 'stop':
-                client.stop_torrent(t_id)
-            elif action == 'start':
-                client.start_torrent(t_id)
-        except Exception as e:
-            c.print_debug(f"Transmission action failed: {e}", self.name)
+        # Immediate feedback: hide the row
+        if row:
+            row.set_visible(False)
+
+        # Update state manager immediately with estimated data
+        data = c.state_manager.get(self.name)
+        if data and action == 'stop':
+            new_data = data.copy()
+            # Remove the torrent from the lists
+            down_list = [t for t in data.get(
+                'downloading', []) if t['id'] != t_id]
+            up_list = [t for t in data.get('uploading', []) if t['id'] != t_id]
+
+            new_data['downloading'] = down_list
+            new_data['uploading'] = up_list
+
+            # Rebuild the text string
+            parts = []
+            if down_list:
+                parts.append(str(len(down_list)))
+            if up_list:
+                parts.append(str(len(up_list)))
+            new_data['text'] = "  ".join(parts)
+
+            # This triggers update_ui on all bar widgets
+            c.state_manager.update(self.name, new_data)
+
+        # If it was the last visible row in the section, hide the section too
+        if ibox and sec:
+            has_visible = False
+            child = ibox.get_first_child()
+            while child:
+                if child.get_visible() and \
+                        not isinstance(child, Gtk.Separator):
+                    has_visible = True
+                    break
+                child = child.get_next_sibling()
+
+            if not has_visible:
+                sec.set_visible(False)
+
+        def run_action():
+            try:
+                client = Client(
+                    host=self.config.get("host", "localhost"),
+                    port=self.config.get("port", 9091)
+                )
+                if action == 'stop':
+                    client.stop_torrent(t_id)
+                elif action == 'start':
+                    client.start_torrent(t_id)
+
+                # Fetch fresh data and update state manager
+                time.sleep(0.3)  # Give Transmission a moment to sync state
+                new_data = self.fetch_data()
+                c.state_manager.update(self.name, new_data)
+            except Exception as e:
+                c.print_debug(f"Transmission action failed: {e}", self.name)
+
+        threading.Thread(target=run_action, daemon=True).start()
 
     def _on_row_enter(self, controller, x, y, data):
         row, revealer = data
@@ -195,6 +256,9 @@ class Transmission(c.BaseModule):
                 btn.set_valign(Gtk.Align.FILL)
                 btn._torrent_id = item['id']
                 btn._action = action_type
+                btn._row = item_row
+                btn._ibox = ibox
+                btn._sec = sec
                 btn.connect('clicked', self._on_torrent_action_clicked)
                 action_box.append(btn)
 
@@ -235,19 +299,28 @@ class Transmission(c.BaseModule):
             return
         widget.set_icon(data.get('icon', ''))
         widget.set_label(data.get('text', ''))
-        widget.set_visible(bool(data.get('text') or data.get('icon')))
+
+        hide_empty = self.config.get('hide_empty', True)
+        if hide_empty:
+            widget.set_visible(bool(data.get('text')))
+        else:
+            widget.set_visible(bool(data.get('text') or data.get('icon')))
+
         if data.get('stale'):
             c.add_style(widget, 'stale')
-        if not widget.get_active():
-            # Optimization: Don't rebuild popover if data hasn't changed
-            compare_data = data.copy()
-            compare_data.pop('timestamp', None)
 
-            if getattr(widget, 'last_popover_data', None) == compare_data:
-                return
+        if widget.get_active():
+            return
 
-            widget.last_popover_data = compare_data
-            widget.set_widget(self.build_popover(data))
+        # Optimization: Don't rebuild popover if data hasn't changed
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
+
+        if getattr(widget, 'last_popover_data', None) == compare_data:
+            return
+
+        widget.last_popover_data = compare_data
+        widget.set_widget(self.build_popover(data))
 
 
 module_map = {
