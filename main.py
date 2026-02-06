@@ -171,6 +171,11 @@ def launch_settings(config_path):
 
 def main():
     """ Main function """
+    # Handle settings mode
+    if args.settings:
+        launch_settings(os.path.expanduser(args.config))
+        return
+
     # log_level was parsed early
     app_log_level = getattr(logging, args.log_level.upper(), logging.WARNING)
     gtk_log_level = getattr(logging, args.gtk_log_level.upper(), logging.WARNING)
@@ -205,10 +210,6 @@ def main():
 
     # Use an empty list for argv to prevent GTK from parsing custom args
     app.run([])
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
