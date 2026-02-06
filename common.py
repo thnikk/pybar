@@ -970,13 +970,6 @@ class Module(Gtk.MenuButton):
         # Set spacing if more than one child is visible
         self.box.set_spacing(5 if count > 1 else 0)
 
-        # Handle text margin if icon is also visible
-        if self.text and self.icon:
-            if self.text.get_visible() and self.icon.get_visible():
-                self.text.set_margin_start(5)
-            else:
-                self.text.set_margin_start(0)
-
     def _update_spacing(self):
         """ Alias for compatibility """
         self._update_layout()

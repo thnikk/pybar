@@ -235,7 +235,8 @@ class Weather(c.BaseModule):
                     "max": self.config.get('max')
                 },
                 "Daily": {"info": daily_info},
-                "text": f"{today_data['icon']} {today_data['temperature']}°F"
+                "icon": today_data['icon'],
+                "text": f"{today_data['temperature']}°F"
             }
         except Exception as e:
             c.print_debug(f"Weather fetch failed: {e}", color='red')
@@ -482,6 +483,7 @@ class Weather(c.BaseModule):
         if not data:
             widget.set_visible(False)
             return
+        widget.set_icon(data.get('icon', ''))
         widget.set_label(data.get('text', ''))
         widget.set_visible(True)
         if data.get('stale'):
