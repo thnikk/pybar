@@ -43,7 +43,7 @@ class StreamToLogger:
         self.stream.flush()
 
 
-def setup_logging():
+def setup_logging(level=logging.WARNING):
     """ Setup logging to file and stderr """
     log_dir = os.path.expanduser('~/.cache/pybar')
     if not os.path.exists(log_dir):
@@ -52,7 +52,7 @@ def setup_logging():
 
     # Configure logging
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level,
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         handlers=[
             logging.FileHandler(log_file, mode='w'),
@@ -71,7 +71,7 @@ def setup_logging():
     return log_file
 
 
-def on_activate(app, config):
+def on_activate(app, config, debug_gc=True):
     if hasattr(app, 'started') and app.started:
         return
     app.started = True
@@ -95,7 +95,7 @@ def on_activate(app, config):
         module.start_worker(name, module_config)
 
     try:
-        app.display = Display(config, app)
+        app.display = Display(config, app, debug_gc=debug_gc)
         # Draw all bars
         app.display.draw_all()
     except Exception:
@@ -114,6 +114,9 @@ def parse_args():
                         help="Replace existing instance")
     parser.add_argument('-s', '--settings', action='store_true',
                         help="Launch settings window")
+    parser.add_argument('-l', '--log-level', type=str, default='WARNING',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        help="Set the logging level")
     args, unknown = parser.parse_known_args()
     return args
 
@@ -134,7 +137,8 @@ def main():
         launch_settings(os.path.expanduser(args.config))
         return
 
-    log_file = setup_logging()
+    log_level = getattr(logging, args.log_level.upper(), logging.WARNING)
+    log_file = setup_logging(log_level)
     logging.info(f"Starting pybar, logging to {log_file}")
 
     # Register bundled fonts
@@ -161,7 +165,7 @@ def main():
         flags=flags
     )
     app.config_path = args.config  # Store config path for settings window
-    app.connect('activate', lambda app: on_activate(app, config))
+    app.connect('activate', lambda app: on_activate(app, config, True))
 
     # Use an empty list for argv to prevent GTK from parsing custom args
     app.run([])

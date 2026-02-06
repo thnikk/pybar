@@ -22,22 +22,31 @@ _worker_stop_flags = {}
 
 
 def discover_modules():
-    """Automatically discover modules in the modules/ directory"""
+    """Automatically discover modules in the modules/ directory in parallel"""
     global _module_map
     modules_dir = c.get_resource_path('modules')
     if not os.path.exists(modules_dir):
         return
 
-    for filename in os.listdir(modules_dir):
-        if filename.endswith('.py') and filename != '__init__.py':
-            module_name = filename[:-3]
-            try:
-                mod = importlib.import_module(f'modules.{module_name}')
-                if hasattr(mod, 'module_map'):
-                    _module_map.update(mod.module_map)
-            except Exception as e:
-                c.print_debug(
-                    f"Failed to load module {module_name}: {e}", color='red')
+    filenames = [f for f in os.listdir(modules_dir)
+                 if f.endswith('.py') and f != '__init__.py']
+    
+    def load_module(filename):
+        module_name = filename[:-3]
+        try:
+            mod = importlib.import_module(f'modules.{module_name}')
+            if hasattr(mod, 'module_map'):
+                return mod.module_map
+        except Exception as e:
+            c.print_debug(
+                f"Failed to load module {module_name}: {e}", color='red')
+        return {}
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(load_module, filenames)
+        for res in results:
+            _module_map.update(res)
 
 
 def get_instance(name, config):
@@ -107,9 +116,19 @@ def stop_worker(name):
 
 
 def stop_all_workers():
-    """Stop all worker threads"""
-    for name in list(_worker_threads.keys()):
-        stop_worker(name)
+    """Stop all worker threads in parallel"""
+    # Signal all to stop first
+    for name in list(_worker_stop_flags.keys()):
+        _worker_stop_flags[name].set()
+
+    # Then join them with a short timeout
+    threads = list(_worker_threads.items())
+    for name, thread in threads:
+        thread.join(timeout=0.1)
+        if name in _worker_threads:
+            del _worker_threads[name]
+        if name in _worker_stop_flags:
+            del _worker_stop_flags[name]
 
     # Force cleanup of Volume/Pulse threads that might hang
     # (Note: we can't easily kill threads in Python, but we can try to
@@ -119,9 +138,10 @@ def stop_all_workers():
 
 
 def clear_instances():
-    """Clear all module instances for reload"""
+    """Clear all module instances for reload in parallel"""
     global _instances, _module_map
     import sys
+    from concurrent.futures import ThreadPoolExecutor
 
     instance_count = len(_instances)
     c.print_debug(
@@ -129,7 +149,8 @@ def clear_instances():
         f"{list(_instances.keys())}"
     )
 
-    for name, instance in list(_instances.items()):
+    def cleanup_instance(item):
+        name, instance = item
         if hasattr(instance, 'cleanup'):
             try:
                 instance.cleanup()
@@ -138,6 +159,9 @@ def clear_instances():
                     f"Failed to cleanup {name}: {e}",
                     color='red'
                 )
+
+    with ThreadPoolExecutor() as executor:
+        executor.map(cleanup_instance, _instances.items())
 
     # Clear the dict
     _instances.clear()

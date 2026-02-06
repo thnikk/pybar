@@ -51,9 +51,7 @@ def get_service_name_and_object_path(service: str) -> typing.Tuple[str, str]:
 
 def debug_print(msg, *args, **kwargs):
     try:
-        # Avoid infinite recursion by checking _instance directly
-        if TrayHost._instance and TrayHost._instance.debug:
-            c.print_debug(msg, *args, **kwargs)
+        c.print_debug(msg, *args, **kwargs)
     except Exception:
         pass
 
@@ -432,7 +430,6 @@ class TrayHost:
         self._items = []
         self.session_bus = SessionMessageBus()
         self.host_id = f"pybar-{os.getpid()}"
-        self.debug = False
         self.watcher_interface = None
 
         # Try to register watcher if not present
@@ -483,9 +480,6 @@ class TrayHost:
 
     def add_module(self, module):
         self.modules.append(module)
-        if module.config.get("debug", False):
-            self.debug = True
-            logging.getLogger("dasbus.connection").setLevel(logging.DEBUG)
         # Add existing items to new module
         for item in self._items:
             module.add_item(item)
@@ -1102,12 +1096,6 @@ class Tray(c.BaseModule):
             'default': True,
             'label': 'Start Collapsed',
             'description': 'Start with tray icons hidden'
-        },
-        'debug': {
-            'type': 'boolean',
-            'default': False,
-            'label': 'Debug Mode',
-            'description': 'Enable debug output for tray'
         },
         'custom_icons': {
             'type': 'dict',

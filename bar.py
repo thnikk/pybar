@@ -26,9 +26,10 @@ from gi.repository import Gio
 
 class Display:
     """ Display class """
-    def __init__(self, config, app):
+    def __init__(self, config, app, debug_gc=True):
         self.app = app
         self.display = Gdk.Display.get_default()
+        self.debug_gc = debug_gc
         monitors = self.display.get_monitors()
         monitors.connect("items-changed", self.on_monitors_changed)
         self.wm = self.get_wm()
@@ -447,45 +448,52 @@ class Display:
         # Redraw all bars
         self.draw_all()
 
-        # Process all pending GTK events to ensure cleanup callbacks run
-        # Do this multiple times to handle callbacks that schedule more work
-        for _ in range(10):
-            while GLib.MainContext.default().pending():
-                GLib.MainContext.default().iteration(False)
-            # Small sleep to let any final callbacks queue
-            import time
-            time.sleep(0.01)
-
-        # Enable gc debugging to find uncollectable objects
-        gc.set_debug(gc.DEBUG_SAVEALL)
+        # Efficiently process pending GTK events
+        while GLib.MainContext.default().pending():
+            GLib.MainContext.default().iteration(False)
 
         # Force garbage collection to clean up destroyed widgets
+        # We use a triple pass to ensure cycles are broken and everything is finalized
         collected_1 = gc.collect()
         collected_2 = gc.collect()  # Double collection for cycles
         collected_3 = gc.collect()  # Third pass to be thorough
 
-        # Check for uncollectable garbage
-        if gc.garbage:
-            c.print_debug(
-                f"WARNING: {len(gc.garbage)} uncollectable objects",
-                color='red'
-            )
-            # Sample the types to understand what's leaking
-            type_counts = {}
-            for obj in gc.garbage[:100]:  # Sample first 100
-                obj_type = type(obj).__name__
-                type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
-            c.print_debug(
-                f"Uncollectable types (sample): {type_counts}"
-            )
-            # Clear the garbage list after inspection
-            gc.garbage.clear()
+        # Optimization: Only perform detailed debugging if requested
+        if self.debug_gc:
+            # Enable gc debugging to find uncollectable objects
+            gc.set_debug(gc.DEBUG_SAVEALL)
+            
+            # One more pass to catch anything moved to garbage by DEBUG_SAVEALL
+            gc.collect()
 
-        gc.set_debug(0)
+            # Check for uncollectable garbage
+            if gc.garbage:
+                c.print_debug(
+                    f"WARNING: {len(gc.garbage)} uncollectable objects",
+                    color='red'
+                )
+                # Sample the types to understand what's leaking
+                type_counts = {}
+                for obj in gc.garbage[:100]:  # Sample first 100
+                    obj_type = type(obj).__name__
+                    type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
+                c.print_debug(
+                    f"Uncollectable types (sample): {type_counts}"
+                )
+                # Clear the garbage list after inspection
+                gc.garbage.clear()
 
-        objs = gc.get_objects()
-        modules_obj = len([o for o in objs if isinstance(o, c.Module)])
-        widgets = len([o for o in objs if isinstance(o, c.Widget)])
+            gc.set_debug(0)
+            
+            objs = gc.get_objects()
+            modules_obj = len([o for o in objs if isinstance(o, c.Module)])
+            widgets = len([o for o in objs if isinstance(o, c.Widget)])
+            
+            c.print_debug(
+                f"GC Stats - Collected: {collected_1}/{collected_2}/"
+                f"{collected_3}, Module objs: {modules_obj}, "
+                f"Widgets: {widgets}"
+            )
 
         # Track which modules were added
         after_modules = set(sys.modules.keys())
@@ -493,11 +501,6 @@ class Display:
         added_modules = after_modules - before_modules
         removed_modules = before_modules - after_modules
 
-        c.print_debug(
-            f"GC Stats - Collected: {collected_1}/{collected_2}/"
-            f"{collected_3}, Module objs: {modules_obj}, "
-            f"Widgets: {widgets}"
-        )
         c.print_debug(
             f"sys.modules: {before_count} -> {after_count} "
             f"(+{len(added_modules)} -{len(removed_modules)})"
