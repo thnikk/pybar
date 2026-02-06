@@ -322,9 +322,9 @@ class Volume(c.BaseModule):
         """ Create volume module widget """
         m = c.Module()
         m.set_position(bar.position)
-        c.add_style(m, 'module-fixed')
         m.icons = self.config.get('icons', {})
         m.set_label('...')
+        m.text.set_width_chars(5)
         m.set_icon('')
 
         # Add scroll controller
