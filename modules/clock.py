@@ -250,6 +250,10 @@ class Clock(c.BaseModule):
 
     def update_ui(self, widget, data):
         """ Update clock UI """
+        # Check if widget has been cleaned up
+        if widget.text is None:
+            return
+
         last = widget.text.get_text()
         new = data['text']
         widget.set_visible(True)

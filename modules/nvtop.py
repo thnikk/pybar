@@ -259,6 +259,10 @@ class NVTop(c.BaseModule):
         if not data:
             return
 
+        # Check if widget has been cleaned up
+        if widget.box is None:
+            return
+
         if data.get('error') == 'command_not_found':
             widget.cards_box.set_visible(False)
             widget.set_icon('⚠')

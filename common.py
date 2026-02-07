@@ -959,6 +959,10 @@ class Module(Gtk.MenuButton):
 
     def _update_layout(self):
         """ Update spacing/margins based on what is visible """
+        # Check if widget has been cleaned up
+        if self.box is None:
+            return
+
         # Count visible children in the main box
         count = 0
         child = self.box.get_first_child()
