@@ -30,6 +30,13 @@ class CustomModule(c.BaseModule):
             'label': 'Return Type',
             'description': 'Output format: json or text'
         },
+        'interval': {
+            'type': 'integer',
+            'default': 60,
+            'label': 'Update Interval',
+            'description': 'Time between updates in seconds',
+            'min': 1
+        },
         'on-click-middle': {
             'type': 'string',
             'default': '',
@@ -107,7 +114,6 @@ class CustomModule(c.BaseModule):
                 return {
                     'text': data.get('text', ''),
                     'icon': data.get('icon', ''),
-                    'tooltip': data.get('tooltip', ''),
                     'class': data.get('class', '')
                 }
             else:
@@ -115,7 +121,6 @@ class CustomModule(c.BaseModule):
                 return {
                     'text': output,
                     'icon': '',
-                    'tooltip': output,
                     'class': ''
                 }
         except CalledProcessError as e:
@@ -227,11 +232,6 @@ class CustomModule(c.BaseModule):
             widget.set_icon(icon)
         else:
             widget.set_icon('')
-
-        # Update tooltip
-        tooltip = data.get('tooltip', '')
-        if tooltip:
-            widget.set_tooltip_text(str(tooltip))
 
         # Update CSS classes
         widget.reset_style()
