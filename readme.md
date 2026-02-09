@@ -4,63 +4,43 @@
 </p>
 
 <p align="center">
-    A statusbar for Sway with clickable widgets.
+    A statusbar for Sway with widgets.
 </p>
 
-![Screenshot](assets/screenshot.png)
-
-### Modules with widgets
-- Weather
-- Updates
-- Hoyoverse
-- Git
-- XDrip+
-- Calendar
-- Volume
-- Backlight
-- Battery
-- Network
-- Power
-- Sales
-- Generic waybar module for waybar-formatted modules
+![Screenshot](assets/screenshot-2.png)
 
 ### Installation
-As pybar is still under very active development, I haven't looked into packaging yet. For now, you can:
+Pybar is released as an executable with pyinstaller. If you're on Arch or Ubuntu, you can just download the latest release for your distribution.
 
-Clone the repo in a safe place and cd into it
+[Releases](https://github.com/thnikk/pybar/releases)
 
-```
-$ mkdir ~/Git
-$ cd ~/Git
-$ git clone https://github.com/thnikk/pybar
-$ cd pybar
-```
+### Manual Installation and Development
+1. Clone the repo
 
-Create a virtualenv for pybar and install dependencies
-```
-$ python -m venv ~/.venv/pybar
-$ ~/.venv/pybar/bin/pip install -r requirements.txt
+``` bash
+git clone https://github.com/thnikk/pybar
 ```
 
-Create a launcher called `pybar` and put it somewhere in your $PATH 
-```
-#!/usr/bin/env sh
+2. cd into it
 
-# Kill previous instances
-pkill -f "python.*pybar"
-
-# Run new bar and log to file
-~/.venv/pybar/bin/python -u ~/Git/pybar/main.py > ~/.cache/pybar.log 2>&1
+``` bash
+cd pybar
 ```
 
-To use the bar on sway, replace the bar section of your config with:
-```
-bar {
-    swaybar_command pybar
-}
+3. Create the virtual environment
+
+``` bash
+python3 -m venv .venv
 ```
 
-To update it, you can run:
+4. Install python dependencies in the venv
+
+``` bash
+.venv/bin/pip install -r requirements.txt
 ```
-$ git -C ~/Git/pybar pull --rebase
+
+5. Run pybar
+
+``` bash
+.venv/bin/python3 main.py
 ```
