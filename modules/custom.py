@@ -25,10 +25,11 @@ class CustomModule(c.BaseModule):
                            'quotes)'
         },
         'return-type': {
-            'type': 'string',
+            'type': 'choice',
             'default': 'json',
             'label': 'Return Type',
-            'description': 'Output format: json or text'
+            'description': 'Output format: json or text',
+            'choices': ['json', 'text']
         },
         'interval': {
             'type': 'integer',
