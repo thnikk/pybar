@@ -930,8 +930,14 @@ class Module(Gtk.MenuButton):
         """Called when widget is destroyed"""
         self.cleanup()
 
+    def _is_valid(self):
+        """Check if widget is still valid for operations"""
+        return not self._cleaned_up and self.box is not None
+
     def set_label(self, text):
         """ Set text and toggle visibility """
+        if not self._is_valid():
+            return self
         if self.text:
             self.text.set_text(str(text))
             self.text.set_visible(bool(text))
@@ -944,6 +950,8 @@ class Module(Gtk.MenuButton):
 
     def set_icon(self, icon):
         """ Set icon and toggle visibility """
+        if not self._is_valid():
+            return self
         if self.icon:
             self.icon.set_text(str(icon))
             self.icon.set_visible(bool(icon))
@@ -980,6 +988,8 @@ class Module(Gtk.MenuButton):
 
     def reset_style(self):
         """ Reset module style back to default """
+        if not self._is_valid():
+            return
         for style in self.added_styles:
             self.get_style_context().remove_class(style)
         self.added_styles = []
@@ -990,6 +1000,8 @@ class Module(Gtk.MenuButton):
 
     def add_style(self, style_class):
         """ Set style """
+        if not self._is_valid():
+            return self
         if isinstance(style_class, str):
             if style_class not in self.added_styles:
                 self.get_style_context().add_class(style_class)
@@ -1003,6 +1015,8 @@ class Module(Gtk.MenuButton):
 
     def del_style(self, style_class):
         """ Remove style """
+        if not self._is_valid():
+            return self
         if isinstance(style_class, str):
             if style_class in self.added_styles:
                 self.get_style_context().remove_class(style_class)
@@ -1016,6 +1030,8 @@ class Module(Gtk.MenuButton):
 
     def add_indicator_style(self, style_class):
         """ Add style to indicator and show it """
+        if not self._is_valid():
+            return self
         was_empty = not self.indicator_added_styles
         if isinstance(style_class, str):
             if style_class not in self.indicator_added_styles:
@@ -1033,6 +1049,8 @@ class Module(Gtk.MenuButton):
 
     def del_indicator_style(self, style_class):
         """ Remove style from indicator and hide if empty """
+        if not self._is_valid():
+            return self
         if isinstance(style_class, str):
             if style_class in self.indicator_added_styles:
                 self.indicator.get_style_context().add_class(style_class)
@@ -1049,6 +1067,8 @@ class Module(Gtk.MenuButton):
 
     def set_widget(self, box):
         """ Set widget """
+        if not self._is_valid():
+            return
         # Clean up existing popover first
         self._cleanup_popover()
 
