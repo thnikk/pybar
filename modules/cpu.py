@@ -60,7 +60,7 @@ class CPU(c.BaseModule):
         """Try to get a meaningful CPU temperature"""
         if not hasattr(psutil, "sensors_temperatures"):
             return None
-        
+
         temps = psutil.sensors_temperatures()
         # Common CPU sensor names
         for name in ['k10temp', 'coretemp', 'cpu_thermal', 'soc_thermal']:
@@ -68,7 +68,7 @@ class CPU(c.BaseModule):
                 for sensor in temps[name]:
                     if sensor.label in ['Tctl', 'Package id 0', '']:
                         return sensor.current
-        
+
         # Fallback: first available temperature
         for name, sensor_list in temps.items():
             if sensor_list:
@@ -162,8 +162,9 @@ class CPU(c.BaseModule):
 
             cols = 4
             num_rows = (cpu_count + cols - 1) // cols
-            
-            # Use size group to keep core columns equal width without making separators wide
+
+            # Use size group to keep core columns equal width without making
+            # separators wide
             size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
 
             # Add vertical separators between columns
@@ -284,7 +285,7 @@ class CPU(c.BaseModule):
         # Info row above graph
         info_row = c.box('h', spacing=0)
         model_lbl = c.label(
-            data.get('model', 'Unknown CPU'), ha='start', he=True)
+            data.get('model', 'Unknown CPU'))
         model_lbl.set_ellipsize(c.Pango.EllipsizeMode.END)
         model_lbl.set_margin_start(10)
         model_lbl.set_margin_end(10)
@@ -305,20 +306,29 @@ class CPU(c.BaseModule):
         speed_lbl.set_margin_top(10)
         speed_lbl.set_margin_bottom(10)
 
+        model_icon = c.label('')
+        model_icon.set_margin_start(10)
+        info_row.append(model_icon)
         info_row.append(model_lbl)
-        
+
         vsep1 = c.sep('v')
         vsep1.set_vexpand(True)
         vsep1.set_valign(Gtk.Align.FILL)
         info_row.append(vsep1)
-        
+
+        temp_icon = c.label('')
+        temp_icon.set_margin_start(10)
+        info_row.append(temp_icon)
         info_row.append(temp_lbl)
-        
+
         vsep2 = c.sep('v')
         vsep2.set_vexpand(True)
         vsep2.set_valign(Gtk.Align.FILL)
         info_row.append(vsep2)
-        
+
+        speed_icon = c.label('')
+        speed_icon.set_margin_start(10)
+        info_row.append(speed_icon)
         info_row.append(speed_lbl)
 
         usage_box.append(info_row)
@@ -420,7 +430,8 @@ class CPU(c.BaseModule):
                 pw['model_lbl'].set_text(data.get('model', 'Unknown CPU'))
             if 'temp_lbl' in pw:
                 temp = data.get('temp')
-                pw['temp_lbl'].set_text(f"{temp:.1f}°C" if temp is not None else "--°C")
+                pw['temp_lbl'].set_text(
+                    f"{temp:.1f}°C" if temp is not None else "--°C")
             if 'speed_lbl' in pw:
                 freq = data.get('freq')
                 if freq:
