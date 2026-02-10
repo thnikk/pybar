@@ -43,6 +43,37 @@ class CPU(c.BaseModule):
         self.history = []
         self.per_cpu_history = []
         self.max_history = config.get('history_length', 60)
+        self.cpu_name = self._get_cpu_name()
+
+    def _get_cpu_name(self):
+        """Get CPU model name from /proc/cpuinfo"""
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                for line in f:
+                    if 'model name' in line:
+                        return line.split(':')[1].strip()
+        except Exception:
+            pass
+        return "Unknown CPU"
+
+    def _get_cpu_temp(self):
+        """Try to get a meaningful CPU temperature"""
+        if not hasattr(psutil, "sensors_temperatures"):
+            return None
+        
+        temps = psutil.sensors_temperatures()
+        # Common CPU sensor names
+        for name in ['k10temp', 'coretemp', 'cpu_thermal', 'soc_thermal']:
+            if name in temps:
+                for sensor in temps[name]:
+                    if sensor.label in ['Tctl', 'Package id 0', '']:
+                        return sensor.current
+        
+        # Fallback: first available temperature
+        for name, sensor_list in temps.items():
+            if sensor_list:
+                return sensor_list[0].current
+        return None
 
     def get_colors(self, count):
         """Generate distinct colors for CPU cores"""
@@ -84,6 +115,8 @@ class CPU(c.BaseModule):
         """Get CPU usage data"""
         total_percent = psutil.cpu_percent(interval=0.5)
         per_cpu = psutil.cpu_percent(interval=None, percpu=True)
+        freq = psutil.cpu_freq()
+        temp = self._get_cpu_temp()
 
         self.history.append(total_percent)
         if len(self.history) > self.max_history:
@@ -104,7 +137,10 @@ class CPU(c.BaseModule):
             "per_cpu": per_cpu,
             "history": self.history.copy(),
             "per_cpu_history": [h.copy() for h in self.per_cpu_history],
-            "cpu_count": len(per_cpu)
+            "cpu_count": len(per_cpu),
+            "freq": freq.current if freq else None,
+            "temp": temp,
+            "model": self.cpu_name
         }
 
     def build_cores_ui(self, widget, data):
@@ -245,6 +281,52 @@ class CPU(c.BaseModule):
         total_top.append(total_val)
         total_row.append(total_top)
 
+        # Info row above graph
+        info_row = c.box('h', spacing=0)
+        model_lbl = c.label(
+            data.get('model', 'Unknown CPU'), ha='start', he=True)
+        model_lbl.set_ellipsize(c.Pango.EllipsizeMode.END)
+        model_lbl.set_margin_start(10)
+        model_lbl.set_margin_end(10)
+        model_lbl.set_margin_top(10)
+        model_lbl.set_margin_bottom(10)
+
+        temp_lbl = c.label("--°C", ha='center')
+        temp_lbl.set_width_chars(6)
+        temp_lbl.set_margin_start(10)
+        temp_lbl.set_margin_end(10)
+        temp_lbl.set_margin_top(10)
+        temp_lbl.set_margin_bottom(10)
+
+        speed_lbl = c.label("-- MHz", ha='center')
+        speed_lbl.set_width_chars(8)
+        speed_lbl.set_margin_start(10)
+        speed_lbl.set_margin_end(10)
+        speed_lbl.set_margin_top(10)
+        speed_lbl.set_margin_bottom(10)
+
+        info_row.append(model_lbl)
+        
+        vsep1 = c.sep('v')
+        vsep1.set_vexpand(True)
+        vsep1.set_valign(Gtk.Align.FILL)
+        info_row.append(vsep1)
+        
+        info_row.append(temp_lbl)
+        
+        vsep2 = c.sep('v')
+        vsep2.set_vexpand(True)
+        vsep2.set_valign(Gtk.Align.FILL)
+        info_row.append(vsep2)
+        
+        info_row.append(speed_lbl)
+
+        usage_box.append(info_row)
+        usage_box.append(c.sep('h'))
+        widget.popover_widgets['model_lbl'] = model_lbl
+        widget.popover_widgets['temp_lbl'] = temp_lbl
+        widget.popover_widgets['speed_lbl'] = speed_lbl
+
         cpu_count = data.get('cpu_count', 0)
         colors = self.get_colors(cpu_count)
 
@@ -333,6 +415,21 @@ class CPU(c.BaseModule):
         if hasattr(widget, 'popover_widgets'):
             pw = widget.popover_widgets
             pw['total_val'].set_text(f"{data['total']:.1f}%")
+
+            if 'model_lbl' in pw:
+                pw['model_lbl'].set_text(data.get('model', 'Unknown CPU'))
+            if 'temp_lbl' in pw:
+                temp = data.get('temp')
+                pw['temp_lbl'].set_text(f"{temp:.1f}°C" if temp is not None else "--°C")
+            if 'speed_lbl' in pw:
+                freq = data.get('freq')
+                if freq:
+                    if freq > 1000:
+                        pw['speed_lbl'].set_text(f"{freq/1000:.2f} GHz")
+                    else:
+                        pw['speed_lbl'].set_text(f"{freq:.0f} MHz")
+                else:
+                    pw['speed_lbl'].set_text("-- MHz")
 
             if 'graph' in pw:
                 multi_data = []
