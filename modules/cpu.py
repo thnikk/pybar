@@ -28,6 +28,12 @@ class CPU(c.BaseModule):
             'description': 'Number of data points to keep in history',
             'min': 10,
             'max': 300
+        },
+        'compact_cores': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Compact Cores',
+            'description': 'Show cores in a compact grid',
         }
     }
 
@@ -36,6 +42,32 @@ class CPU(c.BaseModule):
         self.history = []
         self.per_cpu_history = []
         self.max_history = config.get('history_length', 60)
+
+    def toggle_compact(self, _btn, widget):
+        """Toggle compact cores mode"""
+        compact = not self.config.get('compact_cores', False)
+        self.config['compact_cores'] = compact
+
+        # Update toggle button icon
+        if hasattr(widget, 'compact_toggle_btn'):
+            widget.compact_toggle_btn.set_label('' if compact else '')
+
+        # Rebuild only the cores list
+        data = c.state_manager.get(self.name)
+        if data and hasattr(widget, 'cores_scroll'):
+            # Clear old popover widget references for cores
+            if hasattr(widget, 'popover_widgets'):
+                keys_to_del = [k for k in widget.popover_widgets.keys()
+                               if k.startswith('core_')]
+                for k in keys_to_del:
+                    del widget.popover_widgets[k]
+
+            # Rebuild cores UI and swap child
+            cores_ui = self.build_cores_ui(widget, data)
+            widget.cores_scroll.set_child(cores_ui)
+
+            # Update with current data
+            self.update_ui(widget, data)
 
     def fetch_data(self):
         """Get CPU usage data"""
@@ -64,6 +96,128 @@ class CPU(c.BaseModule):
             "cpu_count": len(per_cpu)
         }
 
+    def build_cores_ui(self, widget, data):
+        """Build the cores list or grid based on current mode"""
+        compact = self.config.get('compact_cores', False)
+        cpu_count = data.get('cpu_count', 0)
+        colors = [
+            (0.96, 0.56, 0.68), (0.97, 0.74, 0.59), (0.98, 0.89, 0.69),
+            (0.67, 0.91, 0.70), (0.54, 0.86, 0.92), (0.54, 0.71, 0.98),
+            (0.71, 0.73, 0.99), (0.80, 0.65, 0.97),
+        ]
+
+        if compact:
+            # Compact grid mode using Gtk.Grid for perfect alignment
+            grid = Gtk.Grid()
+            grid.get_style_context().add_class('box')
+            grid.set_column_homogeneous(False)
+            grid.set_row_homogeneous(False)
+            grid.set_vexpand(True)
+            grid.set_hexpand(True)
+            grid.set_valign(Gtk.Align.FILL)
+            grid.set_halign(Gtk.Align.FILL)
+
+            cols = 4
+            num_rows = (cpu_count + cols - 1) // cols
+            
+            # Use size group to keep core columns equal width without making separators wide
+            size_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+
+            # Add vertical separators between columns
+            for c_idx in range(1, cols):
+                v_sep = c.sep('v')
+                v_sep.set_halign(Gtk.Align.CENTER)
+                v_sep.set_vexpand(True)
+                grid.attach(v_sep, c_idx * 2 - 1, 0, 1, num_rows * 2 - 1)
+
+            # Add horizontal separators between rows
+            for r_idx in range(1, num_rows):
+                h_sep = c.sep('h')
+                h_sep.set_valign(Gtk.Align.CENTER)
+                h_sep.set_hexpand(True)
+                grid.attach(h_sep, 0, r_idx * 2 - 1, cols * 2 - 1, 1)
+
+            for i in range(cpu_count):
+                row_idx = (i // cols) * 2
+                col_idx = (i % cols) * 2
+
+                core_item = c.box('h', spacing=8)
+                core_item.set_margin_start(10)
+                core_item.set_margin_end(10)
+                core_item.set_margin_top(5)
+                core_item.set_margin_bottom(5)
+                core_item.set_vexpand(True)
+                core_item.set_valign(Gtk.Align.FILL)
+                size_group.add_widget(core_item)
+
+                color_idx = i % len(colors)
+                indicator = Gtk.Box()
+                indicator.set_size_request(4, 14)
+                indicator.set_valign(Gtk.Align.CENTER)
+                css = (f"box {{ background-color: "
+                       f"rgb({int(colors[color_idx][0]*255)}, "
+                       f"{int(colors[color_idx][1]*255)}, "
+                       f"{int(colors[color_idx][2]*255)}); "
+                       f"border-radius: 999px; }}")
+                provider = Gtk.CssProvider()
+                provider.load_from_data(css.encode())
+                indicator.get_style_context().add_provider(
+                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                core_item.append(indicator)
+
+                name = c.label(f"{i}:", ha='start')
+                core_item.append(name)
+
+                val = c.label("0%", ha='end', he=True)
+                val.set_width_chars(4)
+                core_item.append(val)
+                widget.popover_widgets[f'core_val_{i}'] = val
+
+                grid.attach(core_item, col_idx, row_idx, 1, 1)
+
+            return grid
+        else:
+            # Normal list mode
+            cores_list = c.box('v', style='box')
+            for i in range(cpu_count):
+                row = c.box('h', style='inner-box')
+
+                color_idx = i % len(colors)
+                indicator = Gtk.Box()
+                indicator.set_size_request(6, 16)
+                css = (f"box {{ background-color: "
+                       f"rgb({int(colors[color_idx][0]*255)}, "
+                       f"{int(colors[color_idx][1]*255)}, "
+                       f"{int(colors[color_idx][2]*255)}); "
+                       f"border-radius: 999px; }}")
+                provider = Gtk.CssProvider()
+                provider.load_from_data(css.encode())
+                indicator.get_style_context().add_provider(
+                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                row.append(indicator)
+
+                name = c.label(f"Core {i}", ha='start')
+                name.set_margin_start(10)
+                row.append(name)
+
+                level_bar = c.level(min=0, max=100, value=0)
+                level_bar.set_hexpand(True)
+                level_bar.set_margin_start(10)
+                level_bar.set_margin_end(10)
+                row.append(level_bar)
+
+                val = c.label("0%", ha='end')
+                val.set_width_chars(5)
+                row.append(val)
+
+                cores_list.append(row)
+                if i < cpu_count - 1:
+                    cores_list.append(c.sep('h'))
+
+                widget.popover_widgets[f'core_level_{i}'] = level_bar
+                widget.popover_widgets[f'core_val_{i}'] = val
+            return cores_list
+
     def build_popover(self, widget, data):
         """Build popover for CPU"""
         widget.popover_widgets = {}
@@ -85,14 +239,9 @@ class CPU(c.BaseModule):
         total_row.append(total_top)
 
         colors = [
-            (0.96, 0.56, 0.68),
-            (0.97, 0.74, 0.59),
-            (0.98, 0.89, 0.69),
-            (0.67, 0.91, 0.70),
-            (0.54, 0.86, 0.92),
-            (0.54, 0.71, 0.98),
-            (0.71, 0.73, 0.99),
-            (0.80, 0.65, 0.97),
+            (0.96, 0.56, 0.68), (0.97, 0.74, 0.59), (0.98, 0.89, 0.69),
+            (0.67, 0.91, 0.70), (0.54, 0.86, 0.92), (0.54, 0.71, 0.98),
+            (0.71, 0.73, 0.99), (0.80, 0.65, 0.97),
         ]
 
         multi_data = []
@@ -112,62 +261,39 @@ class CPU(c.BaseModule):
             max_config=100,
             colors=colors
         )
-        # total_row.append(graph)
         usage_box.append(graph)
         widget.popover_widgets['graph'] = graph
 
-        # usage_box.append(total_row)
         usage_section.append(usage_box)
         main_box.append(usage_section)
 
         cores_section = c.box('v', spacing=10)
-        cores_section.append(
-            c.label('Per Core', style='title', ha='start'))
+        cores_header = c.box('h')
+        cores_header.append(
+            c.label('Per Core', style='title', ha='start', he=True))
 
-        scroll = c.scroll(height=200, width=400, style='scroll')
-        scroll.set_overflow(Gtk.Overflow.HIDDEN)
-        cores_list = c.box('v', style='box')
+        compact = self.config.get('compact_cores', False)
+        toggle_btn = c.button('' if compact else '', style='minimal')
+        toggle_btn.set_tooltip_text("Toggle compact mode")
+        toggle_btn.connect('clicked', self.toggle_compact, widget)
+        widget.compact_toggle_btn = toggle_btn
+        cores_header.append(toggle_btn)
+        cores_section.append(cores_header)
 
         cpu_count = data.get('cpu_count', 0)
-        for i in range(cpu_count):
-            row = c.box('h', style='inner-box')
+        num_rows = (cpu_count + 3) // 4
+        # Calculate height based on compact view: ~34px per row
+        compact_height = max(100, num_rows * 34)
+        compact_height = min(compact_height, 600)
 
-            color_idx = i % len(colors)
-            indicator = Gtk.Box()
-            indicator.set_size_request(6, 16)
-            css = (f"box {{ background-color: "
-                   f"rgb({int(colors[color_idx][0]*255)}, "
-                   f"{int(colors[color_idx][1]*255)}, "
-                   f"{int(colors[color_idx][2]*255)}); "
-                   f"border-radius: 999px; }}")
-            provider = Gtk.CssProvider()
-            provider.load_from_data(css.encode())
-            indicator.get_style_context().add_provider(
-                provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            row.append(indicator)
+        scroll = c.scroll(height=compact_height, width=400, style='scroll')
+        scroll.set_overflow(Gtk.Overflow.HIDDEN)
+        scroll.set_propagate_natural_height(True)
+        widget.cores_scroll = scroll
 
-            name = c.label(f"Core {i}", ha='start')
-            name.set_margin_start(10)
-            row.append(name)
+        cores_ui = self.build_cores_ui(widget, data)
+        scroll.set_child(cores_ui)
 
-            level_bar = c.level(min=0, max=100, value=0)
-            level_bar.set_hexpand(True)
-            level_bar.set_margin_start(10)
-            level_bar.set_margin_end(10)
-            row.append(level_bar)
-
-            val = c.label("0%", ha='end')
-            val.set_width_chars(5)
-            row.append(val)
-
-            cores_list.append(row)
-            if i < cpu_count - 1:
-                cores_list.append(c.sep('h'))
-
-            widget.popover_widgets[f'core_level_{i}'] = level_bar
-            widget.popover_widgets[f'core_val_{i}'] = val
-
-        scroll.set_child(cores_list)
         cores_section.append(scroll)
         main_box.append(cores_section)
 
@@ -186,17 +312,20 @@ class CPU(c.BaseModule):
         widget.set_label(f"{percentage}%")
         widget.text.set_width_chars(4)
 
-        compare_data = data.copy()
-        compare_data.pop('timestamp', None)
-        if (widget.get_popover() and
-                getattr(widget, 'last_popover_data', None) ==
-                compare_data):
-            return
-        widget.last_popover_data = compare_data
-
+        # Ensure popover exists so it can be opened
         if not widget.get_popover():
             widget.set_widget(self.build_popover(widget, data))
 
+        if not widget.get_active():
+            # Optimization: don't update internal widgets if not visible
+            compare_data = data.copy()
+            compare_data.pop('timestamp', None)
+            compare_data.pop('history', None)
+            compare_data.pop('per_cpu_history', None)
+            widget.last_popover_data = compare_data
+            return
+
+        # Update in-place (always while active to keep graph moving)
         if hasattr(widget, 'popover_widgets'):
             pw = widget.popover_widgets
             pw['total_val'].set_text(f"{data['total']:.1f}%")
@@ -218,6 +347,13 @@ class CPU(c.BaseModule):
                     pw[f'core_level_{i}'].set_value(percent)
                 if f'core_val_{i}' in pw:
                     pw[f'core_val_{i}'].set_text(f"{percent:.0f}%")
+
+        # Update comparison data
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
+        compare_data.pop('history', None)
+        compare_data.pop('per_cpu_history', None)
+        widget.last_popover_data = compare_data
 
 
 module_map = {'cpu': CPU}
