@@ -240,7 +240,7 @@ class Disks(c.BaseModule):
             title_row.append(p_percent_label)
             content_box.append(title_row)
 
-            p_pill = c.PillBar(height=8)
+            p_pill = c.PillBar(height=12)
             p_pill.set_has_tooltip(False)
 
             # Usage-based colors or white
