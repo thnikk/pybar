@@ -1,11 +1,10 @@
 #!/usr/bin/python3 -u
 """
-Description: Clock widget
+Description: Clock widget using Gtk.Calendar
 Author: thnikk
 """
 import common as c
 from datetime import datetime
-import calendar
 import os
 import json
 import gi
@@ -46,193 +45,179 @@ class Clock(c.BaseModule):
             "day": now.day,
             "month": now.month,
             "year": now.year,
-            "month_name": now.strftime('%B')
         }
 
-    def diff_month(self, year, month, diff):
-        """ Find year and month difference """
-        if diff < 0 and month == 1:
-            month = 12 - (diff + 1)
-            year = year - 1
-        elif diff > 0 and month == 12:
-            month = 1 + (diff - 1)
-            year = year + 1
-        else:
-            month = month + diff
-        return year, month
-
-    def cal_list(self, year, month, style=None):
-        """ Get calendar list for month and append style to boxes """
-        cal = calendar.Calendar(6)
-        return [
-            [
-                [day, [style]] for day in month
-                if day
-            ]
-            for month in
-            cal.monthdayscalendar(year, month)
-        ]
+    def load_events(self):
+        """ Load events from config file """
+        try:
+            path = os.path.expanduser('~/.config/calendar-events.json')
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            c.print_debug(f"Failed to load calendar events: {e}", color='red')
+        return {}
 
     def event_lookup(self, event):
         """ Get style for event """
         event_types = {
-            "birthday": "blue-fg",
-            "appointment": "orange-fg",
+            "birthday": "blue",
+            "appointment": "orange",
         }
-
         for event_type, style in event_types.items():
             if event_type in event.lower():
                 return style
-        return "green-fg"
+        return "green"
 
-    def style_events(self, last_month, current_month, next_month, events, now):
-        """ Add style to events """
-        for count, month in enumerate([last_month, current_month, next_month]):
-            for week in month:
-                for day, styles in week:
-                    if count == 1 and day == now.day:
-                        styles.append('today')
-                    date = (
-                        f"{self.diff_month(now.year, now.month, count - 1)[1]}"
-                        f"/{day}"
-                    )
-                    if date in list(events):
-                        event_style = self.event_lookup(events[date])
-                        styles.append('event')
-                        styles.append(event_style)
+    def refresh_events(self, calendar_widget, event_box):
+        """ Update marks and event list based on displayed month """
+        month = calendar_widget.get_month() + 1
+        calendar_widget.clear_marks()
 
-    def combine_calendar(self, last_month, current_month, next_month):
-        """ Combine calendar months """
-        combined_month = []
-        if len(last_month[-1]) < 7:
-            combined_month += last_month[:-1]
-            combined_month += [last_month[-1] + current_month[0]]
-            combined_month += current_month[1:]
+        # Clear event box
+        child = event_box.get_first_child()
+        while child:
+            event_box.remove(child)
+            child = event_box.get_first_child()
+
+        events = self.load_events()
+        month_events = []
+        event_map = {}  # day -> [descriptions]
+
+        if events:
+            for date_str, event_desc in events.items():
+                try:
+                    m, d = map(int, date_str.split('/'))
+                    if m == month:
+                        calendar_widget.mark_day(d)
+                        month_events.append((d, event_desc))
+                        if d not in event_map:
+                            event_map[d] = []
+                        event_map[d].append(event_desc)
+                except (ValueError, IndexError):
+                    continue
+
+        if month_events:
+            month_events.sort()
+            events_container = c.box('v', style='box')
+            events_container.set_overflow(Gtk.Overflow.HIDDEN)
+            
+            # Horizontal size group for date blocks
+            # Attach to container to prevent garbage collection
+            events_container.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+            
+            def get_ordinal(n):
+                if 11 <= n <= 13:
+                    return 'th'
+                return {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+
+            for i, (day, event) in enumerate(month_events):
+                row = c.box('h')
+                color_style = self.event_lookup(event)
+                
+                # Date Block - Fixed width based on SizeGroup
+                date_box = c.box('h', style=color_style)
+                date_box.get_style_context().add_class('event-date-box')
+                date_box.set_valign(Gtk.Align.FILL)
+                date_box.set_hexpand(False)
+                events_container.size_group.add_widget(date_box)
+                
+                # Internal centering for date/ordinal
+                date_content = c.box('h')
+                date_content.set_halign(Gtk.Align.CENTER)
+                date_content.set_hexpand(True)
+                date_content.append(c.label(day, style='event-day-number'))
+                date_content.append(c.label(get_ordinal(day), style='event-day-ordinal', va='start'))
+                date_box.append(date_content)
+                
+                row.append(date_box)
+                row.append(c.sep('v'))
+
+                # Event description - Takes up all remaining space
+                desc_label = c.label(event, style='inner-box', wrap=25, ha='start')
+                desc_label.set_hexpand(True)
+                desc_label.set_halign(Gtk.Align.START)
+                row.append(desc_label)
+                
+                events_container.append(row)
+                if i < len(month_events) - 1:
+                    events_container.append(c.sep('h'))
+            event_box.append(events_container)
         else:
-            combined_month = last_month + current_month
-        if len(next_month[0]) < 7:
-            mixed_month = [combined_month[-1] + next_month[0]]
-            del combined_month[-1]
-            combined_month += mixed_month + next_month[1:]
-        return combined_month
+            event_box.append(c.label('No events', style='gray'))
+            path = os.path.expanduser('~/.config/calendar-events.json')
+            if not os.path.exists(path):
+                alert = c.box('v', style='box')
+                alert.append(c.label(
+                    'Set up events in ~/.config/calendar-events.json',
+                    style='inner-box', wrap=20))
+                event_box.append(alert)
 
-    def draw_calendar(self, combined_month):
-        """ Draw calendar"""
-        lines = c.box('v')
-        for week in combined_month:
-            line = c.box('h', spacing=10)
-            for day, styles in week:
-                day_label = c.label(day)
-                for style in styles:
-                    if style:
-                        day_label.get_style_context().add_class(style)
-                day_label.get_style_context().add_class('day')
-                line.append(day_label)
-            lines.append(line)
-        return lines
+        # Style internal calendar labels for better visibility
+        grid = None
+        child = calendar_widget.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Grid):
+                grid = child
+                break
+            child = child.get_next_sibling()
 
-    def draw_events(self, now, events, combined_calendar):
-        """ Draw events """
-        events_section = c.box('v', spacing=20)
-        for offset, month in enumerate(['This', 'Next']):
-            month_events = {
-                date: event for date, event in events.items()
-                if (
-                    date.split('/', maxsplit=1)[0] == str(
-                        self.diff_month(now.year, now.month, offset)[1])
-                )
-            }
-
-            if month_events:
-                event_section = c.box('v', spacing=10)
-                event_line = c.box('h')
-                event_line.append(c.label(f'{month} month'))
-
-                events_box = c.box('v', style='box')
-                shown_events = []
-                for date, event in month_events.items():
-                    if (
-                        int(date.split('/')[0]) == now.month and
-                        int(date.split('/')[1]) < now.day
-                    ) or (
-                        int(date.split('/')[0]) != now.month and
-                        int(date.split('/')[1]) > int(
-                            combined_calendar[-1][-1][0])
-                    ):
-                        continue
-                    shown_events.append(event)
-                    event_box = c.box('h', style='inner-box', spacing=10)
-                    event_dot = c.label('', style='event-dot')
-                    event_style = self.event_lookup(event)
-                    event_dot.get_style_context().add_class(event_style)
-                    event_box.append(event_dot)
-                    event_box.append(c.label(date, style='event-day'))
-                    event_box.append(c.label(event, wrap=20))
-                    events_box.append(event_box)
-
-                    if date != list(month_events)[-1]:
-                        events_box.append(c.sep('h'))
-                if shown_events:
-                    event_section.append(event_line)
-                    event_section.append(events_box)
-                    events_section.append(event_section)
-        return events_section
+        if grid:
+            child = grid.get_first_child()
+            while child:
+                if isinstance(child, Gtk.Label):
+                    classes = child.get_css_classes()
+                    if 'day-number' in classes:
+                        for cls in ['blue', 'orange', 'green', 'blue-fg', 'orange-fg', 'green-fg', 'calendar-event']:
+                            if cls in classes:
+                                child.remove_css_class(cls)
+                        
+                        if 'other-month' not in classes:
+                            try:
+                                day_val = int(child.get_text())
+                                if day_val in event_map:
+                                    style = self.event_lookup(event_map[day_val][0])
+                                    child.add_css_class('calendar-event')
+                                    child.add_css_class(f"{style}-fg")
+                                    child.set_tooltip_text("\n".join(event_map[day_val]))
+                                else:
+                                    child.set_tooltip_text(None)
+                            except ValueError:
+                                pass
+                child = child.get_next_sibling()
 
     def widget_content(self):
-        """ Draw calendar """
-        widget = c.box('v', style='widget', spacing=20)
+        """ Create calendar widget popover content """
+        widget = c.box('v', style='widget', spacing=10)
+        widget.set_size_request(300, -1)
 
-        now = datetime.now()
+        heading = c.label(
+            "Calendar", style="heading", he=True, ha="fill")
+        heading.set_xalign(0.5)
+        widget.append(heading)
 
-        month_label = c.label(now.strftime('%B'), style='heading')
-        widget.append(month_label)
+        cal = Gtk.Calendar()
+        cal.add_css_class('view')
+        cal.set_size_request(-1, 230)
+        widget.append(cal)
 
-        cal_section = c.box('v')
+        # Add "Events" title
+        widget.append(c.label("Events", style="title", he=True, ha="start"))
 
-        # Create calendar box
-        row = c.box('h', spacing=10)
-        for dow in ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]:
-            dow_label = c.label(dow, style='day')
-            c.add_style(dow_label, 'dow')
-            row.append(dow_label)
-        cal_box = c.box('v')
-        cal_box.append(row)
+        # Scrollable event list
+        event_scroll = c.scroll(height=200, style='scroll')
+        event_list_box = c.box('v', spacing=10)
+        event_scroll.set_child(event_list_box)
+        widget.append(event_scroll)
 
-        last_month = self.cal_list(
-            *self.diff_month(now.year, now.month, -1), 'old')[-2:]
-        current_month = self.cal_list(now.year, now.month)
-        next_month = self.cal_list(
-            *self.diff_month(now.year, now.month, 1), 'old')[:2]
+        # Initial refresh
+        self.refresh_events(cal, event_list_box)
 
-        alert = None
-        try:
-            with open(
-                os.path.expanduser('~/.config/calendar-events.json'),
-                'r', encoding='utf-8'
-            ) as file:
-                events = json.loads(file.read())
-        except FileNotFoundError:
-            events = {}
-            alert = c.box('v', style='box')
-            alert.append(c.label(
-                'Set up events in ~/.config/calendar-events.json',
-                style='event-box', wrap=20))
-
-        self.style_events(last_month, current_month, next_month, events, now)
-
-        combined_calendar = self.combine_calendar(
-            last_month, current_month, next_month)
-
-        cal_box.append(self.draw_calendar(combined_calendar))
-        cal_section.append(cal_box)
-        widget.append(cal_section)
-
-        events_section = self.draw_events(now, events, combined_calendar)
-        if events_section:
-            widget.append(events_section)
-
-        if alert:
-            widget.append(alert)
+        # Connect signals for navigation
+        cal.connect('notify::month', lambda *_: self.refresh_events(
+            cal, event_list_box))
+        cal.connect('notify::year', lambda *_: self.refresh_events(
+            cal, event_list_box))
 
         return widget
 
@@ -250,7 +235,6 @@ class Clock(c.BaseModule):
 
     def update_ui(self, widget, data):
         """ Update clock UI """
-        # Check if widget has been cleaned up
         if widget.text is None:
             return
 
@@ -259,11 +243,11 @@ class Clock(c.BaseModule):
         widget.set_visible(True)
         if new != last:
             widget.set_label(new)
-        
-        # Redraw calendar on new day
+
+        # Check if we need to refresh calendar on new day
         current_day = data.get('day')
         last_day = getattr(widget, 'last_day', None)
-        
+
         if current_day != last_day:
             widget.set_widget(self.widget_content())
             widget.last_day = current_day
