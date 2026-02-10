@@ -196,7 +196,7 @@ class CPU(c.BaseModule):
 
                 color_idx = i % len(colors)
                 indicator = Gtk.Box()
-                indicator.set_size_request(4, 14)
+                indicator.set_size_request(6, 14)
                 indicator.set_valign(Gtk.Align.CENTER)
                 css = (f"box {{ background-color: "
                        f"rgb({int(colors[color_idx][0]*255)}, "
