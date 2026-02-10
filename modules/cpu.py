@@ -6,6 +6,7 @@ Author: thnikk
 import common as c
 import psutil
 import gi
+import colorsys
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
 
@@ -42,6 +43,16 @@ class CPU(c.BaseModule):
         self.history = []
         self.per_cpu_history = []
         self.max_history = config.get('history_length', 60)
+
+    def get_colors(self, count):
+        """Generate distinct colors for CPU cores"""
+        colors = []
+        for i in range(count):
+            hue = i / count
+            # Use fixed lightness and saturation for a consistent pastel look
+            rgb = colorsys.hls_to_rgb(hue, 0.75, 0.6)
+            colors.append(rgb)
+        return colors
 
     def toggle_compact(self, _btn, widget):
         """Toggle compact cores mode"""
@@ -100,11 +111,7 @@ class CPU(c.BaseModule):
         """Build the cores list or grid based on current mode"""
         compact = self.config.get('compact_cores', False)
         cpu_count = data.get('cpu_count', 0)
-        colors = [
-            (0.96, 0.56, 0.68), (0.97, 0.74, 0.59), (0.98, 0.89, 0.69),
-            (0.67, 0.91, 0.70), (0.54, 0.86, 0.92), (0.54, 0.71, 0.98),
-            (0.71, 0.73, 0.99), (0.80, 0.65, 0.97),
-        ]
+        colors = self.get_colors(cpu_count)
 
         if compact:
             # Compact grid mode using Gtk.Grid for perfect alignment
@@ -238,11 +245,8 @@ class CPU(c.BaseModule):
         total_top.append(total_val)
         total_row.append(total_top)
 
-        colors = [
-            (0.96, 0.56, 0.68), (0.97, 0.74, 0.59), (0.98, 0.89, 0.69),
-            (0.67, 0.91, 0.70), (0.54, 0.86, 0.92), (0.54, 0.71, 0.98),
-            (0.71, 0.73, 0.99), (0.80, 0.65, 0.97),
-        ]
+        cpu_count = data.get('cpu_count', 0)
+        colors = self.get_colors(cpu_count)
 
         multi_data = []
         if data.get('per_cpu_history'):
