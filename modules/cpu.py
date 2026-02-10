@@ -283,10 +283,9 @@ class CPU(c.BaseModule):
         total_row.append(total_top)
 
         # Info row above graph
-        info_row = c.box('h', spacing=0)
+        info_row = c.box('h', spacing=10)
         model_lbl = c.label(
-            data.get('model', 'Unknown CPU'))
-        model_lbl.set_ellipsize(c.Pango.EllipsizeMode.END)
+            data.get('model', 'Unknown CPU'), length=20)
         model_lbl.set_margin_start(10)
         model_lbl.set_margin_end(10)
         model_lbl.set_margin_top(10)
