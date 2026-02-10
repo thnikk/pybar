@@ -293,6 +293,9 @@ class SchemaWidgetBuilder:
                 'type': 'pillbar'
             }
 
+        if 'style' in params:
+            c.add_style(pillbar, params['style'])
+
         return pillbar
 
     @staticmethod
@@ -319,6 +322,9 @@ class SchemaWidgetBuilder:
                 'widget': graph,
                 'type': 'graph'
             }
+
+        if 'style' in params:
+            c.add_style(graph, params['style'])
 
         return graph
 
