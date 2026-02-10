@@ -154,7 +154,7 @@ class Debug(c.BaseModule):
         log_scroll.add_controller(scroll_controller)
 
         # Inspector button at the bottom
-        inspector_btn = c.button(label="Open Inspector", style="normal")
+        inspector_btn = c.button(label=" Open Inspector", style="normal")
         inspector_btn.connect('clicked', self.open_inspector)
         main_box.append(inspector_btn)
 
