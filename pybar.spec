@@ -17,6 +17,7 @@ a = Analysis(
         'pulsectl',
         'psutil',
         'transmission_rpc',
+        'colorsys',
     ],
     hookspath=[],
     hooksconfig={
