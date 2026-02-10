@@ -19,7 +19,7 @@ class SchemaWidgetBuilder:
     """
 
     @staticmethod
-    def build(schema, updateable_widgets=None):
+    def build(schema, updateable_widgets=None, graph_history=None):
         """
         Build a widget from a schema definition.
         Schema format:
@@ -62,7 +62,12 @@ class SchemaWidgetBuilder:
             None
         )
         if builder_method:
-            return builder_method(params, updateable_widgets)
+            # Pass graph_history for graph widgets
+            if widget_type == 'graph':
+                return builder_method(params, updateable_widgets,
+                                      graph_history)
+            else:
+                return builder_method(params, updateable_widgets)
 
         return None
 
@@ -98,7 +103,8 @@ class SchemaWidgetBuilder:
         # Add children
         children = params.get('children', [])
         for child_schema in children:
-            child = SchemaWidgetBuilder.build(child_schema, updateable_widgets)
+            child = SchemaWidgetBuilder.build(child_schema, updateable_widgets,
+                                              None)
             if child:
                 box.append(child)
 
@@ -243,7 +249,8 @@ class SchemaWidgetBuilder:
         # Add child if present
         children = params.get('children', [])
         if children:
-            child = SchemaWidgetBuilder.build(children[0], updateable_widgets)
+            child = SchemaWidgetBuilder.build(children[0], updateable_widgets,
+                                              None)
             if child:
                 window.set_child(child)
 
@@ -299,7 +306,7 @@ class SchemaWidgetBuilder:
         return pillbar
 
     @staticmethod
-    def _build_graph(params, updateable_widgets=None):
+    def _build_graph(params, updateable_widgets=None, graph_history=None):
         """ Build a graph widget """
         data = params.get('data', [])
         height = params.get('height', 120)
@@ -322,6 +329,9 @@ class SchemaWidgetBuilder:
                 'widget': graph,
                 'type': 'graph'
             }
+            # Initialize graph history with initial data
+            if graph_history is not None and data:
+                graph_history[widget_id] = list(data)
 
         if 'style' in params:
             c.add_style(graph, params['style'])
@@ -487,6 +497,9 @@ class CustomModule(c.BaseModule):
                 # Include widget schema if present
                 if 'widget' in data:
                     result['widget'] = data['widget']
+                # Include widget updates if present
+                if 'widget_updates' in data:
+                    result['widget_updates'] = data['widget_updates']
                 return result
             else:
                 # Plain text output
@@ -560,6 +573,7 @@ class CustomModule(c.BaseModule):
         self._widget_schema = None
         self._widget_schema_hash = None
         self._updateable_widgets = {}
+        self._graph_history = {}  # Track graph data history
 
         def update_callback(data):
             widget = widget_ref()
@@ -631,6 +645,7 @@ class CustomModule(c.BaseModule):
     def _update_widget_values(self, updates):
         """
         Update widget values without rebuilding.
+        For graphs, accumulates history automatically.
         """
         for widget_id, new_value in updates.items():
             if widget_id in self._updateable_widgets:
@@ -650,7 +665,27 @@ class CustomModule(c.BaseModule):
                     elif widget_type == 'pillbar':
                         widget_obj.update(new_value)
                     elif widget_type == 'graph':
-                        widget_obj.update_data(new_value, None)
+                        # Handle graph updates with history tracking
+                        if isinstance(new_value, list):
+                            # Full array provided - use as is
+                            widget_obj.update_data(new_value, None)
+                            self._graph_history[widget_id] = new_value
+                        else:
+                            # Single value - append to history
+                            if widget_id not in self._graph_history:
+                                self._graph_history[widget_id] = []
+                            
+                            self._graph_history[widget_id].append(
+                                float(new_value)
+                            )
+                            # Keep last 50 points
+                            self._graph_history[widget_id] = \
+                                self._graph_history[widget_id][-50:]
+                            
+                            widget_obj.update_data(
+                                self._graph_history[widget_id],
+                                None
+                            )
                 except Exception as e:
                     c.print_debug(
                         f"Custom module {self.name}: failed to update "
@@ -701,7 +736,8 @@ class CustomModule(c.BaseModule):
                 for child_schema in children:
                     child = SchemaWidgetBuilder.build(
                         child_schema,
-                        self._updateable_widgets
+                        self._updateable_widgets,
+                        self._graph_history
                     )
                     if child:
                         popover_widget.box.append(child)
