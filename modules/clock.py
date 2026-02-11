@@ -101,11 +101,12 @@ class Clock(c.BaseModule):
             month_events.sort()
             events_container = c.box('v', style='box')
             events_container.set_overflow(Gtk.Overflow.HIDDEN)
-            
+
             # Horizontal size group for date blocks
             # Attach to container to prevent garbage collection
-            events_container.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
-            
+            events_container.size_group = Gtk.SizeGroup(
+                mode=Gtk.SizeGroupMode.HORIZONTAL)
+
             def get_ordinal(n):
                 if 11 <= n <= 13:
                     return 'th'
@@ -114,31 +115,34 @@ class Clock(c.BaseModule):
             for i, (day, event) in enumerate(month_events):
                 row = c.box('h')
                 color_style = self.event_lookup(event)
-                
+
                 # Date Block - Fixed width based on SizeGroup
                 date_box = c.box('h', style=color_style)
                 date_box.get_style_context().add_class('event-date-box')
                 date_box.set_valign(Gtk.Align.FILL)
                 date_box.set_hexpand(False)
                 events_container.size_group.add_widget(date_box)
-                
+
                 # Internal centering for date/ordinal
                 date_content = c.box('h')
                 date_content.set_halign(Gtk.Align.CENTER)
                 date_content.set_hexpand(True)
                 date_content.append(c.label(day, style='event-day-number'))
-                date_content.append(c.label(get_ordinal(day), style='event-day-ordinal', va='start'))
+                date_content.append(
+                    c.label(get_ordinal(day),
+                            style='event-day-ordinal', va='start'))
                 date_box.append(date_content)
-                
+
                 row.append(date_box)
                 row.append(c.sep('v'))
 
                 # Event description - Takes up all remaining space
-                desc_label = c.label(event, style='inner-box', wrap=25, ha='start')
+                desc_label = c.label(
+                    event, style='inner-box', wrap=25, ha='start')
                 desc_label.set_hexpand(True)
                 desc_label.set_halign(Gtk.Align.START)
                 row.append(desc_label)
-                
+
                 events_container.append(row)
                 if i < len(month_events) - 1:
                     events_container.append(c.sep('h'))
@@ -168,18 +172,22 @@ class Clock(c.BaseModule):
                 if isinstance(child, Gtk.Label):
                     classes = child.get_css_classes()
                     if 'day-number' in classes:
-                        for cls in ['blue', 'orange', 'green', 'blue-fg', 'orange-fg', 'green-fg', 'calendar-event']:
+                        for cls in [
+                                'blue', 'orange', 'green', 'blue-fg',
+                                'orange-fg', 'green-fg', 'calendar-event']:
                             if cls in classes:
                                 child.remove_css_class(cls)
-                        
+
                         if 'other-month' not in classes:
                             try:
                                 day_val = int(child.get_text())
                                 if day_val in event_map:
-                                    style = self.event_lookup(event_map[day_val][0])
+                                    style = self.event_lookup(
+                                        event_map[day_val][0])
                                     child.add_css_class('calendar-event')
                                     child.add_css_class(f"{style}-fg")
-                                    child.set_tooltip_text("\n".join(event_map[day_val]))
+                                    child.set_tooltip_text(
+                                        "\n".join(event_map[day_val]))
                                 else:
                                     child.set_tooltip_text(None)
                             except ValueError:

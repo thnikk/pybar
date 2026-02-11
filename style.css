@@ -484,23 +484,31 @@ calendar.view {
 	border: none;
 	background: none;
 }
+calendar.view header { border-bottom: none; }
 
 calendar.view button { border: 1px solid transparent; }
 calendar.view button:hover {
 	background: rgba(255,255,255,0.1);
 	border: solid 1px rgba(255,255,255,0.1);
 	border-radius: 10px;
-	cursor: pointer;
+}
+calendar.view label:selected {
+	background: transparent;
 }
 
 .day-name {
 	color: @blue;
 }
 
+.day-number {
+	border-radius: 5px;
+}
+
 /* Enhanced calendar event visibility */
 .day-number.calendar-event {
     font-weight: bold;
     text-decoration: underline;
+    background: transparent;
 }
 
 .day-number.today.calendar-event {
