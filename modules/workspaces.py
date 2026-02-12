@@ -251,8 +251,23 @@ class Workspaces(c.BaseModule):
 
             if highlight_visible and name in visible:
                 c.add_style(wrapper, 'visible')
+                # Check adjacency for rounded corners
+                prev_visible = str(n) in visible
+                next_visible = str(n + 2) in visible
+                
+                if prev_visible:
+                    c.del_style(wrapper, 'rounded-left')
+                else:
+                    c.add_style(wrapper, 'rounded-left')
+                
+                if next_visible:
+                    c.del_style(wrapper, 'rounded-right')
+                else:
+                    c.add_style(wrapper, 'rounded-right')
             else:
                 c.del_style(wrapper, 'visible')
+                c.del_style(wrapper, 'rounded-left')
+                c.del_style(wrapper, 'rounded-right')
 
 
 module_map = {

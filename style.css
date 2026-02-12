@@ -75,6 +75,18 @@ window {
 	background: alpha(@white, 0.15);
 }
 
+.workspace-wrapper.rounded-left {
+	border-radius: 5px 0 0 5px;
+}
+
+.workspace-wrapper.rounded-right {
+	border-radius: 0 5px 5px 0;
+}
+
+.workspace-wrapper.rounded-left.rounded-right {
+	border-radius: 5px;
+}
+
 .workspace {
 	padding: 0px 5px;
 	background: transparent;
