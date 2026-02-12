@@ -265,7 +265,7 @@ class CPU(c.BaseModule):
     def build_popover(self, widget, data):
         """Build popover for CPU"""
         widget.popover_widgets = {}
-        main_box = c.box('v', spacing=20, style='small-widget')
+        main_box = c.box('v', spacing=20)
         main_box.append(c.label('CPU', style='heading'))
 
         usage_section = c.box('v', spacing=10)
@@ -283,52 +283,51 @@ class CPU(c.BaseModule):
         total_row.append(total_top)
 
         # Info row above graph
-        info_row = c.box('h', spacing=10)
+        info_row = c.box('h', spacing=0)
+
+        # Model section
+        model_sec = c.box('h', spacing=10, style='box-item')
+        model_icon = c.label('')
+        model_sec.append(model_icon)
+
         model_lbl = c.label(
             data.get('model', 'Unknown CPU'), length=20)
-        model_lbl.set_margin_start(10)
-        model_lbl.set_margin_end(10)
-        model_lbl.set_margin_top(10)
-        model_lbl.set_margin_bottom(10)
+        model_sec.append(model_lbl)
+
+        # Temp section
+        temp_sec = c.box('h', spacing=10, style='box-item')
+        temp_icon = c.label('')
+        temp_sec.append(temp_icon)
 
         temp_lbl = c.label("--°C", ha='center')
         temp_lbl.set_width_chars(6)
-        temp_lbl.set_margin_start(10)
-        temp_lbl.set_margin_end(10)
-        temp_lbl.set_margin_top(10)
-        temp_lbl.set_margin_bottom(10)
+        temp_sec.append(temp_lbl)
+
+        # Speed section
+        speed_sec = c.box('h', spacing=10, style='box-item')
+        speed_icon = c.label('')
+        speed_sec.append(speed_icon)
 
         speed_lbl = c.label("-- MHz", ha='center')
         speed_lbl.set_width_chars(8)
-        speed_lbl.set_margin_start(10)
-        speed_lbl.set_margin_end(10)
-        speed_lbl.set_margin_top(10)
-        speed_lbl.set_margin_bottom(10)
+        speed_sec.append(speed_lbl)
 
-        model_icon = c.label('')
-        model_icon.set_margin_start(10)
-        info_row.append(model_icon)
-        info_row.append(model_lbl)
+        # Build info row
+        info_row.append(model_sec)
 
         vsep1 = c.sep('v')
         vsep1.set_vexpand(True)
         vsep1.set_valign(Gtk.Align.FILL)
         info_row.append(vsep1)
 
-        temp_icon = c.label('')
-        temp_icon.set_margin_start(10)
-        info_row.append(temp_icon)
-        info_row.append(temp_lbl)
+        info_row.append(temp_sec)
 
         vsep2 = c.sep('v')
         vsep2.set_vexpand(True)
         vsep2.set_valign(Gtk.Align.FILL)
         info_row.append(vsep2)
 
-        speed_icon = c.label('')
-        speed_icon.set_margin_start(10)
-        info_row.append(speed_icon)
-        info_row.append(speed_lbl)
+        info_row.append(speed_sec)
 
         usage_box.append(info_row)
         usage_box.append(c.sep('h'))
@@ -350,7 +349,7 @@ class CPU(c.BaseModule):
             state=round(data['total']),
             unit='%',
             height=180,
-            width=400,
+            width=300,
             smooth=False,
             min_config=0,
             max_config=100,
