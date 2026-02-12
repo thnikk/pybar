@@ -76,14 +76,14 @@ window {
 	min-width: 20px;
 }
 
+.workspace.visible:not(.focused) {
+	background: alpha(@white, 0.15);
+	color: @white;
+}
+
 .focused {
 	background: @white;
 	color: @black;
-}
-
-.workspace.visible {
-	background: alpha(@white, 0.15);
-	color: @white;
 }
 
 .indicator.monitor-1 { background: @green; }
