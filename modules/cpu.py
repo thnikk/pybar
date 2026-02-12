@@ -403,6 +403,8 @@ class CPU(c.BaseModule):
     def update_ui(self, widget, data):
         if not data:
             return
+        if not widget.text:
+            return
         percentage = data.get('text', '')
         widget.set_label(f"{percentage}%")
         widget.text.set_width_chars(4)
