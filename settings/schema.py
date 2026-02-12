@@ -55,6 +55,15 @@ GLOBAL_SCHEMA = {
         'label': 'Exclusive Popovers',
         'description': 'Only allow one popover open at a time'
     },
+    'popover-hide-on-workspace-change': {
+        'type': FieldType.BOOLEAN,
+        'default': True,
+        'label': 'Hide Popovers on Workspace Change',
+        'description': (
+            'Automatically hide popovers when the workspace they opened '
+            'on is no longer visible on any monitor'
+        )
+    },
     'namespace': {
         'type': FieldType.STRING,
         'default': 'pybar',

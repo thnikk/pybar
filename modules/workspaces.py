@@ -36,6 +36,14 @@ class Workspaces(c.BaseModule):
             'label': 'Colorize by Monitor',
             'description': (
                 'Color workspaces based on which monitor they are on')
+        },
+        'highlight_visible': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Highlight Visible Workspaces',
+            'description': (
+                'Apply different styling to workspaces currently '
+                'visible on any monitor')
         }
     }
 
@@ -65,10 +73,17 @@ class Workspaces(c.BaseModule):
                 monitor_map = {
                     w['name']: str(monitors.index(w['output']) + 1)
                     for w in raw}
+                # Track visible workspaces across all monitors
+                visible = [
+                    workspace['name'] for workspace in raw
+                    if workspace.get('visible', False)
+                ]
                 return {
                     'workspaces': workspaces,
                     'focused': focused,
-                    'monitors': monitor_map}
+                    'monitors': monitor_map,
+                    'visible': visible
+                }
             except Exception:
                 return None
         else:
@@ -87,10 +102,21 @@ class Workspaces(c.BaseModule):
                 monitor_map = {
                     w['name']: str(monitors.index(w['monitor']) + 1)
                     for w in raw}
+                # Get active workspaces per monitor
+                monitors_data = json.loads(run(
+                    ['hyprctl', '-j', 'monitors'],
+                    check=True, capture_output=True
+                ).stdout.decode('utf-8'))
+                visible = [
+                    str(m['activeWorkspace']['id'])
+                    for m in monitors_data
+                ]
                 return {
                     "workspaces": workspaces,
                     "focused": focused,
-                    "monitors": monitor_map}
+                    "monitors": monitor_map,
+                    "visible": visible
+                }
             except Exception:
                 return None
 
@@ -179,7 +205,7 @@ class Workspaces(c.BaseModule):
             for sub in box._subscriptions:
                 c.state_manager.unsubscribe(sub)
             box._subscriptions.clear()
-        
+
         box.cleanup = cleanup
         return box
 
@@ -188,7 +214,9 @@ class Workspaces(c.BaseModule):
         workspaces = data.get('workspaces', [])
         focused = data.get('focused')
         monitor_map = data.get('monitors', {})
+        visible = data.get('visible', [])
         colorize = self.config.get('colorize_by_monitor', False)
+        highlight_visible = self.config.get('highlight_visible', False)
 
         for n, (button, indicator) in enumerate(
                 zip(widget.buttons, widget.indicators)):
@@ -211,6 +239,11 @@ class Workspaces(c.BaseModule):
                 c.add_style(button, 'focused')
             else:
                 c.del_style(button, 'focused')
+
+            if highlight_visible and name in visible:
+                c.add_style(button, 'visible')
+            else:
+                c.del_style(button, 'visible')
 
 
 module_map = {

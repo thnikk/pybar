@@ -81,6 +81,11 @@ window {
 	color: @black;
 }
 
+.workspace.visible {
+	background: alpha(@white, 0.15);
+	color: @white;
+}
+
 .indicator.monitor-1 { background: @green; }
 .indicator.monitor-2 { background: @blue; }
 .indicator.monitor-3 { background: @red; }

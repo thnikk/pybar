@@ -224,9 +224,8 @@ class Graph(Gtk.DrawingArea):
         # Draw the spline
         first_segment = True
         for i in range(len(extended_points) - 3):
-            p0, p1, p2, p3 = extended_points[i], extended_points[i +
-                                                                 1], extended_points[i+2], extended_points[i+3]
-
+            p0, p1, p2, p3 = extended_points[i], extended_points[
+                i+1], extended_points[i+2], extended_points[i+3]
             for j in range(n_points_per_segment):
                 t = j / (n_points_per_segment -
                          1) if n_points_per_segment > 1 else 0
@@ -485,6 +484,7 @@ class Graph(Gtk.DrawingArea):
 
 class PillBar(Gtk.DrawingArea):
     """ Custom drawing area for a stacked bar breakdown """
+
     def __init__(self, height=12, radius=6, wrap_width=None, hover_delay=0):
         super().__init__()
         self.set_content_height(height)
@@ -605,7 +605,9 @@ class StateManager:
         self.subscribers[name][sub_id] = callback
         if name in self.data:
             GLib.idle_add(callback, self.data[name])
-        print_debug(f"Subscribe: {name} -> ID:{sub_id} (total: {len(self.subscribers[name])})")
+        print_debug(
+            f"Subscribe: {name} -> ID:{sub_id} "
+            f"(total: {len(self.subscribers[name])})")
         return sub_id
 
     def unsubscribe(self, sub_id):
@@ -708,10 +710,12 @@ class BaseModule:
             try:
                 new_data = self.fetch_data()
                 if new_data is not None:
-                    if new_data == {} and self.last_data and self.empty_is_error:
+                    if new_data == {} and self.last_data\
+                            and self.empty_is_error:
                         data = self.last_data.copy()
                         if 'timestamp' in self.last_data:
-                            cache_age = time.time() - self.last_data['timestamp']
+                            cache_age = time.time() - \
+                                self.last_data['timestamp']
                             if cache_age > self.interval * 2:
                                 data['stale'] = True
                         else:
@@ -731,8 +735,8 @@ class BaseModule:
                                     json.dump(data, f)
                             except Exception as e:
                                 print_debug(
-                                    f"Failed to save cache for {self.name}: {e}",
-                                    color='red')
+                                    f"Failed to save cache for "
+                                    f"{self.name}: {e}", color='red')
                 else:
                     if self.last_data:
                         data = self.last_data.copy()
@@ -764,18 +768,18 @@ class BaseModule:
     def create_widget(self, bar):
         """Create the GTK widget for the bar"""
         import weakref
-        
+
         m = Module()
         m.set_position(bar.position)
-        
+
         # Use weak reference to widget to break circular reference
         widget_ref = weakref.ref(m)
-        
+
         def update_callback(data):
             widget = widget_ref()
             if widget is not None:
                 self.update_ui(widget, data)
-        
+
         sub_id = state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
         m._update_callback = update_callback
@@ -921,7 +925,7 @@ class Module(Gtk.MenuButton):
         self.box = None
         self.con = None
         self.indicator = None
-        
+
         # Clear callback reference to break closure
         if hasattr(self, '_update_callback'):
             self._update_callback = None
@@ -1150,6 +1154,10 @@ class Widget(Gtk.Popover):
         self.connect("unmap", self._on_unmap)
         self._destroyed = False
 
+        # Workspace tracking for auto-hide
+        self._workspace_subscription = None
+        self._opened_on_workspace = None
+
     def destroy(self):
         """Ensure proper cleanup of widget resources"""
         if self._destroyed:
@@ -1158,6 +1166,11 @@ class Widget(Gtk.Popover):
 
         # Popdown first to ensure it's not visible
         self.popdown()
+
+        # Unsubscribe from workspace changes
+        if self._workspace_subscription:
+            state_manager.unsubscribe(self._workspace_subscription)
+            self._workspace_subscription = None
 
         # Disconnect all signals first to break reference cycles
         try:
@@ -1198,10 +1211,43 @@ class Widget(Gtk.Popover):
                 active.popdown()
             state_manager.update('active_popover', self)
 
+        # Track workspace and subscribe to workspace visibility changes
+        if config.get('popover-hide-on-workspace-change', True):
+            workspace_data = state_manager.get('workspaces')
+            if workspace_data:
+                # Store the workspace we opened on
+                self._opened_on_workspace = workspace_data.get('focused')
+
+            # Subscribe to workspace changes if not already subscribed
+            if not self._workspace_subscription:
+                self._workspace_subscription = state_manager.subscribe(
+                    'workspaces', self._on_workspace_change
+                )
+
     def _on_unmap(self, _):
         """ Clear active popover if it's us """
         if state_manager.get('active_popover') == self:
             state_manager.update('active_popover', None)
+
+        # Unsubscribe from workspace changes when hidden
+        if self._workspace_subscription:
+            state_manager.unsubscribe(self._workspace_subscription)
+            self._workspace_subscription = None
+        self._opened_on_workspace = None
+
+    def _on_workspace_change(self, data):
+        """
+        Called when workspace visibility changes.
+        Hide popover if the workspace it opened on is no longer visible.
+        """
+        if not data or self._destroyed:
+            return
+
+        visible_workspaces = data.get('visible', [])
+        if (self._opened_on_workspace is not None and
+                self._opened_on_workspace not in visible_workspaces):
+            # Our workspace is no longer visible on any monitor
+            GLib.idle_add(self.popdown)
 
     def heading(self, string):
         self.box.append(label(string))
@@ -1213,6 +1259,7 @@ class Widget(Gtk.Popover):
 
 class HoverPopover(Gtk.Popover):
     """ Lightweight immediate tooltip alternative """
+
     def __init__(self, parent, wrap_width=None):
         super().__init__()
         self.set_parent(parent)
@@ -1244,7 +1291,8 @@ class HoverPopover(Gtk.Popover):
         if self.get_visible() and self.label.get_text() == text:
             # Update position immediately if already showing same text
             rect = Gdk.Rectangle()
-            rect.x, rect.y, rect.width, rect.height = int(x), int(y - offset), 1, 1
+            rect.x, rect.y, rect.width, rect.height = int(
+                x), int(y - offset), 1, 1
             self.set_pointing_to(rect)
             return
 
@@ -1264,7 +1312,8 @@ class HoverPopover(Gtk.Popover):
             px, py, poff = self._pending_coords
             self.label.set_text(self._pending_text)
             rect = Gdk.Rectangle()
-            rect.x, rect.y, rect.width, rect.height = int(px), int(py - poff), 1, 1
+            rect.x, rect.y, rect.width, rect.height = int(
+                px), int(py - poff), 1, 1
             self.set_pointing_to(rect)
             self.popup()
             self._timeout_id = None
