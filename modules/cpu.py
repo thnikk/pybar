@@ -35,6 +35,12 @@ class CPU(c.BaseModule):
             'default': False,
             'label': 'Compact Cores',
             'description': 'Show cores in a compact grid',
+        },
+        'combined_graph': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Combined Graph',
+            'description': 'Show combined usage on graph instead of per-core',
         }
     }
 
@@ -84,6 +90,20 @@ class CPU(c.BaseModule):
             rgb = colorsys.hls_to_rgb(hue, 0.75, 0.6)
             colors.append(rgb)
         return colors
+
+    def toggle_graph(self, _btn, widget):
+        """Toggle combined graph mode"""
+        combined = not self.config.get('combined_graph', False)
+        self.config['combined_graph'] = combined
+
+        # Update toggle button icon
+        if hasattr(widget, 'graph_toggle_btn'):
+            widget.graph_toggle_btn.set_label('' if combined else '')
+
+        # Update UI with current data
+        data = c.state_manager.get(self.name)
+        if data:
+            self.update_ui(widget, data)
 
     def toggle_compact(self, _btn, widget):
         """Toggle compact cores mode"""
@@ -269,8 +289,17 @@ class CPU(c.BaseModule):
         main_box.append(c.label('CPU', style='heading'))
 
         usage_section = c.box('v', spacing=10)
-        usage_section.append(
-            c.label('Usage', style='title', ha='start'))
+        usage_header = c.box('h')
+        usage_header.append(
+            c.label('Usage', style='title', ha='start', he=True))
+
+        combined = self.config.get('combined_graph', False)
+        graph_toggle_btn = c.button('' if combined else '', style='minimal')
+        graph_toggle_btn.set_tooltip_text("Toggle combined/per-core graph")
+        graph_toggle_btn.connect('clicked', self.toggle_graph, widget)
+        widget.graph_toggle_btn = graph_toggle_btn
+        usage_header.append(graph_toggle_btn)
+        usage_section.append(usage_header)
 
         usage_box = c.box('v', style='box')
 
@@ -336,16 +365,22 @@ class CPU(c.BaseModule):
         widget.popover_widgets['speed_lbl'] = speed_lbl
 
         cpu_count = data.get('cpu_count', 0)
-        colors = self.get_colors(cpu_count)
+        combined = self.config.get('combined_graph', False)
 
-        multi_data = []
-        if data.get('per_cpu_history'):
-            for cpu_hist in data['per_cpu_history']:
-                if cpu_hist:
-                    multi_data.append(cpu_hist)
+        graph_data = []
+        if combined:
+            if data.get('history'):
+                graph_data = [data['history']]
+            colors = [(0.3, 0.6, 0.9)]  # Nice blue for combined
+        else:
+            colors = self.get_colors(cpu_count)
+            if data.get('per_cpu_history'):
+                for cpu_hist in data['per_cpu_history']:
+                    if cpu_hist:
+                        graph_data.append(cpu_hist)
 
         graph = c.Graph(
-            data=multi_data if multi_data else [[0]],
+            data=graph_data if graph_data else [[0]],
             state=round(data['total']),
             unit='%',
             height=180,
@@ -443,14 +478,24 @@ class CPU(c.BaseModule):
                     pw['speed_lbl'].set_text("-- MHz")
 
             if 'graph' in pw:
-                multi_data = []
-                if data.get('per_cpu_history'):
-                    for cpu_hist in data['per_cpu_history']:
-                        if cpu_hist:
-                            multi_data.append(cpu_hist)
+                combined = self.config.get('combined_graph', False)
+                graph_data = []
+
+                if combined:
+                    if data.get('history'):
+                        graph_data = [data['history']]
+                    pw['graph'].colors = [(0.3, 0.6, 0.9)]
+                else:
+                    if data.get('per_cpu_history'):
+                        for cpu_hist in data['per_cpu_history']:
+                            if cpu_hist:
+                                graph_data.append(cpu_hist)
+                    # Update colors just in case
+                    cpu_count = data.get('cpu_count', 0)
+                    pw['graph'].colors = self.get_colors(cpu_count)
 
                 pw['graph'].update_data(
-                    multi_data if multi_data else [[0]],
+                    graph_data if graph_data else [[0]],
                     round(data['total']))
 
             per_cpu = data.get('per_cpu', [])
