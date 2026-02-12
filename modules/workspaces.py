@@ -168,6 +168,7 @@ class Workspaces(c.BaseModule):
         box.set_halign(Gtk.Align.CENTER)
         box.buttons = []
         box.indicators = []
+        box.wrappers = []
 
         for n in range(1, 11):
             label = self.config.get('icons', {}).get(
@@ -177,12 +178,19 @@ class Workspaces(c.BaseModule):
             if (label != str(n) and
                     self.config.get('always_show_number', False)):
                 label = f"{n} {label}"
+
+            # Wrapper box for visible background
+            wrapper = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            wrapper.get_style_context().add_class('workspace-wrapper')
+            wrapper.set_visible(False)
+            box.wrappers.append(wrapper)
+            box.append(wrapper)
+
             button = c.button(label=None, style='workspace')
-            button.set_visible(False)
             button.connect(
                 'clicked', lambda _b, wn=n: self.switch_workspace(wn))
             box.buttons.append(button)
-            box.append(button)
+            wrapper.append(button)
 
             overlay = Gtk.Overlay()
             button.set_child(overlay)
@@ -219,13 +227,13 @@ class Workspaces(c.BaseModule):
         colorize = self.config.get('colorize_by_monitor', False)
         highlight_visible = self.config.get('highlight_visible', False)
 
-        for n, (button, indicator) in enumerate(
-                zip(widget.buttons, widget.indicators)):
+        for n, (wrapper, button, indicator) in enumerate(
+                zip(widget.wrappers, widget.buttons, widget.indicators)):
             name = str(n + 1)
             if name in workspaces:
-                button.set_visible(True)
+                wrapper.set_visible(True)
             else:
-                button.set_visible(False)
+                wrapper.set_visible(False)
 
             for m in range(1, 11):
                 c.del_style(indicator, f'monitor-{m}')
@@ -242,9 +250,9 @@ class Workspaces(c.BaseModule):
                 c.del_style(button, 'focused')
 
             if highlight_visible and name in visible:
-                c.add_style(button, 'visible')
+                c.add_style(wrapper, 'visible')
             else:
-                c.del_style(button, 'visible')
+                c.del_style(wrapper, 'visible')
 
 
 module_map = {

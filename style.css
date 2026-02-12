@@ -67,6 +67,14 @@ window {
 	border-radius: 5px;
 }
 
+.workspace-wrapper {
+	background: transparent;
+}
+
+.workspace-wrapper.visible {
+	background: alpha(@white, 0.15);
+}
+
 .workspace {
 	padding: 0px 5px;
 	background: transparent;
@@ -76,13 +84,7 @@ window {
 	min-width: 20px;
 }
 
-.workspace.visible:not(.focused) {
-	background: alpha(@white, 0.15);
-	color: @white;
-	border-radius: 0px;
-}
-
-.focused {
+.workspace.focused {
 	background: @white;
 	color: @black;
 }
