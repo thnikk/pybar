@@ -164,6 +164,7 @@ class Workspaces(c.BaseModule):
     def create_widget(self, bar):
         """ Create workspaces widget """
         box = c.box('h', style='workspaces')
+        box.set_overflow(Gtk.Overflow.HIDDEN)
         box.set_halign(Gtk.Align.CENTER)
         box.buttons = []
         box.indicators = []

@@ -79,6 +79,7 @@ window {
 .workspace.visible:not(.focused) {
 	background: alpha(@white, 0.15);
 	color: @white;
+	border-radius: 0px;
 }
 
 .focused {
