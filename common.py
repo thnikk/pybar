@@ -91,7 +91,7 @@ class Graph(Gtk.DrawingArea):
 
     def __init__(
             self, data, state=None, unit=None, min_config=None,
-            max_config=None, height=120, width=300, smooth=True,
+            max_config=None, height=120, width=300, smooth=False,
             time_markers=None, time_labels=None, hover_labels=None,
             colors=None, secondary_data=None):
         super().__init__()
@@ -406,7 +406,7 @@ class Graph(Gtk.DrawingArea):
         cr.show_text(f"{min_val:.1f}")
 
         # Current value overlay
-        if self.state:
+        if self.state is not None:
             text = f"{self.state}{self.unit}"
             cr.set_font_size(24)
             extents = cr.text_extents(text)
