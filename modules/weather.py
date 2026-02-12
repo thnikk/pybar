@@ -21,7 +21,8 @@ class Weather(c.BaseModule):
             'type': 'string',
             'default': '94102',
             'label': 'ZIP Code / City',
-            'description': 'Location for weather lookup (ZIP code or city name)'
+            'description':
+                'Location for weather lookup (ZIP code or city name)'
         },
         'night_icons': {
             'type': 'boolean',
@@ -262,27 +263,28 @@ class Weather(c.BaseModule):
         widget_obj.popover_widgets['today']['temp'] = temp
 
         extra = c.box('h', spacing=10)
-        
+
         hum_lbl = c.label(f" {today['humidity']}%")
         extra.append(hum_lbl)
         widget_obj.popover_widgets['today']['hum'] = hum_lbl
-        
+
         wind_lbl = c.label(f" {today['wind']}mph")
         extra.append(wind_lbl)
         widget_obj.popover_widgets['today']['wind'] = wind_lbl
-        
+
         today_left.append(extra)
 
         today_right = c.box('v')
-        
+
         desc_lbl = c.label(today['description'], he=True, ha="end")
         today_right.append(desc_lbl)
         widget_obj.popover_widgets['today']['desc'] = desc_lbl
-        
-        feels_lbl = c.label(f"Feels like {today['feels_like']}°", he=True, ha="end")
+
+        feels_lbl = c.label(
+            f"Feels like {today['feels_like']}°", he=True, ha="end")
         today_right.append(feels_lbl)
         widget_obj.popover_widgets['today']['feels'] = feels_lbl
-        
+
         aqi_lbl = c.label(f"{today['quality']} air quality", he=True, ha="end")
         today_right.append(aqi_lbl)
         widget_obj.popover_widgets['today']['aqi'] = aqi_lbl
@@ -293,7 +295,7 @@ class Weather(c.BaseModule):
         sun_lbl = c.label(f'{today["sun_icon"]} {today["sun_time"]}')
         sun_box.append(sun_lbl)
         widget_obj.popover_widgets['today']['sun'] = sun_lbl
-        
+
         today_box.append(sun_box)
 
         today_box.append(today_right)
@@ -376,6 +378,7 @@ class Weather(c.BaseModule):
                 time_markers=time_markers,
                 time_labels=time_labels,
                 hover_labels=hover_labels,
+                smooth=True,
                 secondary_data=data['Hourly']['humidities']
             )
             graph_box.append(graph)
@@ -385,7 +388,8 @@ class Weather(c.BaseModule):
             # Time legend for forecast
             time_box = c.box('h')
             time_box.append(c.label('Now', style='gray', ha='start', he=True))
-            hours_lbl = c.label(f"+{data['Hourly'].get('hours', 5)}h", style='gray', ha='end')
+            hours_lbl = c.label(
+                f"+{data['Hourly'].get('hours', 5)}h", style='gray', ha='end')
             time_box.append(hours_lbl)
             hourly_container.append(time_box)
 
@@ -408,29 +412,29 @@ class Weather(c.BaseModule):
         for hour in data['Hourly']['info']:
             hour_box = c.box('v', style='inner-box-wide')
             hour_group.add_widget(hour_box)
-            
+
             h_widgets = {}
             t_lbl = c.label(f"{hour['temperature']}°")
             hour_box.append(t_lbl)
             h_widgets['temp'] = t_lbl
-            
+
             h_lbl = c.label(f"{hour['humidity']}%")
             hour_box.append(h_lbl)
             h_widgets['hum'] = h_lbl
-            
+
             icon = c.label(hour['icon'], style='icon-small')
-            icon.props.tooltip_text = hour['description']
+            c.set_hover_popover(icon, hour['description'])
             hour_box.append(icon)
             h_widgets['icon'] = icon
-            
+
             time_lbl = c.label(hour['time'])
             hour_box.append(time_lbl)
             h_widgets['time'] = time_lbl
-            
+
             hourly_box.append(hour_box)
             if hour != data['Hourly']['info'][-1]:
                 hourly_box.append(c.sep('v'))
-                
+
             widget_obj.popover_widgets['hourly'].append(h_widgets)
 
         hourly_scroll.set_child(hourly_box)
@@ -441,29 +445,29 @@ class Weather(c.BaseModule):
         daily_container.append(c.label(
             'Daily forecast', style='title', ha='start'))
         daily_box = c.box('v', style='box')
-        
+
         for day in data['Daily']['info']:
             day_box = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
             day_box.get_style_context().add_class('inner-box')
-            
+
             d_widgets = {}
             time_lbl = c.label(day['time'])
             day_box.set_start_widget(time_lbl)
             d_widgets['time'] = time_lbl
-            
+
             hl_lbl = c.label(f"{day['high']}° / {day['low']}°")
             day_box.set_end_widget(hl_lbl)
             d_widgets['hl'] = hl_lbl
-            
+
             icon = c.label(day['icon'])
-            icon.props.tooltip_text = day['description']
+            c.set_hover_popover(icon, day['description'])
             day_box.set_center_widget(icon)
             d_widgets['icon'] = icon
 
             daily_box.append(day_box)
             if day != data['Daily']['info'][-1]:
                 daily_box.append(c.sep('h'))
-                
+
             widget_obj.popover_widgets['daily'].append(d_widgets)
 
         daily_container.append(daily_box)
@@ -493,7 +497,7 @@ class Weather(c.BaseModule):
         compare_data = data.copy()
         # Weather data doesn't have a timestamp field usually, but just in case
         compare_data.pop('timestamp', None)
-        
+
         if (widget.get_popover() and
                 getattr(widget, 'last_popover_data', None) == compare_data):
             return
@@ -503,11 +507,13 @@ class Weather(c.BaseModule):
         needs_rebuild = False
         if not widget.get_popover() or not hasattr(widget, 'popover_widgets'):
             needs_rebuild = True
-        elif len(widget.popover_widgets['hourly']) != len(data['Hourly']['info']):
+        elif len(widget.popover_widgets['hourly']) !=\
+                len(data['Hourly']['info']):
             needs_rebuild = True
-        elif len(widget.popover_widgets['daily']) != len(data['Daily']['info']):
+        elif len(widget.popover_widgets['daily']) !=\
+                len(data['Daily']['info']):
             needs_rebuild = True
-            
+
         if needs_rebuild:
             widget.set_widget(self.build_popover(widget, data))
         else:
@@ -515,14 +521,16 @@ class Weather(c.BaseModule):
             today = data['Today']['info'][0]
             w = widget.popover_widgets
             w['city'].set_text(data['City'])
-            w['today']['temp'].set_text(f"{today['temperature']}° {today['icon']}")
+            w['today']['temp'].set_text(
+                f"{today['temperature']}° {today['icon']}")
             w['today']['hum'].set_text(f" {today['humidity']}%")
             w['today']['wind'].set_text(f" {today['wind']}mph")
             w['today']['desc'].set_text(today['description'])
             w['today']['feels'].set_text(f"Feels like {today['feels_like']}°")
             w['today']['aqi'].set_text(f"{today['quality']} air quality")
-            w['today']['sun'].set_text(f'{today["sun_icon"]} {today["sun_time"]}')
-            
+            w['today']['sun'].set_text(
+                f'{today["sun_icon"]} {today["sun_time"]}')
+
             # Update Hourly
             for i, h_widgets in enumerate(w['hourly']):
                 if i < len(data['Hourly']['info']):
@@ -530,18 +538,21 @@ class Weather(c.BaseModule):
                     h_widgets['temp'].set_text(f"{h_data['temperature']}°")
                     h_widgets['hum'].set_text(f"{h_data['humidity']}%")
                     h_widgets['icon'].set_text(h_data['icon'])
-                    h_widgets['icon'].props.tooltip_text = h_data['description']
+                    c.set_hover_popover(
+                        h_widgets['icon'], h_data['description'])
                     h_widgets['time'].set_text(h_data['time'])
-            
+
             # Update Daily
             for i, d_widgets in enumerate(w['daily']):
                 if i < len(data['Daily']['info']):
                     d_data = data['Daily']['info'][i]
                     d_widgets['time'].set_text(d_data['time'])
-                    d_widgets['hl'].set_text(f"{d_data['high']}° / {d_data['low']}°")
+                    d_widgets['hl'].set_text(
+                        f"{d_data['high']}° / {d_data['low']}°")
                     d_widgets['icon'].set_text(d_data['icon'])
-                    d_widgets['icon'].props.tooltip_text = d_data['description']
-            
+                    c.set_hover_popover(
+                        d_widgets['icon'], d_data['description'])
+
             # Update Graph
             if 'graph' in w:
                 # Recalculate markers (logic duplicated from build_popover)
@@ -551,7 +562,7 @@ class Weather(c.BaseModule):
                 time_markers_data = []
                 sunrise_time = today['sunrise']
                 sunset_time = today['sunset']
-                
+
                 def time_to_hours(time_str):
                     try:
                         time_part, period = time_str.strip().split()
@@ -571,14 +582,16 @@ class Weather(c.BaseModule):
                 if sunrise_hours is not None:
                     sunrise_offset = (sunrise_hours - current_hour) % 24
                     if 0 < sunrise_offset <= hours_to_show:
-                        time_markers_data.append((sunrise_offset, "Sunrise", sunrise_hours))
+                        time_markers_data.append(
+                            (sunrise_offset, "Sunrise", sunrise_hours))
                 if sunset_hours is not None:
                     sunset_offset = (sunset_hours - current_hour) % 24
                     if 0 < sunset_offset <= hours_to_show:
-                        time_markers_data.append((sunset_offset, "Sunset", sunset_hours))
-                
+                        time_markers_data.append(
+                            (sunset_offset, "Sunset", sunset_hours))
+
                 time_markers_data.sort(key=lambda x: x[2])
-                
+
                 w['graph'].update_data(
                     data['Hourly']['temperatures'], None)
                 w['graph'].secondary_data = data['Hourly']['humidities']
