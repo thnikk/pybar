@@ -129,7 +129,23 @@ class Updates(c.BaseModule):
         ] + [
             'echo "Packages updated, press enter to close terminal."',
             'read x']
-        Popen([data['terminal'], 'sh', '-c', '; '.join(commands)])
+        process = Popen([data['terminal'], 'sh', '-c', '; '.join(commands)])
+
+        # Monitor process completion in a thread
+        def monitor_completion():
+            process.wait()  # Block until terminal closes
+            c.print_debug(
+                "Update terminal closed, forcing refresh",
+                color='green'
+            )
+            import module
+            module.force_update(self.name)
+
+        import threading
+        monitor_thread = threading.Thread(
+            target=monitor_completion, daemon=True
+        )
+        monitor_thread.start()
 
     def click_link(self, _btn, url):
         Popen(['xdg-open', url])

@@ -682,6 +682,7 @@ class BaseModule:
         """Standard worker loop with caching"""
         import module
         stop_event = module._worker_stop_flags.get(self.name)
+        wake_event = module._worker_wake_flags.get(self.name)
         first_run = True
         while True:
             data = None
@@ -759,9 +760,18 @@ class BaseModule:
                 break
 
             sleep_time = max(0, self.interval - execution_time)
+            # Check for stop or wake signals
             if stop_event:
-                if stop_event.wait(timeout=sleep_time):
-                    break
+                if wake_event:
+                    # Wait for stop, wake, or timeout
+                    woken = wake_event.wait(timeout=sleep_time)
+                    if stop_event.is_set():
+                        break
+                    if woken:
+                        wake_event.clear()  # Clear flag and continue
+                else:
+                    if stop_event.wait(timeout=sleep_time):
+                        break
             else:
                 time.sleep(sleep_time)
 

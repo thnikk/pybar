@@ -19,6 +19,7 @@ _instances = {}
 _module_map = {}
 _worker_threads = {}
 _worker_stop_flags = {}
+_worker_wake_flags = {}
 
 
 def discover_modules():
@@ -77,8 +78,9 @@ def start_worker(name, config):
     # Stop existing worker if any
     stop_worker(name)
 
-    # Create stop flag
+    # Create stop and wake flags
     _worker_stop_flags[name] = threading.Event()
+    _worker_wake_flags[name] = threading.Event()
 
     instance = get_instance(name, config)
     if instance:
@@ -101,18 +103,35 @@ def start_worker(name, config):
         thread.start()
 
 
+def force_update(name):
+    """Force a module to update immediately by waking its worker"""
+    if name in _worker_wake_flags:
+        c.print_debug(f"Forcing update for {name}", color='green')
+        _worker_wake_flags[name].set()
+        return True
+    c.print_debug(
+        f"Cannot force update for {name}: worker not found",
+        color='yellow'
+    )
+    return False
+
+
 def stop_worker(name):
     """Stop a specific worker thread"""
     if name in _worker_stop_flags:
         _worker_stop_flags[name].set()
+    if name in _worker_wake_flags:
+        _worker_wake_flags[name].set()
     if name in _worker_threads:
         thread = _worker_threads[name]
         # Wait briefly for thread to stop (or use a timeout)
         thread.join(timeout=1.0)
         del _worker_threads[name]
-    # Clean up stop flag
+    # Clean up flags
     if name in _worker_stop_flags:
         del _worker_stop_flags[name]
+    if name in _worker_wake_flags:
+        del _worker_wake_flags[name]
 
 
 def stop_all_workers():
@@ -120,6 +139,8 @@ def stop_all_workers():
     # Signal all to stop first
     for name in list(_worker_stop_flags.keys()):
         _worker_stop_flags[name].set()
+    for name in list(_worker_wake_flags.keys()):
+        _worker_wake_flags[name].set()
 
     # Then join them with a short timeout
     threads = list(_worker_threads.items())
@@ -129,6 +150,8 @@ def stop_all_workers():
             del _worker_threads[name]
         if name in _worker_stop_flags:
             del _worker_stop_flags[name]
+        if name in _worker_wake_flags:
+            del _worker_wake_flags[name]
 
     # Force cleanup of Volume/Pulse threads that might hang
     # (Note: we can't easily kill threads in Python, but we can try to
@@ -193,6 +216,7 @@ def clear_instances():
 def command_worker(name, config):
     """Worker for waybar-style command modules"""
     stop_event = _worker_stop_flags.get(name)
+    wake_event = _worker_wake_flags.get(name)
     interval = config.get('interval', 60)
     module_type = config.get('type', name)
     is_hass = module_type.startswith('hass') or name.startswith('hass')
@@ -246,9 +270,18 @@ def command_worker(name, config):
             c.state_manager.update(name, data)
 
         first_run = False
+        # Check for stop or wake signals
         if stop_event:
-            if stop_event.wait(timeout=interval):
-                break
+            if wake_event:
+                # Wait for stop, wake, or timeout
+                woken = wake_event.wait(timeout=interval)
+                if stop_event.is_set():
+                    break
+                if woken:
+                    wake_event.clear()  # Clear flag and continue
+            else:
+                if stop_event.wait(timeout=interval):
+                    break
         else:
             time.sleep(interval)
 
