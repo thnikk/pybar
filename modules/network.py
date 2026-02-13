@@ -32,11 +32,58 @@ class Network(c.BaseModule):
         }
     }
 
+    def __init__(self, name, config):
+        super().__init__(name, config)
+        self.monitor_thread = None
+        self.monitor_running = False
+
+    def start_monitor(self):
+        """ Monitor NetworkManager events for immediate updates """
+        if self.monitor_running:
+            return
+
+        def monitor_events():
+            try:
+                import subprocess
+                process = subprocess.Popen(
+                    ['nmcli', 'monitor'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1
+                )
+
+                self.monitor_running = True
+                while self.monitor_running:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+
+                    # Trigger immediate update on connection events
+                    if 'connected' in line.lower() or \
+                       'disconnected' in line.lower():
+                        new_data = self.fetch_data()
+                        c.state_manager.update(self.name, new_data)
+
+                process.terminate()
+            except Exception as e:
+                c.print_debug(
+                    f"Network monitor error: {e}", color='red')
+
+        self.monitor_thread = threading.Thread(
+            target=monitor_events, daemon=True)
+        self.monitor_thread.start()
+
+    def stop_monitor(self):
+        """ Stop the network monitor """
+        self.monitor_running = False
+
     def get_devices(self):
         """ Get active NetworkManager connections """
         try:
             res = run(
-                ['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE,CONNECTION', 'd'],
+                ['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE,CONNECTION',
+                    'd'],
                 check=True, capture_output=True).stdout.decode('utf-8')
             devices = []
             for line in res.splitlines():
@@ -55,7 +102,8 @@ class Network(c.BaseModule):
 
             # Also get IPs for connected devices
             res_ip = run(
-                ['nmcli', '-t', '-f', 'GENERAL.DEVICE,IP4.ADDRESS', 'd', 'show'],
+                ['nmcli', '-t', '-f', 'GENERAL.DEVICE,IP4.ADDRESS',
+                    'd', 'show'],
                 check=True, capture_output=True).stdout.decode('utf-8')
             curr_dev = None
             for line in res_ip.splitlines():
@@ -69,7 +117,8 @@ class Network(c.BaseModule):
                             break
             return devices
         except Exception as e:
-            c.print_debug(f"Error fetching network devices: {e}", color='red')
+            c.print_debug(
+                f"Error fetching network devices: {e}", color='red')
             return []
 
     def check_internet(self):
@@ -100,7 +149,8 @@ class Network(c.BaseModule):
         """ Scan for available Wi-Fi networks """
         try:
             res = run(
-                ['nmcli', '-t', '-f', 'SSID,SIGNAL,SECURITY,BARS,IN-USE',
+                ['nmcli', '-t', '-f',
+                    'SSID,SIGNAL,SECURITY,BARS,IN-USE',
                     'dev', 'wifi', 'list'],
                 check=True, capture_output=True
             ).stdout.decode('utf-8')
@@ -121,7 +171,8 @@ class Network(c.BaseModule):
                     })
             # Sort by signal strength
             networks.sort(key=lambda x: int(
-                x['SIGNAL']) if x['SIGNAL'].isdigit() else 0, reverse=True)
+                x['SIGNAL']) if x['SIGNAL'].isdigit() else 0,
+                reverse=True)
             return networks
         except Exception as e:
             c.print_debug(f"Error scanning Wi-Fi: {e}", color='red')
@@ -132,9 +183,14 @@ class Network(c.BaseModule):
         has_internet = self.check_internet()
         devices = self.get_devices()
         wifi_networks = self.get_wifi_networks()
-        icons = {"ethernet": "", "wifi": "", "wifi-p2p": ""}
+        icons = {
+            "ethernet": "\uf796",
+            "wifi": "\uf1eb",
+            "wifi-p2p": "\uf3cf"
+        }
         connection_type = None
         connection_ip = None
+        connection_ssid = None
 
         for device in devices:
             state = device.get('GENERAL.STATE', '').lower()
@@ -142,19 +198,27 @@ class Network(c.BaseModule):
                 connection_type = device.get('GENERAL.TYPE')
                 connection_ip = device.get('IP4.ADDRESS[1]', '').split(
                     '/')[0] if 'IP4.ADDRESS[1]' in device else None
+                # Get SSID for wifi connections
+                if connection_type == 'wifi':
+                    connection_ssid = device.get(
+                        'GENERAL.CONNECTION', '')
                 if connection_type in icons:
                     break
 
         always_show = self.config.get('always_show', True)
 
+        # Only show wifi icon if actually connected with an SSID
+        if connection_type == 'wifi' and not connection_ssid:
+            connection_type = None
+
         if connection_type:
-            text = icons.get(connection_type, "") if always_show else ""
+            text = icons.get(connection_type, "") if always_show else ""
             tooltip = f"{connection_type}\n{connection_ip}"
         elif has_internet:
-            text = "" if always_show else ""
+            text = "\uf0c1" if always_show else ""
             tooltip = "Connected (Unknown device)"
         else:
-            text = ""
+            text = "\uf127" if always_show else ""
             tooltip = "No connection"
 
         return {
@@ -163,13 +227,16 @@ class Network(c.BaseModule):
             "devices": devices,
             "wifi_networks": wifi_networks,
             "connection_type": connection_type,
+            "connection_ssid": connection_ssid,
+            "always_show": always_show,
         }
 
     def get_wifi_device(self):
         """ Get the name of the Wi-Fi device """
         try:
             res = run(['nmcli', '-t', '-f', 'DEVICE,TYPE', 'd'],
-                      check=True, capture_output=True).stdout.decode('utf-8')
+                      check=True,
+                      capture_output=True).stdout.decode('utf-8')
             for line in res.splitlines():
                 parts = line.split(':')
                 if len(parts) == 2 and parts[1] == 'wifi':
@@ -190,22 +257,27 @@ class Network(c.BaseModule):
                         GLib.idle_add(button.set_label, "Forgetting...")
                     if wifi_dev:
                         res = run(
-                            ['nmcli', '-t', '-f', 'CONNECTION', 'd', 'show',
-                                wifi_dev], capture_output=True, text=True)
+                            ['nmcli', '-t', '-f', 'CONNECTION', 'd',
+                                'show', wifi_dev],
+                            capture_output=True, text=True)
                         if ssid in res.stdout:
                             run(
-                                ['nmcli', 'device', 'disconnect', wifi_dev],
+                                ['nmcli', 'device', 'disconnect',
+                                    wifi_dev],
                                 check=False)
-                    run(['nmcli', 'connection', 'delete', ssid], check=True)
+                    run(['nmcli', 'connection', 'delete', ssid],
+                        check=True)
                 elif disconnect:
                     if button:
-                        GLib.idle_add(button.set_label, "Disconnecting...")
+                        GLib.idle_add(button.set_label,
+                                      "Disconnecting...")
                     if wifi_dev:
                         run(
                             ['nmcli', 'device', 'disconnect', wifi_dev],
                             check=True)
                     else:
-                        run(['nmcli', 'connection', 'down', ssid], check=True)
+                        run(['nmcli', 'connection', 'down', ssid],
+                            check=True)
                 else:
                     if button:
                         GLib.idle_add(button.set_label, "Connecting...")
@@ -236,10 +308,19 @@ class Network(c.BaseModule):
 
         threading.Thread(target=run_nmcli, daemon=True).start()
 
-    def toggle_wifi_details(self, _btn, details_box, indicator):
+    def toggle_wifi_details(
+            self, _btn, details_box, indicator, pass_entry=None):
         visible = not details_box.get_visible()
         details_box.set_visible(visible)
-        indicator.set_text('' if visible else '')
+        indicator.set_text('' if visible else '')
+        # Grab focus on password entry when details are shown
+        if visible and pass_entry:
+            def focus_entry():
+                if pass_entry.get_realized():
+                    pass_entry.grab_focus()
+                    return False
+                return True
+            GLib.timeout_add(100, focus_entry)
 
     def build_popover(self, widget, data):
         """ Build popover for network """
@@ -263,6 +344,7 @@ class Network(c.BaseModule):
 
             connected_any = True
             dev_name = device.get('GENERAL.DEVICE', 'unknown')
+            is_wifi = device.get('GENERAL.TYPE') == 'wifi'
             network_box = c.box('v', spacing=10)
             network_box.append(
                 c.label(device.get(
@@ -273,7 +355,7 @@ class Network(c.BaseModule):
 
             items = []
             for long, short in names.items():
-                if short == 'SSID' and device.get('GENERAL.TYPE') != 'wifi':
+                if short == 'SSID' and not is_wifi:
                     continue
                 if long in device:
                     items.append((short, device[long], long))
@@ -286,16 +368,46 @@ class Network(c.BaseModule):
                 device_box.append(line)
 
                 if long == 'IP4.ADDRESS[1]':
-                    widget.device_widgets[dev_name]['ip_label'] = val_label
+                    widget.device_widgets[dev_name]['ip_label'] = (
+                        val_label)
 
                 if i != len(items) - 1:
                     device_box.append(c.sep('h'))
+
+            # Add disconnect/forget buttons for wifi
+            if is_wifi:
+                ssid = device.get('GENERAL.CONNECTION', '')
+                if ssid:
+                    device_box.append(c.sep('h'))
+                    btn_box = c.box('h', spacing=0, style='inner-box')
+                    btn_box.set_homogeneous(True)
+
+                    disconnect_btn = c.button(
+                        "Disconnect", style='red', ha='fill')
+                    disconnect_btn.connect(
+                        'clicked', lambda b, s=ssid: self.wifi_action(
+                            s, disconnect=True, button=b))
+                    c.add_style(disconnect_btn, 'group-button')
+                    disconnect_btn.set_hexpand(True)
+                    btn_box.append(disconnect_btn)
+
+                    forget_btn = c.button(
+                        "Forget", style='normal', ha='fill')
+                    forget_btn.connect(
+                        'clicked', lambda b, s=ssid: self.wifi_action(
+                            s, forget=True, button=b))
+                    c.add_style(forget_btn, 'group-button')
+                    forget_btn.set_hexpand(True)
+                    btn_box.append(forget_btn)
+
+                    device_box.append(btn_box)
 
             network_box.append(device_box)
             main_box.append(network_box)
 
         if not connected_any:
-            main_box.append(c.label("No active connections", style='gray'))
+            main_box.append(c.label("No active connections",
+                                     style='gray'))
 
         # Available networks
         if data.get('wifi_networks'):
@@ -316,11 +428,12 @@ class Network(c.BaseModule):
                 c.add_style(ssid_btn, ['minimal', 'inner-box'])
 
                 ssid_content = c.box('h', spacing=10)
-                indicator = c.label('', style='gray')
+                indicator = c.label('', style='gray')
                 ssid_label = c.label(net['SSID'], ha='start', he=True)
                 signal_label = c.label(
                     f"{net['SIGNAL']}%", style='gray', ha='end')
-                widget.wifi_widgets[net['SSID']]['signal'] = signal_label
+                widget.wifi_widgets[net['SSID']]['signal'] = (
+                    signal_label)
 
                 ssid_content.append(indicator)
                 ssid_content.append(ssid_label)
@@ -338,7 +451,8 @@ class Network(c.BaseModule):
                 # Info line
                 info_line = c.box('h')
                 info_line.append(c.label("Security", style='gray'))
-                info_line.append(c.label(net['SECURITY'], ha='end', he=True))
+                info_line.append(c.label(net['SECURITY'], ha='end',
+                                         he=True))
                 details_inner.append(info_line)
 
                 # Actions
@@ -351,24 +465,28 @@ class Network(c.BaseModule):
                         action_btn = c.button(
                             "Disconnect", style='red', ha='fill')
                         action_btn.connect(
-                            'clicked', lambda b, s=net['SSID']: self.wifi_action(
+                            'clicked',
+                            lambda b, s=net['SSID']: self.wifi_action(
                                 s, disconnect=True, button=b))
                     else:
                         action_btn = c.button(
                             "Connect", style='blue', ha='fill')
                         action_btn.connect(
-                            'clicked', lambda b, s=net['SSID']: self.wifi_action(
+                            'clicked',
+                            lambda b, s=net['SSID']: self.wifi_action(
                                 s, button=b))
 
                     c.add_style(action_btn, 'group-button')
                     action_btn.set_hexpand(True)
                     btn_box.append(action_btn)
 
-                    forget_btn = c.button("Forget", style='normal', ha='fill')
+                    forget_btn = c.button("Forget", style='normal',
+                                          ha='fill')
                     c.add_style(forget_btn, 'group-button')
                     forget_btn.set_hexpand(True)
                     forget_btn.connect(
-                        'clicked', lambda b, s=net['SSID']: self.wifi_action(
+                        'clicked',
+                        lambda b, s=net['SSID']: self.wifi_action(
                             s, forget=True, button=b))
                     btn_box.append(forget_btn)
 
@@ -379,9 +497,23 @@ class Network(c.BaseModule):
                     pass_entry.set_placeholder_text('Password...')
                     pass_entry.set_visibility(False)
                     pass_entry.set_hexpand(True)
+                    pass_entry.set_can_focus(True)
+                    pass_entry.set_focusable(True)
+                    pass_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+                    pass_entry.set_activates_default(False)
                     c.add_style(pass_entry, 'normal')
 
-                    connect_btn = c.button("Connect", style='blue', ha='fill')
+                    # Add click handler to ensure focus
+                    click_controller = Gtk.GestureClick.new()
+                    
+                    def on_entry_click(gesture, n_press, x, y, entry=pass_entry):
+                        entry.grab_focus()
+                    
+                    click_controller.connect('pressed', on_entry_click)
+                    pass_entry.add_controller(click_controller)
+
+                    connect_btn = c.button("Connect", style='blue',
+                                           ha='fill')
                     connect_btn.set_hexpand(True)
 
                     def on_connect(b, s=net['SSID'], e=pass_entry):
@@ -393,12 +525,20 @@ class Network(c.BaseModule):
 
                     details_inner.append(pass_entry)
                     details_inner.append(connect_btn)
+                    widget.wifi_widgets[net['SSID']]['pass_entry'] = (
+                        pass_entry)
 
                 details_box.append(details_inner)
 
-                ssid_btn.connect(
-                    'clicked', self.toggle_wifi_details,
-                    details_box, indicator)
+                # Connect toggle with pass_entry if it exists
+                if net['IN-USE'] or net['REMEMBERED']:
+                    ssid_btn.connect(
+                        'clicked', self.toggle_wifi_details,
+                        details_box, indicator)
+                else:
+                    ssid_btn.connect(
+                        'clicked', self.toggle_wifi_details,
+                        details_box, indicator, pass_entry)
 
                 item_con.append(ssid_btn)
                 item_con.append(details_box)
@@ -414,6 +554,10 @@ class Network(c.BaseModule):
         return main_box
 
     def create_widget(self, bar):
+        # Start network event monitor
+        if not self.monitor_running:
+            self.start_monitor()
+
         m = c.Module()
         m.set_position(bar.position)
         m.set_label('...')
@@ -431,48 +575,100 @@ class Network(c.BaseModule):
         widget.set_visible(bool(data.get('text')))
         widget.set_tooltip_text(data.get('tooltip', ''))
 
-        # Optimization: Don't update if data hasn't changed
-        compare_data = data.copy()
-        compare_data.pop('timestamp', None)
-        
-        if (widget.get_popover() and
-                getattr(widget, 'last_popover_data', None) == compare_data):
-            return
-
-        widget.last_popover_data = compare_data
-
         needs_rebuild = False
-        if not widget.get_popover():
+        popover = widget.get_popover()
+        popover_was_visible = False
+
+        # Create popover if it doesn't exist
+        if not popover:
             needs_rebuild = True
         else:
-            # Check devices
+            # Check devices (connection status)
             curr_devs = set(getattr(widget, 'device_widgets', {}).keys())
             new_devs = set()
+            new_dev_states = {}
             for d in data.get('devices', []):
-                 if 'connected' in d.get('GENERAL.STATE', '').lower():
-                      new_devs.add(d.get('GENERAL.DEVICE', 'unknown'))
+                if 'connected' in d.get('GENERAL.STATE', '').lower():
+                    dev_name = d.get('GENERAL.DEVICE', 'unknown')
+                    new_devs.add(dev_name)
+                    # Track state for connected devices
+                    new_dev_states[dev_name] = {
+                        'state': d.get('GENERAL.STATE', ''),
+                        'ip': d.get('IP4.ADDRESS[1]', ''),
+                        'ssid': d.get('GENERAL.CONNECTION', '')
+                    }
+
+            devices_changed = curr_devs != new_devs
+
+            # Also check if any device state changed
+            if not devices_changed:
+                old_states = getattr(widget, '_dev_states', {})
+                if old_states != new_dev_states:
+                    devices_changed = True
             
-            # Check wifi
+            # Store current state for next comparison
+            widget._dev_states = new_dev_states
+
+            # Check wifi list
             curr_wifi = set(getattr(widget, 'wifi_widgets', {}).keys())
-            new_wifi = set(n['SSID'] for n in data.get('wifi_networks', []))
-            
-            if curr_devs != new_devs or curr_wifi != new_wifi:
+            new_wifi = set(
+                n['SSID'] for n in data.get('wifi_networks', []))
+
+            wifi_list_changed = curr_wifi != new_wifi
+
+            # Debug output
+            if devices_changed:
+                c.print_debug(
+                    f"Network: devices changed {curr_devs} -> {new_devs}",
+                    color='yellow')
+                c.print_debug(
+                    f"Network: state change detected", color='yellow')
+
+            # Connection status changes require rebuild
+            if devices_changed:
                 needs_rebuild = True
-        
+                # Remember if popover was visible
+                if popover.get_visible():
+                    popover_was_visible = True
+                    popover.popdown()
+            # Only rebuild for wifi list changes if popover not visible
+            elif wifi_list_changed:
+                if not popover.get_visible():
+                    needs_rebuild = True
+
+        # Rebuild when needed
         if needs_rebuild:
             widget.set_widget(self.build_popover(widget, data))
+            # Reopen if it was visible before rebuild
+            if popover_was_visible:
+                def reopen_popover():
+                    new_popover = widget.get_popover()
+                    if new_popover:
+                        new_popover.popup()
+                    return False
+                GLib.timeout_add(100, reopen_popover)
         else:
             # Update Devices
-            devices = {d['GENERAL.DEVICE']: d for d in data.get('devices', [])}
-            for dev_name, widgets in getattr(widget, 'device_widgets', {}).items():
+            devices = {
+                d['GENERAL.DEVICE']: d
+                for d in data.get('devices', [])
+            }
+            for dev_name, widgets in getattr(
+                    widget, 'device_widgets', {}).items():
                 if dev_name in devices:
                     dev = devices[dev_name]
                     if 'ip_label' in widgets:
-                         widgets['ip_label'].set_text(dev.get('IP4.ADDRESS[1]', 'None'))
-            
+                        ip_val = dev.get('IP4.ADDRESS[1]', 'None')
+                        if '/' in ip_val:
+                            ip_val = ip_val.split('/')[0]
+                        widgets['ip_label'].set_text(ip_val)
+
             # Update Wifi
-            wifi_map = {n['SSID']: n for n in data.get('wifi_networks', [])}
-            for ssid, widgets in getattr(widget, 'wifi_widgets', {}).items():
+            wifi_map = {
+                n['SSID']: n for n in data.get('wifi_networks', [])
+            }
+            for ssid, widgets in getattr(
+                    widget, 'wifi_widgets', {}).items():
                 if ssid in wifi_map:
                     net = wifi_map[ssid]
                     if 'signal' in widgets:
