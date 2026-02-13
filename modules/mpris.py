@@ -342,7 +342,8 @@ class MPRIS(c.BaseModule):
                     widget.pop_art_placeholder.set_visible(True)
 
         # Update labels
-        player_name = data.get('player', '').split('.')[-1].capitalize()
+        player_name = data.get('player', '').strip(
+                'org.mpris.MediaPlayer2.').split('.')[0].capitalize()
         if hasattr(widget, 'pop_player_name') and \
                 widget.pop_player_name.get_text() != player_name:
             widget.pop_player_name.set_text(player_name)
