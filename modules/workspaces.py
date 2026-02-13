@@ -251,9 +251,12 @@ class Workspaces(c.BaseModule):
 
             if highlight_visible and name in visible:
                 c.add_style(wrapper, 'visible')
-                # Check adjacency for rounded corners
-                prev_visible = str(n) in visible
-                next_visible = str(n + 2) in visible
+                # Check adjacency in the displayed workspaces list
+                current_index = workspaces.index(name)
+                prev_visible = (current_index > 0 and
+                                workspaces[current_index - 1] in visible)
+                next_visible = (current_index < len(workspaces) - 1 and
+                                workspaces[current_index + 1] in visible)
                 
                 if prev_visible:
                     c.del_style(wrapper, 'rounded-left')
