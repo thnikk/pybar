@@ -14,6 +14,16 @@ window {
 	background: none;
 }
 
+.password-window {
+	background: #1c1f26;
+	border: solid 1px rgba(255, 255, 255, 0.1);
+	border-radius: 20px;
+}
+
+.password-entry {
+	background: #2b303b;
+}
+
 .bar {
 	padding: 5px;
 	background: alpha(@black, 0.8);

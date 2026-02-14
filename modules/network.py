@@ -248,38 +248,49 @@ class Network(c.BaseModule):
     def prompt_password(self, ssid, button=None):
         """ Prompt for Wi-Fi password """
         win = Gtk.Window(title=f"Password for {ssid}")
+        win.set_name("dialog")
+        win.set_resizable(False)
         win.set_modal(True)
         win.set_default_size(300, -1)
-        
+        c.add_style(win, 'password-window')
+
         box = c.box('v', spacing=10)
         box.set_margin_top(20)
         box.set_margin_bottom(20)
         box.set_margin_start(20)
         box.set_margin_end(20)
-        
+
         lbl = c.label(f"Enter password for network '{ssid}'", wrap=True)
-        
+
         entry = Gtk.Entry()
         entry.set_visibility(False)
         entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
         entry.set_activates_default(True)
-        c.add_style(entry, 'normal')
-        
+        c.add_style(entry, 'password-entry')
+
         btn_box = c.box('h', spacing=10)
         btn_box.set_halign(Gtk.Align.END)
-        
+
         cancel_btn = c.button("Cancel")
         connect_btn = c.button("Connect", style='suggested-action')
-        
+
         btn_box.append(cancel_btn)
         btn_box.append(connect_btn)
-        
+
         box.append(lbl)
         box.append(entry)
         box.append(btn_box)
-        
+
         win.set_child(box)
         win.set_default_widget(connect_btn)
+
+        # Make transient for the bar window to hint floating behavior
+        if button:
+            root = button.get_root()
+            if root and isinstance(root, Gtk.Window):
+                win.set_transient_for(root)
+                # Also set modal to ensure it stays on top
+                win.set_modal(True)
 
         def on_confirm(*args):
             pwd = entry.get_text()
@@ -289,7 +300,7 @@ class Network(c.BaseModule):
         connect_btn.connect('clicked', on_confirm)
         entry.connect('activate', on_confirm)
         cancel_btn.connect('clicked', lambda *args: win.destroy())
-        
+
         win.present()
 
     def wifi_action(
@@ -329,10 +340,11 @@ class Network(c.BaseModule):
                     if button:
                         GLib.idle_add(button.set_label, "Connecting...")
 
-                    # If password is provided, ensure we start with a clean state
-                    # to avoid "key-mgmt property is missing" errors with stale profiles
+                    # If password is provided, ensure we start with a clean
+                    # state to avoid "key-mgmt property is missing" errors with
+                    # stale profiles
                     if password:
-                        run(['nmcli', 'connection', 'delete', ssid], 
+                        run(['nmcli', 'connection', 'delete', ssid],
                             capture_output=True, check=False)
 
                     cmd = ['nmcli', 'dev', 'wifi', 'connect', ssid]
@@ -461,8 +473,7 @@ class Network(c.BaseModule):
             main_box.append(network_box)
 
         if not connected_any:
-            main_box.append(c.label("No active connections",
-                                     style='gray'))
+            main_box.append(c.label("No active connections", style='gray'))
 
         # Available networks
         if data.get('wifi_networks'):
@@ -632,7 +643,7 @@ class Network(c.BaseModule):
                 old_states = getattr(widget, '_dev_states', {})
                 if old_states != new_dev_states:
                     devices_changed = True
-            
+
             # Store current state for next comparison
             widget._dev_states = new_dev_states
 
@@ -649,7 +660,7 @@ class Network(c.BaseModule):
                     f"Network: devices changed {curr_devs} -> {new_devs}",
                     color='yellow')
                 c.print_debug(
-                    f"Network: state change detected", color='yellow')
+                    "Network: state change detected", color='yellow')
 
             # Connection status changes require rebuild
             if devices_changed:
