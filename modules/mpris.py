@@ -220,6 +220,16 @@ class MPRIS(c.BaseModule):
             except Exception:
                 pass
 
+            # Try to get human readable name
+            player_identity = None
+            try:
+                player_identity = unwrap(self.active_player_proxy.Identity)
+            except Exception:
+                pass
+            
+            if not player_identity:
+                player_identity = self.active_player_bus_name.split('.')[-1].capitalize()
+
             return {
                 "status": status,
                 "song": title,
@@ -230,7 +240,8 @@ class MPRIS(c.BaseModule):
                 "position_str": format_time(position),
                 "length_str": format_time(length),
                 "text": title,
-                "player": self.active_player_bus_name
+                "player": self.active_player_bus_name,
+                "player_name": str(player_identity)
             }
         except Exception as e:
             c.print_debug(f"MPRIS get_status error: {e}", color='red')
@@ -342,8 +353,7 @@ class MPRIS(c.BaseModule):
                     widget.pop_art_placeholder.set_visible(True)
 
         # Update labels
-        player_name = data.get('player', '').strip(
-                'org.mpris.MediaPlayer2.').split('.')[0].capitalize()
+        player_name = data.get('player_name', 'Unknown')
         if hasattr(widget, 'pop_player_name') and \
                 widget.pop_player_name.get_text() != player_name:
             widget.pop_player_name.set_text(player_name)
@@ -386,7 +396,7 @@ class MPRIS(c.BaseModule):
         main_box = c.box('v', spacing=10, style='small-widget')
 
         # Player Name at the very top
-        player_name = data.get('player', '').split('.')[-1].capitalize()
+        player_name = data.get('player_name', 'Unknown')
         widget.pop_player_name = c.label(player_name, style='heading')
         main_box.append(widget.pop_player_name)
 
