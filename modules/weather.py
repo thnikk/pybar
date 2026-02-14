@@ -423,9 +423,11 @@ class Weather(c.BaseModule):
             h_widgets['hum'] = h_lbl
 
             icon = c.label(hour['icon'], style='icon-small')
-            c.set_hover_popover(icon, hour['description'])
             hour_box.append(icon)
             h_widgets['icon'] = icon
+            h_widgets['description'] = hour['description']
+            c.set_hover_popover(
+                icon, lambda w=h_widgets: w['description'])
 
             time_lbl = c.label(hour['time'])
             hour_box.append(time_lbl)
@@ -460,9 +462,11 @@ class Weather(c.BaseModule):
             d_widgets['hl'] = hl_lbl
 
             icon = c.label(day['icon'])
-            c.set_hover_popover(icon, day['description'])
             day_box.set_center_widget(icon)
             d_widgets['icon'] = icon
+            d_widgets['description'] = day['description']
+            c.set_hover_popover(
+                icon, lambda w=d_widgets: w['description'])
 
             daily_box.append(day_box)
             if day != data['Daily']['info'][-1]:
@@ -538,8 +542,7 @@ class Weather(c.BaseModule):
                     h_widgets['temp'].set_text(f"{h_data['temperature']}°")
                     h_widgets['hum'].set_text(f"{h_data['humidity']}%")
                     h_widgets['icon'].set_text(h_data['icon'])
-                    c.set_hover_popover(
-                        h_widgets['icon'], h_data['description'])
+                    h_widgets['description'] = h_data['description']
                     h_widgets['time'].set_text(h_data['time'])
 
             # Update Daily
@@ -550,8 +553,7 @@ class Weather(c.BaseModule):
                     d_widgets['hl'].set_text(
                         f"{d_data['high']}° / {d_data['low']}°")
                     d_widgets['icon'].set_text(d_data['icon'])
-                    c.set_hover_popover(
-                        d_widgets['icon'], d_data['description'])
+                    d_widgets['description'] = d_data['description']
 
             # Update Graph
             if 'graph' in w:

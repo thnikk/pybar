@@ -245,10 +245,15 @@ class Disks(c.BaseModule):
             p_level = c.level(min=0, max=100, value=part['percent'])
             p_level.set_hexpand(True)
             p_level.get_style_context().add_class('horizontal')
+            
+            # Store hover text data for dynamic updates
+            p_level._hover_used = part['used']
+            p_level._hover_total = part['total']
             c.set_hover_popover(
                 p_level,
-                (f"Used: {self.format_size(part['used'])} / "
-                 f"{self.format_size(part['total'])}"),
+                lambda l=p_level: (
+                    f"Used: {self.format_size(l._hover_used)} / "
+                    f"{self.format_size(l._hover_total)}"),
                 delay=500
             )
 
@@ -326,7 +331,11 @@ class Disks(c.BaseModule):
             colorize = self.config.get('colorize_usage', False)
             for i, part in enumerate(data['partitions']):
                 if f'part_level_{i}' in pw:
-                    pw[f'part_level_{i}'].set_value(part['percent'])
+                    level = pw[f'part_level_{i}']
+                    level.set_value(part['percent'])
+                    # Update hover text data
+                    level._hover_used = part['used']
+                    level._hover_total = part['total']
 
                     # Update color if needed
                     if f'part_provider_{i}' in pw:

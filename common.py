@@ -1340,8 +1340,22 @@ def set_hover_popover(widget, text_provider, delay=500, wrap_width=None):
     """
     Attach a HoverPopover to a widget.
     text_provider can be a string or a callable that returns a string.
+    
+    Note: This should only be called ONCE per widget during widget
+    creation. To update the text dynamically, pass a callable that
+    fetches the current value.
     """
+    # Clean up existing popover if one exists
+    if hasattr(widget, '_hover_popover'):
+        old_popover = widget._hover_popover
+        if old_popover:
+            old_popover.popdown()
+            if hasattr(old_popover, 'unparent'):
+                old_popover.unparent()
+    
     popover = HoverPopover(widget, wrap_width=wrap_width)
+    widget._hover_popover = popover  # Store reference to prevent duplicates
+    
     motion = Gtk.EventControllerMotion.new()
 
     def on_motion(controller, x, y):
