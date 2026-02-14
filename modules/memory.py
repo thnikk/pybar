@@ -383,8 +383,6 @@ class Memory(c.BaseModule):
             # Command
             cmd = c.label("cmd", ha='start', he=True, length=20)
             cmd.set_xalign(0)
-            c.set_hover_popover(cmd, lambda l_cmd=cmd: getattr(
-                l_cmd, '_hover_text', ''), delay=500, wrap_width=40)
             info.append(cmd)
 
             # Memory
@@ -488,7 +486,6 @@ class Memory(c.BaseModule):
                     p = procs[i]
                     pw[f'p_name_{i}'].set_text(p['name'])
                     pw[f'p_cmd_{i}'].set_text(p['cmd'])
-                    pw[f'p_cmd_{i}']._hover_text = p['cmd']
                     pw[f'p_mem_{i}'].set_text(p['mem'])
 
                     ind = pw[f'p_ind_{i}']

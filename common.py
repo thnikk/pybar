@@ -1460,11 +1460,70 @@ def sep(orientation, style=None):
     return separator
 
 
+class TruncatedLabel(Gtk.Label):
+    """Label that automatically shows HoverPopover when text is truncated"""
+
+    def __init__(self, max_length=None, **kwargs):
+        # Extract initial text from kwargs before parent init
+        initial_text = kwargs.pop('label', '')
+        super().__init__(**kwargs)
+        self._max_length = max_length
+        self._full_text = ""
+        self._hover_popover = None
+        self._popover_initialized = False
+
+        # Set up motion controller to trigger popover on hover
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("enter", self._on_enter)
+        motion.connect("motion", self._on_motion)
+        motion.connect("leave", self._on_leave)
+        self.add_controller(motion)
+        self.set_has_tooltip(False)
+
+        # Now set the text using our custom set_text
+        self.set_text(initial_text)
+
+    def _ensure_popover(self):
+        """Lazy initialization of HoverPopover"""
+        if not self._popover_initialized and self.get_root():
+            self._hover_popover = HoverPopover(self, wrap_width=40)
+            self._popover_initialized = True
+
+    def _on_enter(self, controller, x, y):
+        self._ensure_popover()
+
+    def _on_motion(self, controller, x, y):
+        if self._hover_popover and self._full_text:
+            self._hover_popover.show_text(
+                self._full_text, x, y, offset=y, delay=500
+            )
+        elif self._hover_popover:
+            self._hover_popover.popdown()
+
+    def _on_leave(self, controller):
+        if self._hover_popover:
+            self._hover_popover.popdown()
+
+    def set_text(self, text):
+        text = str(text)
+        super().set_text(text)
+        # Only show hover popover if text is truncated
+        if self._max_length and len(text) > self._max_length:
+            self._full_text = text
+        else:
+            self._full_text = ""
+
+
 def label(
         input_text, style=None, va=None, ha=None,
         he=False, wrap=None, length=None):
     """ Create label """
-    text = Gtk.Label(label=str(input_text))
+    if isinstance(length, int):
+        text = TruncatedLabel(max_length=length, label=str(input_text))
+        text.set_max_width_chars(length)
+        text.set_ellipsize(Pango.EllipsizeMode.END)
+    else:
+        text = Gtk.Label(label=str(input_text))
     if style:
         text.get_style_context().add_class(style)
     if va in align:
@@ -1475,11 +1534,6 @@ def label(
     if isinstance(wrap, int):
         text.set_wrap(True)
         text.set_max_width_chars(wrap)
-    if isinstance(length, int):
-        text.set_max_width_chars(length)
-        text.set_ellipsize(Pango.EllipsizeMode.END)
-        if len(str(input_text)) > length:
-            text.set_tooltip_text(str(input_text))
     return text
 
 
