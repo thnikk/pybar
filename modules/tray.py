@@ -968,10 +968,12 @@ class TrayModuleWidget(Gtk.Box):
             self.append(self.revealer)
 
         is_collapsed = config.get("collapsed", True)
+        self.user_wants_expanded = not is_collapsed
         self.revealer.set_reveal_child(not is_collapsed)
-        self._update_ui_state()
 
         self.icons = {}
+        self._update_ui_state()
+
         TrayHost.get_instance().add_module(self)
         self.connect("destroy", self._on_destroy)
 
@@ -990,27 +992,40 @@ class TrayModuleWidget(Gtk.Box):
         self.cleanup()
 
     def _on_toggle(self, _btn):
-        revealed = not self.revealer.get_reveal_child()
-        self.revealer.set_reveal_child(revealed)
+        self.user_wants_expanded = not self.user_wants_expanded
         self._update_ui_state()
 
     def _update_ui_state(self):
-        revealed = self.revealer.get_reveal_child()
-        self.set_spacing(5 if revealed else 0)
+        has_icons = len(self.icons) > 0
+
+        # Hide revealer completely when no icons to prevent width change
+        self.revealer.set_visible(has_icons)
+
+        # Only actually reveal if user wants it expanded AND there are icons
+        should_reveal = self.user_wants_expanded and has_icons
+        self.revealer.set_reveal_child(should_reveal)
+
+        # Only add spacing if revealed AND there are icons
+        self.set_spacing(5 if should_reveal else 0)
 
         label_text = ""
         if self.direction == "right":
-            label_text = "" if revealed else ""
+            label_text = "" if self.user_wants_expanded else ""
         else:
-            label_text = "" if revealed else ""
+            label_text = "" if self.user_wants_expanded else ""
 
         self.toggle_label.set_text(label_text)
 
-        if revealed:
-            self.get_style_context().remove_class("collapsed")
+        # Only change CSS class when there are icons to prevent padding
+        # changes
+        if has_icons:
+            if self.user_wants_expanded:
+                self.get_style_context().remove_class("collapsed")
+            else:
+                self.get_style_context().add_class("collapsed")
         else:
+            # Keep collapsed class when no icons
             self.get_style_context().add_class("collapsed")
-
     def add_item(self, item):
         full_name = f"{item.service_name}{item.object_path}"
 
@@ -1061,6 +1076,7 @@ class TrayModuleWidget(Gtk.Box):
             icon = TrayIcon(item, self.icon_size, self)
             self.icons[full_name] = icon
             self.icons_box.append(icon)
+            self._update_ui_state()
 
     def update_item(self, item, changed):
         full_name = f"{item.service_name}{item.object_path}"
@@ -1072,6 +1088,7 @@ class TrayModuleWidget(Gtk.Box):
         if full_name in self.icons:
             icon = self.icons.pop(full_name)
             self.icons_box.remove(icon)
+            self._update_ui_state()
 
 
 class Tray(c.BaseModule):
