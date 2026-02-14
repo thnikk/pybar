@@ -213,17 +213,17 @@ class Network(c.BaseModule):
 
         if connection_type:
             text = icons.get(connection_type, "") if always_show else ""
-            tooltip = f"{connection_type}\n{connection_ip}"
+            # tooltip = f"{connection_type}\n{connection_ip}"
         elif has_internet:
             text = "\uf0c1" if always_show else ""
-            tooltip = "Connected (Unknown device)"
+            # tooltip = "Connected (Unknown device)"
         else:
             text = "\uf127" if always_show else ""
-            tooltip = "No connection"
+            # tooltip = "No connection"
 
         return {
             "text": text,
-            "tooltip": tooltip,
+            # "tooltip": tooltip,
             "devices": devices,
             "wifi_networks": wifi_networks,
             "connection_type": connection_type,
@@ -244,6 +244,53 @@ class Network(c.BaseModule):
         except Exception:
             pass
         return None
+
+    def prompt_password(self, ssid, button=None):
+        """ Prompt for Wi-Fi password """
+        win = Gtk.Window(title=f"Password for {ssid}")
+        win.set_modal(True)
+        win.set_default_size(300, -1)
+        
+        box = c.box('v', spacing=10)
+        box.set_margin_top(20)
+        box.set_margin_bottom(20)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+        
+        lbl = c.label(f"Enter password for network '{ssid}'", wrap=True)
+        
+        entry = Gtk.Entry()
+        entry.set_visibility(False)
+        entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        entry.set_activates_default(True)
+        c.add_style(entry, 'normal')
+        
+        btn_box = c.box('h', spacing=10)
+        btn_box.set_halign(Gtk.Align.END)
+        
+        cancel_btn = c.button("Cancel")
+        connect_btn = c.button("Connect", style='suggested-action')
+        
+        btn_box.append(cancel_btn)
+        btn_box.append(connect_btn)
+        
+        box.append(lbl)
+        box.append(entry)
+        box.append(btn_box)
+        
+        win.set_child(box)
+        win.set_default_widget(connect_btn)
+
+        def on_confirm(*args):
+            pwd = entry.get_text()
+            win.destroy()
+            self.wifi_action(ssid, pwd, button=button)
+
+        connect_btn.connect('clicked', on_confirm)
+        entry.connect('activate', on_confirm)
+        cancel_btn.connect('clicked', lambda *args: win.destroy())
+        
+        win.present()
 
     def wifi_action(
             self, ssid, password=None, disconnect=False, forget=False,
@@ -282,10 +329,18 @@ class Network(c.BaseModule):
                     if button:
                         GLib.idle_add(button.set_label, "Connecting...")
 
+                    # If password is provided, ensure we start with a clean state
+                    # to avoid "key-mgmt property is missing" errors with stale profiles
+                    if password:
+                        run(['nmcli', 'connection', 'delete', ssid], 
+                            capture_output=True, check=False)
+
                     cmd = ['nmcli', 'dev', 'wifi', 'connect', ssid]
                     if password:
                         cmd += ['password', password]
+                        cmd += ['name', ssid]
 
+                    c.print_debug(f"Connecting to {ssid}...")
                     result = run(cmd, capture_output=True, text=True)
                     if result.returncode != 0:
                         c.print_debug(
@@ -492,53 +547,25 @@ class Network(c.BaseModule):
 
                     details_inner.append(btn_box)
                 else:
-                    # Password and Connect
-                    pass_entry = Gtk.Entry()
-                    pass_entry.set_placeholder_text('Password...')
-                    pass_entry.set_visibility(False)
-                    pass_entry.set_hexpand(True)
-                    pass_entry.set_can_focus(True)
-                    pass_entry.set_focusable(True)
-                    pass_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
-                    pass_entry.set_activates_default(False)
-                    c.add_style(pass_entry, 'normal')
-
-                    # Add click handler to ensure focus
-                    click_controller = Gtk.GestureClick.new()
-                    
-                    def on_entry_click(gesture, n_press, x, y, entry=pass_entry):
-                        entry.grab_focus()
-                    
-                    click_controller.connect('pressed', on_entry_click)
-                    pass_entry.add_controller(click_controller)
-
+                    # Connect button
                     connect_btn = c.button("Connect", style='blue',
                                            ha='fill')
                     connect_btn.set_hexpand(True)
 
-                    def on_connect(b, s=net['SSID'], e=pass_entry):
-                        self.wifi_action(s, e.get_text(), button=b)
+                    def on_connect(b, s=net['SSID'], sec=net['SECURITY']):
+                        if sec and sec != "--" and "none" not in sec.lower():
+                            self.prompt_password(s, button=b)
+                        else:
+                            self.wifi_action(s, button=b)
 
                     connect_btn.connect('clicked', on_connect)
-                    pass_entry.connect(
-                        'activate', lambda _e: on_connect(connect_btn))
-
-                    details_inner.append(pass_entry)
                     details_inner.append(connect_btn)
-                    widget.wifi_widgets[net['SSID']]['pass_entry'] = (
-                        pass_entry)
 
                 details_box.append(details_inner)
 
-                # Connect toggle with pass_entry if it exists
-                if net['IN-USE'] or net['REMEMBERED']:
-                    ssid_btn.connect(
-                        'clicked', self.toggle_wifi_details,
-                        details_box, indicator)
-                else:
-                    ssid_btn.connect(
-                        'clicked', self.toggle_wifi_details,
-                        details_box, indicator, pass_entry)
+                ssid_btn.connect(
+                    'clicked', self.toggle_wifi_details,
+                    details_box, indicator)
 
                 item_con.append(ssid_btn)
                 item_con.append(details_box)
@@ -573,7 +600,7 @@ class Network(c.BaseModule):
             return
         widget.set_label(data.get('text', ''))
         widget.set_visible(bool(data.get('text')))
-        widget.set_tooltip_text(data.get('tooltip', ''))
+        # widget.set_tooltip_text(data.get('tooltip', ''))
 
         needs_rebuild = False
         popover = widget.get_popover()
