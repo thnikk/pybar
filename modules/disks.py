@@ -242,8 +242,15 @@ class Disks(c.BaseModule):
             title_row.append(p_percent_label)
             content_box.append(title_row)
 
-            p_pill = c.PillBar(height=12)
-            p_pill.set_has_tooltip(False)
+            p_level = c.level(min=0, max=100, value=part['percent'])
+            p_level.set_hexpand(True)
+            p_level.get_style_context().add_class('horizontal')
+            c.set_hover_popover(
+                p_level,
+                (f"Used: {self.format_size(part['used'])} / "
+                 f"{self.format_size(part['total'])}"),
+                delay=500
+            )
 
             # Usage-based colors or white
             if self.config.get('colorize_usage', False):
@@ -252,21 +259,25 @@ class Disks(c.BaseModule):
             else:
                 usage_color = (1.0, 1.0, 1.0)
 
-            p_segments = [{
-                'percent': part['percent'],
-                'color': usage_color,
-                'tooltip': f"Used: {self.format_size(part['used'])} / "
-                f"{self.format_size(part['total'])}"
-            }]
-            p_pill.update(p_segments)
-            content_box.append(p_pill)
+            # Apply color via CSS provider
+            p_provider = Gtk.CssProvider()
+            css = (f"levelbar block.filled {{ background-color: "
+                   f"rgb({int(usage_color[0]*255)}, "
+                   f"{int(usage_color[1]*255)}, "
+                   f"{int(usage_color[2]*255)}); }}")
+            p_provider.load_from_data(css.encode())
+            p_level.get_style_context().add_provider(
+                p_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+            content_box.append(p_level)
 
             row.append(content_box)
             part_list.append(row)
             if i < len(data['partitions']) - 1:
                 part_list.append(c.sep('h'))
 
-            widget.popover_widgets[f'part_pill_{i}'] = p_pill
+            widget.popover_widgets[f'part_level_{i}'] = p_level
+            widget.popover_widgets[f'part_provider_{i}'] = p_provider
             widget.popover_widgets[f'part_percent_{i}'] = p_percent_label
 
         scroll = c.scroll(height=max(
@@ -314,20 +325,27 @@ class Disks(c.BaseModule):
 
             colorize = self.config.get('colorize_usage', False)
             for i, part in enumerate(data['partitions']):
-                if f'part_pill_{i}' in pw:
-                    if colorize:
-                        usage_color = COLOR_GREEN if part['percent'] < 80 \
-                            else COLOR_RED
-                    else:
-                        usage_color = (1.0, 1.0, 1.0)
-                    pw[f'part_pill_{i}'].update([{
-                        'percent': part['percent'],
-                        'color': usage_color,
-                        'tooltip': f"Used: {self.format_size(part['used'])} / "
-                        f"{self.format_size(part['total'])}"
-                    }])
+                if f'part_level_{i}' in pw:
+                    pw[f'part_level_{i}'].set_value(part['percent'])
+
+                    # Update color if needed
+                    if f'part_provider_{i}' in pw:
+                        if colorize:
+                            usage_color = COLOR_GREEN if part['percent'] < 80 \
+                                else COLOR_RED
+                        else:
+                            usage_color = (1.0, 1.0, 1.0)
+
+                        css = (f"levelbar block.filled {{ "
+                               f"background-color: "
+                               f"rgb({int(usage_color[0]*255)}, "
+                               f"{int(usage_color[1]*255)}, "
+                               f"{int(usage_color[2]*255)}); }}")
+                        pw[f'part_provider_{i}'].load_from_data(css.encode())
+
                 if f'part_percent_{i}' in pw:
-                    pw[f'part_percent_{i}'].set_text(f"{part['percent']:.1f}%")
+                    pw[f'part_percent_{i}'].set_text(
+                        f"{part['percent']:.1f}%")
 
 
 module_map = {'disks': Disks}
