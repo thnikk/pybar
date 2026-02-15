@@ -183,9 +183,6 @@ class NVTop(c.BaseModule):
             if devices[i].get('mem_total') is not None:
                 mem_gb_box = c.box('h', spacing=10)
                 mem_gb_box.set_hexpand(True)
-                mem_gb_icon = c.label('', style='gray')
-                icon_size_group.add_widget(mem_gb_icon)
-                mem_gb_box.append(mem_gb_icon)
                 mem_used = self.bytes_to_gb(devices[i].get('mem_used'))
                 mem_total = round(
                         self.bytes_to_gb(devices[i].get('mem_total')))
