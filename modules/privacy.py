@@ -37,7 +37,7 @@ class Privacy(c.BaseModule):
             name_path = f'/sys/class/video4linux/video{index}/name'
             if os.path.exists(name_path):
                 with open(name_path, 'r', encoding='utf-8') as f:
-                    return f"{f.read().strip()} ({device_path})"
+                    return f"{f.readline().strip()} ({device_path})"
             return f"Webcam/Video Device ({device_path})"
 
         return device_path
@@ -49,38 +49,43 @@ class Privacy(c.BaseModule):
         """
         device_usage = {}
 
-        for pid in [p for p in os.listdir('/proc') if p.isdigit()]:
+        for pid in (p for p in os.listdir('/proc') if p.isdigit()):
             fd_dir = os.path.join('/proc', pid, 'fd')
             try:
-                for fd in os.listdir(fd_dir):
-                    full_fd_path = os.path.join(fd_dir, fd)
-                    try:
-                        target_path = os.readlink(full_fd_path)
-
-                        if target_path.startswith('/dev/video'):
-                            with open(
-                                f'/proc/{pid}/comm', 'r', encoding='utf-8'
-                            ) as f:
-                                comm = f.read().strip()
-
-                            friendly_name = self.get_friendly_name(target_path)
-
-                            if friendly_name not in device_usage:
-                                device_usage[friendly_name] = {
-                                    'path': target_path,
-                                    'processes': [],
-                                    'type': 'video'
-                                }
-
-                            process_info = f"{comm} (PID: {pid})"
-                            if process_info not in \
-                                    device_usage[friendly_name]['processes']:
-                                device_usage[friendly_name][
-                                    'processes'].append(process_info)
-                    except (PermissionError, OSError):
-                        continue
+                fds = os.listdir(fd_dir)
             except (PermissionError, OSError):
                 continue
+
+            for fd in fds:
+                full_fd_path = os.path.join(fd_dir, fd)
+                try:
+                    target_path = os.readlink(full_fd_path)
+                except (PermissionError, OSError):
+                    continue
+
+                if target_path.startswith('/dev/video'):
+                    try:
+                        with open(f'/proc/{pid}/comm', 'r',
+                                  encoding='utf-8') as f:
+                            comm = f.readline().strip()
+                    except (PermissionError, OSError):
+                        continue
+
+                    friendly_name = self.get_friendly_name(target_path)
+
+                    if friendly_name not in device_usage:
+                        device_usage[friendly_name] = {
+                            'path': target_path,
+                            'processes': set(),
+                            'type': 'video'
+                        }
+
+                    device_usage[friendly_name]['processes'].add(
+                        f"{comm} (PID: {pid})")
+
+        # Convert sets back to lists for consistent API
+        for device in device_usage.values():
+            device['processes'] = list(device['processes'])
 
         return device_usage
 
@@ -92,7 +97,7 @@ class Privacy(c.BaseModule):
             return None
         try:
             with open(f'/proc/{pid}/comm', 'r', encoding='utf-8') as f:
-                return f.read().strip()
+                return f.readline().strip()
         except (FileNotFoundError, PermissionError):
             return None
 
@@ -206,12 +211,15 @@ class Privacy(c.BaseModule):
             if friendly_key not in device_usage:
                 device_usage[friendly_key] = {
                     'path': path,
-                    'processes': [],
+                    'processes': set(),
                     'type': device_type
                 }
 
-            if proc_info not in device_usage[friendly_key]['processes']:
-                device_usage[friendly_key]['processes'].append(proc_info)
+            device_usage[friendly_key]['processes'].add(proc_info)
+
+        # Convert sets back to lists for consistent API
+        for device in device_usage.values():
+            device['processes'] = list(device['processes'])
 
         return device_usage
 
@@ -245,12 +253,10 @@ class Privacy(c.BaseModule):
         # Header
         main_box.append(c.label('Privacy Monitor', style='heading'))
 
-        # Group by category
-        categories = {
-            'Audio Recording': {'icon': '', 'devices': {}},
-            'Video Recording': {'icon': '', 'devices': {}},
-            'Screen Sharing': {'icon': '', 'devices': {}},
-        }
+        # Group by category using direct assignment
+        audio_devices = {}
+        video_devices = {}
+        screen_devices = {}
 
         for friendly_name, info in data.items():
             if not isinstance(info, dict):
@@ -258,15 +264,22 @@ class Privacy(c.BaseModule):
             device_type = info.get('type')
 
             if device_type == 'audio':
-                categories['Audio Recording']['devices'][friendly_name] = info
+                audio_devices[friendly_name] = info
             elif device_type == 'video':
-                categories['Video Recording']['devices'][friendly_name] = info
+                video_devices[friendly_name] = info
             elif device_type == 'screen_share':
-                categories['Screen Sharing']['devices'][friendly_name] = info
+                screen_devices[friendly_name] = info
 
-        active_cats = {k: v for k, v in categories.items() if v['devices']}
+        # Build categories dict only for non-empty ones
+        categories = []
+        if audio_devices:
+            categories.append(('', 'Audio Recording', audio_devices))
+        if video_devices:
+            categories.append(('', 'Video Recording', video_devices))
+        if screen_devices:
+            categories.append(('', 'Screen Sharing', screen_devices))
 
-        if not active_cats:
+        if not categories:
             main_box.append(
                 c.label('No active devices detected', style='inner-box'))
             return main_box
@@ -275,20 +288,21 @@ class Privacy(c.BaseModule):
         scroll = c.scroll(height=350)
         content_box = c.box('v', spacing=15)
 
-        for cat_name, cat_data in active_cats.items():
+        for icon, cat_name, devices in categories:
             cat_section = c.box('v', spacing=8)
 
             # Category header with icon
             cat_header = c.box('h', spacing=10)
-            cat_header.append(c.label(cat_data['icon']))
+            cat_header.append(c.label(icon))
             cat_header.append(c.label(cat_name, style='title'))
             cat_section.append(cat_header)
 
             # Device list
             dev_container = c.box('v', style='box')
 
-            devices = cat_data['devices']
-            for i, (name, info) in enumerate(devices.items()):
+            items = list(devices.items())
+            last_idx = len(items) - 1
+            for i, (name, info) in enumerate(items):
                 dev_box = c.box('v', spacing=5, style='box-item')
 
                 # Device name and path
@@ -297,14 +311,14 @@ class Privacy(c.BaseModule):
                                style='gray', ha='start'))
 
                 # Processes
-                for prog in sorted(info.get('processes', [])):
+                for prog in sorted(info.get('processes', ())):
                     prog_row = c.box('h', spacing=8)
                     prog_row.append(c.label('●'))
                     prog_row.append(c.label(prog, ha='start'))
                     dev_box.append(prog_row)
 
                 dev_container.append(dev_box)
-                if i != len(devices) - 1:
+                if i != last_idx:
                     dev_container.append(c.sep('h'))
 
             cat_section.append(dev_container)
