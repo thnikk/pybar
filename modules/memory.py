@@ -175,10 +175,19 @@ class Memory(c.BaseModule):
                     r_pid = get_repr(pid)
                     if r_pid not in aggregates:
                         root = all_procs[r_pid]
+                        # Build full command from exe path + cmdline args
+                        cmdline = root.get('cmdline') or []
+                        if cmdline:
+                            # Use exe as the executable path, fall back to cmdline[0]
+                            exe_path = root.get('exe') or cmdline[0]
+                            args = cmdline[1:] if len(cmdline) > 1 else []
+                            full_cmd = f"{exe_path} {' '.join(args)}".strip()
+                        else:
+                            full_cmd = root.get('exe') or root['name']
                         aggregates[r_pid] = {
                             'pid': r_pid,
                             'name': root['name'],
-                            'cmd': root['cmd'] or root['name'],
+                            'cmd': full_cmd,
                             'rss': 0
                         }
                     aggregates[r_pid]['rss'] += all_procs[pid]['rss']
