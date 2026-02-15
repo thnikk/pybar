@@ -24,10 +24,13 @@ class MemoryBar(c.PillBar):
         # 1. Add process segments
         for p in procs:
             if 'rgb' in p:
+                tooltip = p.get('cmd', p.get('name', ''))
+                if len(tooltip) > 300:
+                    tooltip = tooltip[:297] + "..."
                 segments.append({
                     'percent': p['percent'],
                     'color': p['rgb'],
-                    'tooltip': p.get('cmd', p.get('name', ''))
+                    'tooltip': tooltip
                 })
 
         # 2. Add remaining used memory
@@ -494,7 +497,10 @@ class Memory(c.BaseModule):
                 if i < len(procs):
                     p = procs[i]
                     pw[f'p_name_{i}'].set_text(p['name'])
-                    pw[f'p_cmd_{i}'].set_text(p['cmd'])
+                    cmd_text = p['cmd']
+                    if len(cmd_text) > 300:
+                        cmd_text = cmd_text[:297] + "..."
+                    pw[f'p_cmd_{i}'].set_text(cmd_text)
                     pw[f'p_mem_{i}'].set_text(p['mem'])
 
                     ind = pw[f'p_ind_{i}']
