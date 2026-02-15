@@ -51,7 +51,7 @@ jobs:
       - name: Zip Artifact
         run: |
           cd dist/pybar
-          zip ../pybar-arch.zip *
+          zip ../../pybar-arch.zip *
 
       - name: Create Artifact
         uses: actions/upload-artifact@v4
@@ -96,7 +96,7 @@ jobs:
       - name: Zip Artifact
         run: |
           cd dist/pybar
-          zip ../pybar-ubuntu.zip *
+          zip ../../pybar-ubuntu.zip *
 
       - name: Create Artifact
         uses: actions/upload-artifact@v4
