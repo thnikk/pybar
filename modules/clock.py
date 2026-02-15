@@ -172,11 +172,18 @@ class Clock(c.BaseModule):
                 if isinstance(child, Gtk.Label):
                     classes = child.get_css_classes()
                     if 'day-number' in classes:
+                        # Check if this is today before clearing classes
+                        is_today = 'today' in classes
+
                         for cls in [
                                 'blue', 'orange', 'green', 'blue-fg',
                                 'orange-fg', 'green-fg', 'calendar-event']:
                             if cls in classes:
                                 child.remove_css_class(cls)
+
+                        # Re-apply today class if it was present
+                        if is_today:
+                            child.add_css_class('today')
 
                         if 'other-month' not in classes:
                             try:
