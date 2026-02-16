@@ -286,7 +286,9 @@ class Disks(c.BaseModule):
             widget.popover_widgets[f'part_percent_{i}'] = p_percent_label
 
         scroll = c.scroll(height=max(
-            100, min(400, len(data['partitions']) * 60)), width=400)
+            100, min(400, len(data['partitions']) * 60)), width=400,
+            style='scroll')
+        scroll.set_overflow(Gtk.Overflow.HIDDEN)
         scroll.set_child(part_list)
         part_section.append(scroll)
         main_box.append(part_section)
