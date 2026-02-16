@@ -32,6 +32,7 @@ class Power(c.BaseModule):
 
     def power_action(self, _btn, command):
         """ Action for power menu buttons """
+        self.module.get_popover().popdown()  # Dismiss before action
         run(command, check=False, capture_output=False)
 
     def build_popover(self):
@@ -41,6 +42,10 @@ class Power(c.BaseModule):
         buttons = {
             "Lock  ": self.config.get("lock", ["swaylock"]),
             "Log out  ": self.config.get("log_out", ["swaymsg", "exit"]),
+            "Blank Displays ": [
+                "swayidle", "-w", "timeout", "3",
+                'swaymsg "output * power off"', "resume",
+                'swaymsg "output * power on" && pkill swayidle'],
             "Suspend  ": ["systemctl", "suspend"],
             "Reboot  ": ["systemctl", "reboot"],
             "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
@@ -74,6 +79,8 @@ class Power(c.BaseModule):
         m.set_position(bar.position)
         m.set_icon('')
         m.set_visible(True)
+        self.module = m
+        self.bar = bar
         m.set_widget(self.build_popover())
 
         sub_id = c.state_manager.subscribe(
