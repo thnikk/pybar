@@ -661,6 +661,11 @@ popover.bar-context-menu button:hover {
 	color: @white;
 }
 
+.mode {
+	background: @red;
+	color: @black;
+}
+
 /* Scroll indicators for scrollable areas */
 scrolledwindow undershoot.top {
 	background: linear-gradient(to bottom,
