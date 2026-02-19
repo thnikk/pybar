@@ -617,6 +617,11 @@ class Bar:
                 loaded_module = module.module(self, name, self.config)
                 if loaded_module:
                     section.append(loaded_module)
+                else:
+                    logging.warning(
+                        f"Module '{name}' could not be loaded and will "
+                        "be skipped."
+                    )
 
     def _on_right_click(self, gesture, n_press, x, y):
         """ Handle right-click on bar to show context menu """

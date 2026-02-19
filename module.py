@@ -294,33 +294,36 @@ def module(bar, name, config):
     if instance:
         return instance.create_widget(bar)
 
-    # Generic fallback
-    import weakref
-    
-    m = c.Module()
-    m.set_position(bar.position)
+    # Waybar-style command fallback
+    if 'command' in module_config:
+        import weakref
+        
+        m = c.Module()
+        m.set_position(bar.position)
 
-    # Use weak reference to widget to break circular reference
-    widget_ref = weakref.ref(m)
-    
-    def generic_update(data):
-        widget = widget_ref()
-        if widget is None or not data:
-            return
-        if 'text' in data:
-            widget.set_label(data['text'])
-            widget.set_visible(bool(data['text']))
-        if 'icon' in data:
-            widget.set_icon(data['icon'])
-        if 'tooltip' in data:
-            widget.set_tooltip_text(str(data['tooltip']))
-        widget.reset_style()
-        if 'class' in data:
-            c.add_style(widget, data['class'])
-        if data.get('stale'):
-            c.add_style(widget, 'stale')
-    
-    sub_id = c.state_manager.subscribe(name, generic_update)
-    m._subscriptions.append(sub_id)
-    m._update_callback = generic_update
-    return m
+        # Use weak reference to widget to break circular reference
+        widget_ref = weakref.ref(m)
+        
+        def generic_update(data):
+            widget = widget_ref()
+            if widget is None or not data:
+                return
+            if 'text' in data:
+                widget.set_label(data['text'])
+                widget.set_visible(bool(data['text']))
+            if 'icon' in data:
+                widget.set_icon(data['icon'])
+            if 'tooltip' in data:
+                widget.set_tooltip_text(str(data['tooltip']))
+            widget.reset_style()
+            if 'class' in data:
+                c.add_style(widget, data['class'])
+            if data.get('stale'):
+                c.add_style(widget, 'stale')
+        
+        sub_id = c.state_manager.subscribe(name, generic_update)
+        m._subscriptions.append(sub_id)
+        m._update_callback = generic_update
+        return m
+
+    return None
