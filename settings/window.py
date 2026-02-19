@@ -106,6 +106,14 @@ button.restart-btn.reloading {
     background: #888888;
     color: #cccccc;
 }
+
+.inspector-btn {
+    opacity: 0;
+}
+
+.inspector-btn:hover {
+    opacity: 0.4;
+}
 """
 from settings.tabs.general import GeneralTab
 from settings.tabs.modules import ModulesTab
@@ -129,10 +137,11 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         inspector_btn = Gtk.Button()
         inspector_icon = Gtk.Image.new_from_icon_name(
-            'emblem-system-symbolic'
+            'system-search-symbolic'
         )
         inspector_btn.set_child(inspector_icon)
         inspector_btn.add_css_class('flat')
+        inspector_btn.add_css_class('inspector-btn')
         inspector_btn.set_tooltip_text('Open GTK Inspector')
         inspector_btn.connect('clicked', self._open_inspector)
         header.pack_start(inspector_btn)
