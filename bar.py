@@ -670,6 +670,12 @@ class Bar:
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)
 
+        # Inspector button
+        inspector_btn = c.icon_button('', 'Inspector')
+        inspector_btn.get_style_context().add_class('flat')
+        inspector_btn.connect('clicked', self._open_inspector, popover)
+        menu_box.append(inspector_btn)
+
         popover.set_child(menu_box)
 
         # Position the popover at click location
@@ -694,6 +700,11 @@ class Bar:
         popover.popdown()
         # Reload configuration and rebuild bars without spawning new process
         GLib.idle_add(self.display.reload)
+
+    def _open_inspector(self, btn, popover):
+        """ Open GTK Inspector """
+        popover.popdown()
+        Gtk.Window.set_interactive_debugging(True)
 
     def modules(self, modules):
         """ Add modules to bar """
