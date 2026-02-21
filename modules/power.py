@@ -4,7 +4,7 @@ Description: Power module refactored for unified state
 Author: thnikk
 """
 import common as c
-from subprocess import run
+from subprocess import Popen
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk  # noqa
@@ -33,7 +33,7 @@ class Power(c.BaseModule):
     def power_action(self, _btn, command):
         """ Action for power menu buttons """
         self.module.get_popover().popdown()  # Dismiss before action
-        run(command, check=False, capture_output=False)
+        Popen(command)
 
     def build_popover(self):
         """ Build power menu popover """
@@ -43,9 +43,10 @@ class Power(c.BaseModule):
             "Lock  ": self.config.get("lock", ["swaylock"]),
             "Log out  ": self.config.get("log_out", ["swaymsg", "exit"]),
             "Blank Displays ": [
-                "swayidle", "-w", "timeout", "3",
-                'swaymsg "output * power off"', "resume",
-                'swaymsg "output * power on" && pkill swayidle'],
+                "swayidle", "-w",
+                "timeout", "3", 'swaymsg "output * power off"',
+                "resume", 'swaymsg "output * power on" && pkill swayidle'
+            ],
             "Suspend  ": ["systemctl", "suspend"],
             "Reboot  ": ["systemctl", "reboot"],
             "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
