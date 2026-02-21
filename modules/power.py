@@ -12,17 +12,17 @@ from gi.repository import Gtk  # noqa
 
 class Power(c.BaseModule):
     SCHEMA = {
-        'lock': {
+        'sway_lock': {
             'type': 'string',
             'default': 'swaylock',
-            'label': 'Lock Command',
-            'description': 'Command to lock the screen'
+            'label': 'Sway Lock Command',
+            'description': 'Command to lock the screen in Sway'
         },
-        'log_out': {
+        'hyprland_lock': {
             'type': 'string',
-            'default': 'swaymsg exit',
-            'label': 'Log Out Command',
-            'description': 'Command to log out'
+            'default': 'hyprlock',
+            'label': 'Hyprland Lock Command',
+            'description': 'Command to lock the screen in Hyprland'
         }
     }
 
@@ -32,21 +32,34 @@ class Power(c.BaseModule):
 
     def power_action(self, _btn, command):
         """ Action for power menu buttons """
+        import shlex
         self.module.get_popover().popdown()  # Dismiss before action
+        if isinstance(command, str):
+            command = shlex.split(command)
         Popen(command)
 
     def build_popover(self):
         """ Build power menu popover """
         main_box = c.box('v', spacing=30)
 
+        is_hyprland = getattr(self, 'wm', 'sway') == 'hyprland'
+
+        lock_cmd = self.config.get('hyprland_lock', ["hyprlock"]) if is_hyprland else self.config.get('sway_lock', ["swaylock"])
+        logout_cmd = ["hyprctl", "dispatch", "exit"] if is_hyprland else ["swaymsg", "exit"]
+        blank_cmd = [
+            "swayidle", "-w",
+            "timeout", "3", 'hyprctl dispatch dpms off',
+            "resume", 'hyprctl dispatch dpms on && pkill swayidle'
+        ] if is_hyprland else [
+            "swayidle", "-w",
+            "timeout", "3", 'swaymsg "output * power off"',
+            "resume", 'swaymsg "output * power on" && pkill swayidle'
+        ]
+
         buttons = {
-            "Lock  ": self.config.get("lock", ["swaylock"]),
-            "Log out  ": self.config.get("log_out", ["swaymsg", "exit"]),
-            "Blank Displays ": [
-                "swayidle", "-w",
-                "timeout", "3", 'swaymsg "output * power off"',
-                "resume", 'swaymsg "output * power on" && pkill swayidle'
-            ],
+            "Lock  ": lock_cmd,
+            "Log out  ": logout_cmd,
+            "Blank Displays ": blank_cmd,
             "Suspend  ": ["systemctl", "suspend"],
             "Reboot  ": ["systemctl", "reboot"],
             "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
@@ -82,6 +95,7 @@ class Power(c.BaseModule):
         m.set_visible(True)
         self.module = m
         self.bar = bar
+        self.wm = bar.display.wm
         m.set_widget(self.build_popover())
 
         sub_id = c.state_manager.subscribe(
