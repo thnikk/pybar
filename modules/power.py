@@ -52,8 +52,8 @@ class Power(c.BaseModule):
             "resume", 'hyprctl dispatch dpms on && pkill swayidle'
         ] if is_hyprland else [
             "swayidle", "-w",
-            "timeout", "3", 'swaymsg "output * power off"',
-            "resume", 'swaymsg "output * power on" && pkill swayidle'
+            "timeout", "3", 'swaymsg "output * dpms off"',
+            "resume", 'swaymsg "output * dpms on" && pkill swayidle'
         ]
 
         buttons = {
