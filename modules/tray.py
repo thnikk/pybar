@@ -646,6 +646,11 @@ class TrayIcon(Gtk.Box):
         click.set_button(0)  # Handle all buttons
         click.connect("released", self._on_click)
         self.add_controller(click)
+
+        self.set_has_tooltip(False)
+        self._tooltip_text = ""
+        c.set_hover_popover(self, lambda: self._tooltip_text, delay=200)
+
         self.update()
 
     def _get_custom_icon(self):
@@ -910,10 +915,11 @@ class TrayIcon(Gtk.Box):
         if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
             title = tooltip[2]
             desc = tooltip[3] if len(tooltip) > 3 else ""
-            self.set_tooltip_markup(
-                f"<b>{title}</b>\n{desc}" if desc else title)
+            self._tooltip_text = f"{title}\n{desc}" if desc else title
         elif props.get("Title"):
-            self.set_tooltip_text(props.get("Title"))
+            self._tooltip_text = props.get("Title")
+        else:
+            self._tooltip_text = ""
 
         status = props.get("Status", "Active")
         self.set_visible(status != "Passive")
