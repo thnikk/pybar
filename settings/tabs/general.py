@@ -36,7 +36,7 @@ class GeneralTab(Gtk.Box):
         self.append(self.popovers_group)
 
         for key, schema_field in GLOBAL_SCHEMA.items():
-            if key in ['style', 'outputs']:
+            if key in ['style', 'outputs', 'bar-height', 'font-size']:
                 continue
 
             value = config.get(key, schema_field.get('default'))
@@ -59,6 +59,21 @@ class GeneralTab(Gtk.Box):
                 
                 row.add_suffix(dropdown)
                 row.set_activatable_widget(dropdown)
+
+                # Add reset button
+                reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+                reset_btn.set_valign(Gtk.Align.CENTER)
+                reset_btn.add_css_class('flat')
+                reset_btn.set_tooltip_text('Reset to default')
+                
+                def on_reset_clicked(_, k=key, d=dropdown, s=schema_field):
+                    choices = s.get('choices', [])
+                    default = s.get('default')
+                    if default in choices:
+                        d.set_selected(choices.index(default))
+
+                reset_btn.connect('clicked', on_reset_clicked)
+                row.add_suffix(reset_btn)
                 
                 class SimpleEditor:
                     def __init__(self, dropdown, choices, key, parent):
@@ -95,6 +110,17 @@ class GeneralTab(Gtk.Box):
                 # Use the actual control widget for alignment if possible
                 editor.set_valign(Gtk.Align.CENTER)
                 row.add_suffix(editor)
+
+                # Add reset button
+                reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+                reset_btn.set_valign(Gtk.Align.CENTER)
+                reset_btn.add_css_class('flat')
+                reset_btn.set_tooltip_text('Reset to default')
+                reset_btn.connect(
+                    'clicked', lambda _, k=key, e=editor, s=schema_field:
+                    e.set_value(s.get('default'))
+                )
+                row.add_suffix(reset_btn)
 
                 # If it's a toggle, make the row activatable
                 if hasattr(editor, 'switch'):

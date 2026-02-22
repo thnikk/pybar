@@ -43,6 +43,22 @@ GLOBAL_SCHEMA = {
         'min': 0,
         'max': 50
     },
+    'bar-height': {
+        'type': FieldType.INTEGER,
+        'default': 28,
+        'label': 'Bar Height',
+        'description': 'Minimum height of the bar in pixels',
+        'min': 20,
+        'max': 100
+    },
+    'font-size': {
+        'type': FieldType.INTEGER,
+        'default': 16,
+        'label': 'Font Size',
+        'description': 'Base font size for the bar in pixels',
+        'min': 8,
+        'max': 48
+    },
     'popover-autohide': {
         'type': FieldType.BOOLEAN,
         'default': True,

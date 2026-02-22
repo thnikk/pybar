@@ -82,9 +82,31 @@ class Display:
         if self.default_css_data:
             self._add_css_provider(self.default_css_data, from_string=True)
             
+        # Apply dynamic overrides from config
+        dynamic_css = self._generate_dynamic_css()
+        if dynamic_css:
+            self._add_css_provider(dynamic_css, from_string=True)
+
         # Load custom CSS
         if 'style' in self.config:
             self._add_css_provider(self.config['style'], from_string=False)
+
+    def _generate_dynamic_css(self):
+        """Generate CSS from config values"""
+        css = []
+        
+        bar_height = self.config.get('bar-height')
+        font_size = self.config.get('font-size')
+        
+        if bar_height is not None or font_size is not None:
+            css.append(".bar {")
+            if bar_height is not None:
+                css.append(f"    min-height: {bar_height}px;")
+            if font_size is not None:
+                css.append(f"    font-size: {font_size}px;")
+            css.append("}")
+            
+        return "\n".join(css) if css else None
 
     def _add_css_provider(self, data, from_string=False):
         """Helper to create and attach a CSS provider"""

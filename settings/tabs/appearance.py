@@ -29,6 +29,44 @@ class AppearanceTab(Gtk.Box):
         header.set_focusable(True)
         self.append(header)
 
+        # Bar Dimensions
+        dimensions_group = Adw.PreferencesGroup()
+        dimensions_group.set_title('Dimensions & Typography')
+        self.append(dimensions_group)
+
+        for key in ['bar-height', 'font-size']:
+            schema_field = GLOBAL_SCHEMA[key]
+            value = config.get(key, schema_field['default'])
+            
+            row = Adw.ActionRow()
+            row.set_title(schema_field.get('label', key))
+            row.set_subtitle(schema_field.get('description', ''))
+
+            editor = create_editor(
+                key, schema_field, value, self._on_field_change,
+                show_label=False
+            )
+            editor.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(editor)
+
+            # Add reset button
+            reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+            reset_btn.set_valign(Gtk.Align.CENTER)
+            reset_btn.add_css_class('flat')
+            reset_btn.set_tooltip_text('Reset to default')
+            reset_btn.connect(
+                'clicked', lambda _, k=key, e=editor, s=schema_field:
+                e.set_value(s['default'])
+            )
+            row.add_suffix(reset_btn)
+
+            dimensions_group.add(row)
+            
+            if key == 'bar-height':
+                self.bar_height_editor = editor
+            else:
+                self.font_size_editor = editor
+
         style_schema = GLOBAL_SCHEMA['style']
         self.style_editor = create_editor(
             'style', style_schema,
@@ -90,10 +128,16 @@ class AppearanceTab(Gtk.Box):
         self.config = config
         self.style_editor.set_value(config.get('style', ''))
         self.outputs_editor.set_value(config.get('outputs', []))
+        self.bar_height_editor.set_value(
+            config.get('bar-height', GLOBAL_SCHEMA['bar-height']['default']))
+        self.font_size_editor.set_value(
+            config.get('font-size', GLOBAL_SCHEMA['font-size']['default']))
 
     def get_values(self):
         """Get current values"""
         return {
             'style': self.style_editor.get_value(),
-            'outputs': self.outputs_editor.get_value()
+            'outputs': self.outputs_editor.get_value(),
+            'bar-height': self.bar_height_editor.get_value(),
+            'font-size': self.font_size_editor.get_value()
         }
