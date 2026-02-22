@@ -3,13 +3,12 @@
 Description: Appearance settings tab
 Author: thnikk
 """
+from settings.widgets.editors import create_editor
+from settings.schema import FieldType, GLOBAL_SCHEMA
+from gi.repository import Gtk, Adw, Gdk
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, Gdk
-
-from settings.schema import FieldType, GLOBAL_SCHEMA
-from settings.widgets.editors import create_editor
 
 
 class AppearanceTab(Gtk.Box):
@@ -31,13 +30,13 @@ class AppearanceTab(Gtk.Box):
 
         # Bar Dimensions
         dimensions_group = Adw.PreferencesGroup()
-        dimensions_group.set_title('Dimensions & Typography')
+        dimensions_group.set_title('Dimensions &amp; Typography')
         self.append(dimensions_group)
 
         for key in ['bar-height', 'font-size']:
             schema_field = GLOBAL_SCHEMA[key]
             value = config.get(key, schema_field['default'])
-            
+
             row = Adw.ActionRow()
             row.set_title(schema_field.get('label', key))
             row.set_subtitle(schema_field.get('description', ''))
@@ -61,7 +60,7 @@ class AppearanceTab(Gtk.Box):
             row.add_suffix(reset_btn)
 
             dimensions_group.add(row)
-            
+
             if key == 'bar-height':
                 self.bar_height_editor = editor
             else:
@@ -78,7 +77,7 @@ class AppearanceTab(Gtk.Box):
         outputs_schema = GLOBAL_SCHEMA['outputs']
         outputs_schema['choices'] = self._get_monitors()
         outputs_schema['choices_label'] = 'Add monitor...'
-        
+
         self.outputs_editor = create_editor(
             'outputs', outputs_schema,
             config.get('outputs', outputs_schema['default']),
