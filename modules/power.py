@@ -32,7 +32,7 @@ class Power(c.BaseModule):
 
     def __init__(self, name, config):
         super().__init__(name, config)
-        self.blanking_thread = None
+        self.blanking_active = False
 
     def fetch_data(self):
         """ Power module doesn't really have data but we follow the pattern """
@@ -53,6 +53,10 @@ class Power(c.BaseModule):
 
     def blank_displays(self):
         """ Turn off displays and wait for input """
+        if self.blanking_active:
+            return
+        self.blanking_active = True
+
         is_hyprland = getattr(self, 'wm', 'sway') == 'hyprland'
         off_cmd = ["hyprctl", "dispatch", "dpms", "off"] if is_hyprland else ["swaymsg", "output * dpms off"]
         on_cmd = ["hyprctl", "dispatch", "dpms", "on"] if is_hyprland else ["swaymsg", "output * dpms on"]
@@ -104,6 +108,7 @@ class Power(c.BaseModule):
             finally:
                 for dev in devices:
                     dev.close()
+                self.blanking_active = False
 
         threading.Thread(target=listener, daemon=True).start()
 
