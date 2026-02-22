@@ -802,6 +802,7 @@ class TrayIcon(Gtk.Box):
         self.popover_menu = Gtk.PopoverMenu.new_from_model(menu_model)
         self.popover_menu.add_css_class("tray-popover")
         self.popover_menu.set_parent(self)
+        self.popover_menu.set_can_focus(False)
         self.popover_menu.insert_action_group("menu", action_group)
         self.popover_menu.set_has_arrow(True)
         self.popover_menu.connect("map", lambda p: c.handle_popover_edge(p))
