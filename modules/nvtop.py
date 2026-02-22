@@ -282,7 +282,7 @@ class NVTop(c.BaseModule):
 
         # Dynamically manage level bars
         while len(widget.bar_gpu_levels) < len(devices):
-            levels_box = c.box('h', spacing=4)
+            levels_box = c.box('h', spacing=4, style='levels-box')
             l1 = Gtk.LevelBar.new_for_interval(0, 100)
             l1.set_min_value(0)
             l1.set_max_value(100)

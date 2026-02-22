@@ -32,6 +32,7 @@ window {
 	font-family: "Nunito SemiBold", "Font Awesome 6 Free Solid", "Font Awesome 7 Free Solid";
 	font-size: 16px;
 	color: @white;
+	min-height: 28px;
 }
 
 .module {
@@ -42,7 +43,7 @@ window {
 	text-shadow: none;
 	opacity: 0.8;
 	transition: opacity 200ms ease;
-	min-height: 0;
+	min-height: 24px;
 }
 
 .stale {
@@ -186,6 +187,10 @@ scrollbar slider { background: none; border: none; }
 .module levelbar trough { min-width: 3px; min-height: 15px; border: none; background: none; margin: 3px 0px;}
 .module levelbar block { border-radius: 3px; border: none; background: @gray; }
 .module levelbar block.filled { background-color: alpha(@white, 0.8); }
+
+.levels-box {
+	padding: 2px 0px;
+}
 
 scale trough { background: @black; border: 1px solid transparent; min-height: 4px; }
 scale trough highlight { background: alpha(@blue, 1); border: 1px solid transparent; }

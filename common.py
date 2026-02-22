@@ -836,8 +836,6 @@ class Module(Gtk.MenuButton):
         self.box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.box.set_vexpand(False)
         self.box.set_halign(Gtk.Align.CENTER)
-        self.box.set_margin_top(4)
-        self.box.set_margin_bottom(4)
 
         self.con.set_child(self.box)
         self.indicator.set_valign(Gtk.Align.END)
