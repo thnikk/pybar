@@ -162,11 +162,13 @@ class StatusNotifierItem:
 
             # Connect signals if they exist
             for signal_name, prop_names in [
-                ('NewTitle', ["Title"]),
-                ('NewIcon', ["IconName", "IconPixmap"]),
+                ('NewTitle', ["Title", "ToolTip"]),
+                ('NewIcon', ["IconName", "IconPixmap", "ToolTip", "Title"]),
                 ('NewAttentionIcon', [
-                 "AttentionIconName", "AttentionIconPixmap"]),
-                ('NewStatus', ["Status"])
+                 "AttentionIconName", "AttentionIconPixmap", "ToolTip"]),
+                ('NewOverlayIcon', ["OverlayIconName", "OverlayIconPixmap"]),
+                ('NewToolTip', ["ToolTip", "Title"]),
+                ('NewStatus', ["Status", "ToolTip"])
             ]:
                 if hasattr(self.item_proxy, signal_name):
                     getattr(self.item_proxy, signal_name).connect(
@@ -920,6 +922,12 @@ class TrayIcon(Gtk.Box):
             self._tooltip_text = props.get("Title")
         else:
             self._tooltip_text = ""
+
+        if hasattr(self, '_hover_popover') and self._hover_popover and self._hover_popover.get_visible():
+            if self._tooltip_text:
+                self._hover_popover.label.set_text(self._tooltip_text)
+            else:
+                self._hover_popover.popdown()
 
         status = props.get("Status", "Active")
         self.set_visible(status != "Passive")
