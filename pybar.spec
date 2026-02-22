@@ -18,6 +18,7 @@ a = Analysis(
         'psutil',
         'transmission_rpc',
         'colorsys',
+        'evdev'
     ],
     hookspath=[],
     hooksconfig={
