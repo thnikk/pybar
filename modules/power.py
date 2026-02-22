@@ -4,10 +4,14 @@ Description: Power module refactored for unified state
 Author: thnikk
 """
 import common as c
-from subprocess import Popen
+from subprocess import Popen, run
+import threading
+import select
+import time
+import evdev
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+from gi.repository import Gtk, GLib  # noqa
 
 
 class Power(c.BaseModule):
@@ -26,6 +30,10 @@ class Power(c.BaseModule):
         }
     }
 
+    def __init__(self, name, config):
+        super().__init__(name, config)
+        self.blanking_thread = None
+
     def fetch_data(self):
         """ Power module doesn't really have data but we follow the pattern """
         return {"icon": ""}
@@ -34,9 +42,70 @@ class Power(c.BaseModule):
         """ Action for power menu buttons """
         import shlex
         self.module.get_popover().popdown()  # Dismiss before action
+
+        if command == "blank":
+            self.blank_displays()
+            return
+
         if isinstance(command, str):
             command = shlex.split(command)
         Popen(command)
+
+    def blank_displays(self):
+        """ Turn off displays and wait for input """
+        is_hyprland = getattr(self, 'wm', 'sway') == 'hyprland'
+        off_cmd = ["hyprctl", "dispatch", "dpms", "off"] if is_hyprland else ["swaymsg", "output * dpms off"]
+        on_cmd = ["hyprctl", "dispatch", "dpms", "on"] if is_hyprland else ["swaymsg", "output * dpms on"]
+
+        def listener():
+            devices = []
+            try:
+                # Filter for keyboards and pointers
+                for path in evdev.list_devices():
+                    try:
+                        dev = evdev.InputDevice(path)
+                        caps = dev.capabilities()
+                        # EV_KEY (1), EV_REL (2), EV_ABS (3)
+                        if 1 in caps or 2 in caps or 3 in caps:
+                            devices.append(dev)
+                        else:
+                            dev.close()
+                    except (PermissionError, OSError):
+                        continue
+
+                if not devices:
+                    run([
+                        "notify-send", "Pybar Power Module",
+                        "No input devices found or permission denied."
+                    ])
+                    return
+
+                # Turn off displays
+                run(off_cmd)
+                time.sleep(1)  # Grace period to avoid instant wake
+
+                # Wait for input
+                while True:
+                    r, _, _ = select.select(devices, [], [])
+                    if r:
+                        break
+
+                # Wake up
+                run(on_cmd)
+
+            except PermissionError:
+                run([
+                    "notify-send", "Pybar Power Module",
+                    "Permission denied accessing /dev/input. "
+                    "Add user to 'input' group."
+                ])
+            except Exception as e:
+                run(["notify-send", "Pybar Power Module", f"Error: {str(e)}"])
+            finally:
+                for dev in devices:
+                    dev.close()
+
+        threading.Thread(target=listener, daemon=True).start()
 
     def build_popover(self):
         """ Build power menu popover """
@@ -46,20 +115,11 @@ class Power(c.BaseModule):
 
         lock_cmd = self.config.get('hyprland_lock', ["hyprlock"]) if is_hyprland else self.config.get('sway_lock', ["swaylock"])
         logout_cmd = ["hyprctl", "dispatch", "exit"] if is_hyprland else ["swaymsg", "exit"]
-        blank_cmd = [
-            "swayidle", "-w",
-            "timeout", "3", 'hyprctl dispatch dpms off',
-            "resume", 'hyprctl dispatch dpms on && pkill swayidle'
-        ] if is_hyprland else [
-            "swayidle", "-w",
-            "timeout", "3", 'swaymsg "output * dpms off"',
-            "resume", 'swaymsg "output * dpms on" && pkill swayidle'
-        ]
 
         buttons = {
             "Lock  ": lock_cmd,
             "Log out  ": logout_cmd,
-            "Blank Displays ": blank_cmd,
+            "Blank Displays ": "blank",
             "Suspend  ": ["systemctl", "suspend"],
             "Reboot  ": ["systemctl", "reboot"],
             "Reboot to UEFI  ": ["systemctl", "reboot", "--firmware-setup"],
