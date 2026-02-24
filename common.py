@@ -1222,6 +1222,11 @@ class Widget(Gtk.Popover):
         if config.get('popover-arrow', False):
             handle_popover_edge(self)
 
+        # Highlight the parent module while the popover is open
+        parent = self.get_parent()
+        if parent:
+            parent.add_css_class('popover-open')
+
         if config.get('popover-exclusive', False):
             active = state_manager.get('active_popover')
             if active and active != self:
@@ -1245,6 +1250,11 @@ class Widget(Gtk.Popover):
         """ Clear active popover if it's us """
         if state_manager.get('active_popover') == self:
             state_manager.update('active_popover', None)
+
+        # Remove highlight from parent module
+        parent = self.get_parent()
+        if parent:
+            parent.remove_css_class('popover-open')
 
         # Unsubscribe from workspace changes when hidden
         if self._workspace_subscription:
