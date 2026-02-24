@@ -297,16 +297,20 @@ class Volume(c.BaseModule):
             section_box.append(c.label(name, style='title', ha='start'))
             devices_box = c.box('v', style='box')
 
-            for i, device in enumerate(devices):
-                # Skip monitors
-                if name != 'Programs' and 'Monitor of' in device.get(
-                        'description', ''):
-                    continue
+            # Filter monitors before iterating so separator logic is correct
+            if name != 'Programs':
+                visible = [
+                    d for d in devices
+                    if 'Monitor of' not in d.get('description', '')
+                ]
+            else:
+                visible = devices
 
+            for i, device in enumerate(visible):
                 dev_row, controls = self.build_device_row(name, device)
                 widget.popover_widgets[name][device['index']] = controls
                 devices_box.append(dev_row)
-                if i != len(devices) - 1:
+                if i != len(visible) - 1:
                     devices_box.append(c.sep('h'))
 
             section_box.append(devices_box)
