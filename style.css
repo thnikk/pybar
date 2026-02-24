@@ -253,7 +253,7 @@ entry.normal, entry.normal > text, entry.normal text {
 }
 
 .normal:hover, button.normal:hover, entry.normal:hover {
-	background: #1c1f26;
+	background: #3b4252;
 	border: 1px solid rgba(255,255,255,0.1);
 }
 
