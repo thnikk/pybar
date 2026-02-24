@@ -71,6 +71,14 @@ GLOBAL_SCHEMA = {
         'label': 'Exclusive Popovers',
         'description': 'Only allow one popover open at a time'
     },
+    'popover-arrow': {
+        'type': FieldType.BOOLEAN,
+        'default': False,
+        'label': 'Popover Arrow',
+        'description': (
+            'Show the popover arrow (disables margin)'
+        )
+    },
     'popover-hide-on-workspace-change': {
         'type': FieldType.BOOLEAN,
         'default': True,

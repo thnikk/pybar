@@ -1156,6 +1156,13 @@ class Widget(Gtk.Popover):
         autohide = config.get('popover-autohide', True)
         self.set_autohide(autohide)
 
+        # Disable arrow and add margin unless popover-arrow is set
+        if not config.get('popover-arrow', False):
+            self.set_has_arrow(False)
+            margin = 5
+            self.set_margin_bottom(margin)
+            self.set_margin_top(margin)
+
         self.box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
@@ -1210,9 +1217,11 @@ class Widget(Gtk.Popover):
 
     def _on_map(self, _):
         """ Check if we are close to the screen edge and flatten corners """
-        handle_popover_edge(self)
-
         config = state_manager.get('config') or {}
+        # handle_popover_edge is incompatible with no-arrow mode
+        if config.get('popover-arrow', False):
+            handle_popover_edge(self)
+
         if config.get('popover-exclusive', False):
             active = state_manager.get('active_popover')
             if active and active != self:
