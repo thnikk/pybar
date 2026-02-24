@@ -91,7 +91,7 @@ class Workspaces(c.BaseModule):
                 raw = json.loads(run(
                     ['hyprctl', '-j', 'workspaces'],
                     check=True, capture_output=True).stdout.decode('utf-8'))
-                workspaces = [w['name'] for w in raw]
+                workspaces = sorted([w['name'] for w in raw])
                 focused = json.loads(run(
                     ['hyprctl', '-j', 'activeworkspace'],
                     check=True, capture_output=True
@@ -102,13 +102,14 @@ class Workspaces(c.BaseModule):
                 monitor_map = {
                     w['name']: str(monitors.index(w['monitor']) + 1)
                     for w in raw}
-                # Get active workspaces per monitor
+                # Get active workspaces per monitor (use name for
+                # consistency with workspaces list)
                 monitors_data = json.loads(run(
                     ['hyprctl', '-j', 'monitors'],
                     check=True, capture_output=True
                 ).stdout.decode('utf-8'))
                 visible = [
-                    str(m['activeWorkspace']['id'])
+                    str(m['activeWorkspace']['name'])
                     for m in monitors_data
                 ]
                 return {
