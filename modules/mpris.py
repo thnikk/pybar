@@ -169,7 +169,7 @@ class MPRIS(c.BaseModule):
         },
         'visualizer': {
             'type': 'boolean',
-            'default': True,
+            'default': False,
             'label': 'Visualizer',
             'description': 'Show animated bar visualizer over album art'
         }
