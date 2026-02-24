@@ -36,8 +36,8 @@ class Visualizer(Gtk.DrawingArea):
     # Gradient top/bottom alpha values
     # ALPHA_TOP = 0.95
     # ALPHA_BOT = 0.25
-    ALPHA_TOP = 1
-    ALPHA_BOT = 1
+    ALPHA_TOP = 0.6
+    ALPHA_BOT = 0.6
 
     def __init__(self, width, height=56):
         super().__init__()
@@ -171,7 +171,7 @@ class MPRIS(c.BaseModule):
             'type': 'boolean',
             'default': False,
             'label': 'Visualizer',
-            'description': 'Show animated bar visualizer over album art'
+            'description': 'Show dummy visualizer over album art'
         }
     }
 
@@ -333,9 +333,10 @@ class MPRIS(c.BaseModule):
                 player_identity = unwrap(self.active_player_proxy.Identity)
             except Exception:
                 pass
-            
+
             if not player_identity:
-                player_identity = self.active_player_bus_name.split('.')[-1].capitalize()
+                player_identity = self.active_player_bus_name.split(
+                    '.')[-1].capitalize()
 
             return {
                 "status": status,
@@ -592,8 +593,8 @@ class MPRIS(c.BaseModule):
             data.get('song', 'Unknown Song'),
             length=art_size // 15, style='title')
         widget.pop_artist = c.label(
-                data.get('artist', ''), style='artist',
-                wrap=art_size // 15)
+            data.get('artist', ''), style='artist',
+            length=art_size // 15)
         widget.pop_artist.set_visible(bool(data.get('artist')))
 
         content_box.append(widget.pop_song)
