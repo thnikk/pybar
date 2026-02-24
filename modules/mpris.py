@@ -6,6 +6,9 @@ Author: thnikk
 import common as c
 import os
 import hashlib
+import math
+import random
+import cairo
 import requests
 import time
 from dasbus.connection import SessionMessageBus
@@ -15,6 +18,103 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('GdkPixbuf', '2.0')
 from gi.repository import Gtk, Gdk, Pango, GdkPixbuf, GLib  # noqa
+
+
+class Visualizer(Gtk.DrawingArea):
+    """ Animated bar visualizer for album art overlay """
+
+    # Number of bars in the visualizer
+    BAR_COUNT = 40
+    # How often to tick the animation in milliseconds
+    TICK_MS = 40
+    # Fraction of bar area used per bar (rest is gap)
+    BAR_FILL = 0.5
+    # Smoothing factor for bar height interpolation
+    SMOOTH = 0.25
+    # Probability a bar picks a new random target each tick
+    RETARGET_CHANCE = 0.2
+    # Gradient top/bottom alpha values
+    # ALPHA_TOP = 0.95
+    # ALPHA_BOT = 0.25
+    ALPHA_TOP = 1
+    ALPHA_BOT = 1
+
+    def __init__(self, width, height=56):
+        super().__init__()
+        self.set_content_width(width)
+        self.set_content_height(height)
+        self.set_hexpand(True)
+        c.add_style(self, 'visualizer')
+        self.set_overflow(Gtk.Overflow.HIDDEN)
+        self._heights = [0.0] * self.BAR_COUNT
+        self._targets = [
+            random.uniform(0.05, 0.5) for _ in range(self.BAR_COUNT)
+        ]
+        self._timeout_id = None
+        self.set_draw_func(self._draw)
+
+    def start(self):
+        """ Begin animation ticks """
+        if self._timeout_id is None:
+            self._timeout_id = GLib.timeout_add(
+                self.TICK_MS, self._tick
+            )
+
+    def stop(self):
+        """ Stop animation tick; bar heights are preserved for the revealer """
+        if self._timeout_id is not None:
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
+
+    def _tick(self):
+        """ Advance animation one frame """
+        for i in range(self.BAR_COUNT):
+            if random.random() < self.RETARGET_CHANCE:
+                self._targets[i] = random.uniform(0.05, 1.0)
+            # Ease bar height towards target
+            self._heights[i] += (
+                (self._targets[i] - self._heights[i]) * self.SMOOTH
+            )
+        self.queue_draw()
+        return True
+
+    def _draw(self, _area, cr, width, height, *_args):
+        """ Draw background gradient then fully-rounded visualizer bars """
+        # Dark gradient behind bars for contrast
+        bg = cairo.LinearGradient(0, 0, 0, height)
+        bg.add_color_stop_rgba(0, 0.0, 0.0, 0.0, 0.0)
+        bg.add_color_stop_rgba(1, 0.0, 0.0, 0.0, 0.5)
+        cr.set_source(bg)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+
+        n = self.BAR_COUNT
+        slot_w = width / n
+        bar_w = slot_w * self.BAR_FILL
+        gap_w = slot_w * (1.0 - self.BAR_FILL)
+        # Radius is half bar width so the top is a perfect semicircle
+        r = bar_w / 2
+        for i, h in enumerate(self._heights):
+            # Minimum bar height is one full diameter so cap is always visible
+            bar_h = max(bar_w, h * height * 0.92)
+            x = i * slot_w + gap_w / 2
+            y = height - bar_h
+            grad = cairo.LinearGradient(x, y, x, height)
+            grad.add_color_stop_rgba(
+                0, 1.0, 1.0, 1.0, self.ALPHA_TOP
+            )
+            grad.add_color_stop_rgba(
+                1, 1.0, 1.0, 1.0, self.ALPHA_BOT
+            )
+            cr.set_source(grad)
+            # Full semicircle top, square bottom
+            cr.new_sub_path()
+            cr.arc(x + r, y + r, r, math.pi, 2 * math.pi)
+            cr.line_to(x + bar_w, height)
+            cr.line_to(x, height)
+            cr.close_path()
+            cr.fill()
+
 
 CACHE_DIR = os.path.expanduser('~/.cache/pybar')
 
@@ -66,6 +166,12 @@ class MPRIS(c.BaseModule):
             'default': True,
             'label': 'Show Title',
             'description': 'Show song title in the bar'
+        },
+        'visualizer': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Visualizer',
+            'description': 'Show animated bar visualizer over album art'
         }
     }
 
@@ -84,6 +190,7 @@ class MPRIS(c.BaseModule):
         self.last_used_player = None
         self.art_size = config.get('art_size', 300)
         self.show_title = config.get('show_title', True)
+        self.show_visualizer = config.get('visualizer', True)
 
     def find_player(self):
         """ Find a player matching the config """
@@ -391,6 +498,16 @@ class MPRIS(c.BaseModule):
             if widget.pop_play_btn.get_label() != label:
                 widget.pop_play_btn.set_label(label)
 
+        # Show/hide visualizer overlay based on playback state
+        if hasattr(widget, 'pop_vis_revealer') and \
+                hasattr(widget, 'pop_visualizer'):
+            is_playing = data.get('status') == 'playing'
+            widget.pop_vis_revealer.set_reveal_child(is_playing)
+            if is_playing:
+                widget.pop_visualizer.start()
+            else:
+                widget.pop_visualizer.stop()
+
     def build_popover(self, widget, data):
         """ Build mpris popover """
         main_box = c.box('v', spacing=10, style='small-widget')
@@ -423,7 +540,36 @@ class MPRIS(c.BaseModule):
 
         art_container.append(widget.pop_art)
         art_container.append(widget.pop_art_placeholder)
-        main_box.append(art_container)
+
+        # Wrap art in Gtk.Overlay so visualizer can float on top
+        art_overlay = Gtk.Overlay()
+        art_overlay.set_halign(Gtk.Align.CENTER)
+        art_overlay.set_child(art_container)
+
+        if self.show_visualizer:
+            # Visualizer anchored to the bottom of the art overlay
+            widget.pop_visualizer = Visualizer(art_size)
+            widget.pop_visualizer.set_valign(Gtk.Align.END)
+            widget.pop_visualizer.set_halign(Gtk.Align.FILL)
+
+            # Revealer hides/shows visualizer with a crossfade
+            widget.pop_vis_revealer = Gtk.Revealer()
+            widget.pop_vis_revealer.set_transition_type(
+                Gtk.RevealerTransitionType.CROSSFADE
+            )
+            widget.pop_vis_revealer.set_transition_duration(300)
+            widget.pop_vis_revealer.set_child(widget.pop_visualizer)
+            widget.pop_vis_revealer.set_valign(Gtk.Align.END)
+            widget.pop_vis_revealer.set_halign(Gtk.Align.FILL)
+            art_overlay.add_overlay(widget.pop_vis_revealer)
+
+            # Sync initial visualizer state with playback status
+            is_playing = data.get('status') == 'playing'
+            widget.pop_vis_revealer.set_reveal_child(is_playing)
+            if is_playing:
+                widget.pop_visualizer.start()
+
+        main_box.append(art_overlay)
 
         # Initial art load
         if art_path and os.path.exists(art_path):
