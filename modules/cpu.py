@@ -261,6 +261,7 @@ class CPU(c.BaseModule):
                 row.append(indicator)
 
                 name = c.label(f"Core {i}", ha='start')
+                name.set_width_chars(7)
                 name.set_margin_start(10)
                 row.append(name)
 
