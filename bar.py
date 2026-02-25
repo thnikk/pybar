@@ -712,17 +712,18 @@ class Bar:
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)
 
-        # Screenshot button
-        screenshot_btn = c.icon_button(' ', 'Screenshot')
-        screenshot_btn.get_style_context().add_class('flat')
-        screenshot_btn.connect('clicked', self._take_screenshot, popover)
-        menu_box.append(screenshot_btn)
+        if c.state_manager.get('debug'):
+            # Screenshot button
+            screenshot_btn = c.icon_button(' ', 'Screenshot')
+            screenshot_btn.get_style_context().add_class('flat')
+            screenshot_btn.connect('clicked', self._take_screenshot, popover)
+            menu_box.append(screenshot_btn)
 
-        # Inspector button
-        inspector_btn = c.icon_button('', 'Inspector')
-        inspector_btn.get_style_context().add_class('flat')
-        inspector_btn.connect('clicked', self._open_inspector, popover)
-        menu_box.append(inspector_btn)
+            # Inspector button
+            inspector_btn = c.icon_button('', 'Inspector')
+            inspector_btn.get_style_context().add_class('flat')
+            inspector_btn.connect('clicked', self._open_inspector, popover)
+            menu_box.append(inspector_btn)
 
         popover.set_child(menu_box)
 

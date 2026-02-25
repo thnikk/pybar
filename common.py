@@ -573,7 +573,7 @@ class PillBar(Gtk.DrawingArea):
 
 class StateManager:
     def __init__(self):
-        self.data = {}
+        self.data = {'debug': False}
         self.subscribers = {}
         self._next_id = 0
 

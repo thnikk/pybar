@@ -25,6 +25,8 @@ def parse_args():
     parser.add_argument('-g', '--gtk-log-level', type=str, default='WARNING',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the GTK/GLib logging level")
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help="Enable debug mode (enables inspector and screenshots)")
     args, unknown = parser.parse_known_args()
     return args
 
@@ -189,6 +191,7 @@ def main():
 
     config = Config.load(args.config)
     c.state_manager.update('config', config)
+    c.state_manager.update('debug', args.debug)
 
     # Set the cache directory if it's not specified in the config
     if "cache" not in list(config):
