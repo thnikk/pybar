@@ -678,7 +678,8 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         module_type = module_config.get('type', module_name)
 
         mod.discover_modules()
-        module_class = mod._module_map.get(module_type)
+        module_class = mod._module_map.get(module_type) or \
+                       mod._alias_map.get(module_type)
 
         if not module_class:
             # Re-add placeholder for no settings

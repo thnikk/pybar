@@ -664,8 +664,11 @@ class BaseModule:
         self.interval = config.get('interval', module_default or 60)
         self.cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
         self.last_data = None
+        import module
+        resolved_type = module.resolve_type(config.get('type', name))
         self.is_hass = name.startswith('hass') or \
-            config.get('type', '').startswith('hass')
+            resolved_type.startswith('hass') or \
+            resolved_type.startswith('homeassistant')
         self.empty_is_error = getattr(
             self.__class__, 'EMPTY_IS_ERROR', True
         )

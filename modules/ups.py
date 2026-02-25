@@ -184,5 +184,6 @@ class UPS(c.BaseModule):
 
 
 module_map = {
-    'ups': UPS
+    'cyberpower': UPS
 }
+alias_map = {'ups': UPS}

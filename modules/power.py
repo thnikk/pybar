@@ -174,5 +174,8 @@ class Power(c.BaseModule):
 
 
 module_map = {
+    'power_menu': Power
+}
+alias_map = {
     'power': Power
 }

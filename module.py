@@ -17,6 +17,8 @@ from gi.repository import Gtk, Gdk, GLib  # noqa
 
 _instances = {}
 _module_map = {}
+_alias_map = {}
+_canonical_map = {}
 _worker_threads = {}
 _worker_stop_flags = {}
 _worker_wake_flags = {}
@@ -24,20 +26,23 @@ _worker_wake_flags = {}
 
 def discover_modules():
     """Automatically discover modules in the modules/ directory in parallel"""
-    global _module_map
+    global _module_map, _alias_map, _canonical_map
     modules_dir = c.get_resource_path('modules')
     if not os.path.exists(modules_dir):
         return
 
     filenames = [f for f in os.listdir(modules_dir)
                  if f.endswith('.py') and f != '__init__.py']
-    
+
     def load_module(filename):
         module_name = filename[:-3]
         try:
             mod = importlib.import_module(f'modules.{module_name}')
-            if hasattr(mod, 'module_map'):
-                return mod.module_map
+            return {
+                'module_map': getattr(mod, 'module_map', {}),
+                'alias_map': getattr(mod, 'alias_map', {}),
+                'canonical_base': module_name
+            }
         except Exception as e:
             c.print_debug(
                 f"Failed to load module {module_name}: {e}", color='red')
@@ -47,7 +52,30 @@ def discover_modules():
     with ThreadPoolExecutor() as executor:
         results = executor.map(load_module, filenames)
         for res in results:
-            _module_map.update(res)
+            if not res:
+                continue
+            m_map = res['module_map']
+            a_map = res['alias_map']
+            base = res['canonical_base']
+
+            _module_map.update(m_map)
+            _alias_map.update(a_map)
+
+            # Map aliases to their canonical name
+            for alias, cls in a_map.items():
+                canonical = base
+                for k, v in m_map.items():
+                    if v == cls:
+                        canonical = k
+                        break
+                _canonical_map[alias] = canonical
+
+
+def resolve_type(module_type):
+    """Resolve an alias to its canonical module type"""
+    if not _module_map:
+        discover_modules()
+    return _canonical_map.get(module_type, module_type)
 
 
 def get_instance(name, config):
@@ -66,11 +94,15 @@ def get_instance(name, config):
     module_type = config.get('type', name)
     if module_type in _module_map:
         cls = _module_map[module_type]
-        instance = cls(name, config)
-        _instances[name] = instance
-        c.print_debug(f"Created new instance for {name}")
-        return instance
-    return None
+    elif module_type in _alias_map:
+        cls = _alias_map[module_type]
+    else:
+        return None
+
+    instance = cls(name, config)
+    _instances[name] = instance
+    c.print_debug(f"Created new instance for {name}")
+    return instance
 
 
 def start_worker(name, config):
@@ -162,7 +194,7 @@ def stop_all_workers():
 
 def clear_instances():
     """Clear all module instances for reload in parallel"""
-    global _instances, _module_map
+    global _instances, _module_map, _alias_map, _canonical_map
     import sys
     from concurrent.futures import ThreadPoolExecutor
 
@@ -198,6 +230,8 @@ def clear_instances():
 
     # Clear module map to force re-discovery on next use
     _module_map = {}
+    _alias_map = {}
+    _canonical_map = {}
 
     # Remove all dynamically loaded modules from sys.modules
     modules_to_remove = [
@@ -218,8 +252,10 @@ def command_worker(name, config):
     stop_event = _worker_stop_flags.get(name)
     wake_event = _worker_wake_flags.get(name)
     interval = config.get('interval', 60)
-    module_type = config.get('type', name)
-    is_hass = module_type.startswith('hass') or name.startswith('hass')
+    module_type = resolve_type(config.get('type', name))
+    is_hass = module_type.startswith('hass') or \
+              module_type.startswith('homeassistant') or \
+              name.startswith('hass')
     cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
 
     last_data = None

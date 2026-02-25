@@ -195,5 +195,8 @@ class HASS(c.BaseModule):
 
 
 module_map = {
+    'hass_sensor': HASS
+}
+alias_map = {
     'hass': HASS
 }

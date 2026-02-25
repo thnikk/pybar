@@ -162,5 +162,8 @@ class HASS2(c.BaseModule):
 
 
 module_map = {
+    'hass_dashboard': HASS2
+}
+alias_map = {
     'hass_2': HASS2
 }
