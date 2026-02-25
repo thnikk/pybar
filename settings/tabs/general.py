@@ -30,6 +30,14 @@ class GeneralTab(Gtk.Box):
         self.general_group.set_description('Configure global bar behavior')
         self.append(self.general_group)
 
+        # Floating Mode Group
+        self.floating_group = Adw.PreferencesGroup()
+        self.floating_group.set_title('Floating Mode')
+        self.floating_group.set_description(
+            'Configure floating bar appearance'
+        )
+        self.append(self.floating_group)
+
         # Popovers Group
         self.popovers_group = Adw.PreferencesGroup()
         self.popovers_group.set_title('Popovers')
@@ -126,7 +134,10 @@ class GeneralTab(Gtk.Box):
                 if hasattr(editor, 'switch'):
                     row.set_activatable_widget(editor.switch)
 
-            if 'popover' in key:
+            # Determine which group the setting belongs to
+            if key in ['floating-mode', 'margin', 'corner-radius']:
+                self.floating_group.add(row)
+            elif 'popover' in key:
                 self.popovers_group.add(row)
             else:
                 self.general_group.add(row)

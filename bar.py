@@ -97,13 +97,33 @@ class Display:
         
         bar_height = self.config.get('bar-height')
         font_size = self.config.get('font-size')
+        floating_mode = self.config.get('floating-mode', False)
+        corner_radius = self.config.get('corner-radius', 0)
         
-        if bar_height is not None or font_size is not None:
+        # Generate .bar CSS if any bar properties are set
+        if (bar_height is not None or font_size is not None or
+                floating_mode or corner_radius > 0):
             css.append(".bar {")
             if bar_height is not None:
                 css.append(f"    min-height: {bar_height}px;")
             if font_size is not None:
                 css.append(f"    font-size: {font_size}px;")
+            
+            # Apply full border when floating mode is enabled
+            if floating_mode:
+                css.append("    border: 1px solid rgba(255, 255, 255, 0.1);")
+                if corner_radius > 0:
+                    css.append(f"    border-radius: {corner_radius}px;")
+                else:
+                    css.append("    border-radius: 0px;")
+            else:
+                # Only top border when floating mode is disabled
+                css.append("    border: none;")
+                css.append(
+                    "    border-top: 1px solid rgba(255, 255, 255, 0.1);"
+                )
+                css.append("    border-radius: 0px;")
+            
             css.append("}")
             
         return "\n".join(css) if css else None
@@ -764,11 +784,9 @@ class Bar:
         Gtk4LayerShell.set_anchor(self.window, Gtk4LayerShell.Edge.LEFT, 1)
         Gtk4LayerShell.set_anchor(self.window, Gtk4LayerShell.Edge.RIGHT, 1)
 
-        # Set margin to make bar more readable for testing
-        try:
-            margin = self.config['margin']
-        except KeyError:
-            margin = 10
+        # Set margin only when floating mode is enabled
+        floating_mode = self.config.get('floating-mode', False)
+        margin = self.config.get('margin', 10) if floating_mode else 0
 
         Gtk4LayerShell.set_margin(
             self.window, Gtk4LayerShell.Edge.LEFT, margin)

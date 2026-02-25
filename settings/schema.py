@@ -27,13 +27,33 @@ GLOBAL_SCHEMA = {
         'description': 'Position of the bar on screen',
         'choices': ['top', 'bottom']
     },
+    'floating-mode': {
+        'type': FieldType.BOOLEAN,
+        'default': False,
+        'label': 'Floating Mode',
+        'description': 'Enable floating bar with full border and margins'
+    },
     'margin': {
         'type': FieldType.INTEGER,
         'default': 10,
         'label': 'Margin',
-        'description': 'Margin around the bar in pixels',
+        'description': (
+            'Margin around the bar in pixels '
+            '(only applied when floating mode is enabled)'
+        ),
         'min': 0,
         'max': 100
+    },
+    'corner-radius': {
+        'type': FieldType.INTEGER,
+        'default': 10,
+        'label': 'Corner Radius',
+        'description': (
+            'Corner radius of the bar in pixels '
+            '(only applied when floating mode is enabled)'
+        ),
+        'min': 0,
+        'max': 50
     },
     'spacing': {
         'type': FieldType.INTEGER,
