@@ -407,8 +407,14 @@ class Display:
             f"{list(self.bars.keys())}"
         )
 
+        # Preserve debug state
+        debug_mode = c.state_manager.get('debug')
+
         # Clear state manager subscribers BEFORE destroying widgets
         c.state_manager.clear()
+
+        # Restore debug state
+        c.state_manager.update('debug', debug_mode)
 
         # Destroy existing bars and cleanup modules
         for plug, bar in list(self.bars.items()):
