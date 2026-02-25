@@ -1,14 +1,17 @@
 name: Build and Release pybar
 
+permissions:
+  contents: write
+
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version tag (e.g., v1.0.0)'
-        required: true
+        description: 'Version tag (e.g., v1.0.0) - optional for builds'
+        required: false
         type: string
 
 jobs:
@@ -26,6 +29,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create virtual environment
         run: |
@@ -48,16 +53,11 @@ jobs:
           source venv/bin/activate
           pyinstaller pybar.spec
 
-      - name: Zip Artifact
-        run: |
-          cd dist/pybar
-          zip -r ../../pybar-arch.zip *
-
-      - name: Create Artifact
+      - name: Upload Arch Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pybar-arch-zip
-          path: pybar-arch.zip
+          name: pybar-archlinux
+          path: dist/pybar
 
   build:
     runs-on: ubuntu-latest
@@ -66,11 +66,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
           apt update
-          apt install -y libgirepository-2.0-dev libgtk-4-dev libatk1.0-dev openssl zip libgtk4-layer-shell-dev python3 python3-pip python3-venv git
+          apt install -y libgirepository-2.0-dev libgtk-4-dev \
+          libatk1.0-dev openssl zip libgtk4-layer-shell-dev python3 \
+          python3-pip python3-venv git
 
       - name: Create virtual environment
         run: |
@@ -93,45 +97,110 @@ jobs:
           . venv/bin/activate
           pyinstaller pybar.spec
 
-      - name: Zip Artifact
-        run: |
-          cd dist/pybar
-          zip -r ../../pybar-ubuntu.zip *
-
-      - name: Create Artifact
+      - name: Upload Ubuntu artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pybar-ubuntu-zip
-          path: pybar-ubuntu.zip
+          name: pybar-ubuntu
+          path: dist/pybar
 
   release:
-    name: Create Release
-    if: github.event_name == 'workflow_dispatch'
     needs: [build-arch, build]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    if: |
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.tag_name != '')
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Download Arch Artifact
+      - name: Download Arch Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: pybar-arch-zip
+          name: pybar-archlinux
+          path: ./artifacts/archlinux
 
-      - name: Download Ubuntu Artifact
+      - name: Download Ubuntu artifact
         uses: actions/download-artifact@v4
         with:
-          name: pybar-ubuntu-zip
+          name: pybar-ubuntu
+          path: ./artifacts/ubuntu
 
-      - name: Create GitHub Release
+      - name: Create zip archives
+        run: |
+          cd artifacts/archlinux
+          zip -r ../pybar-arch.zip *
+          cd ../ubuntu
+          zip -r ../pybar-ubuntu.zip *
+          cd ..
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get the tag name
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          else
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+          fi
+
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 \
+            "${TAG_NAME}^" 2>/dev/null || echo "")
+
+          # Generate changelog
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since ${PREV_TAG}" > notes.md
+            echo "" >> notes.md
+            git log ${PREV_TAG}..${TAG_NAME} \
+              --pretty=format:"* %s (%h)" >> notes.md
+          else
+            echo "## Initial Release" > notes.md
+          fi
+
+          echo "" >> notes.md
+          echo "## Downloads" >> notes.md
+          echo "" >> notes.md
+          echo "* \`pybar-arch.zip\` - Arch Linux build" >> notes.md
+          echo "* \`pybar-ubuntu.zip\` - Ubuntu build" >> notes.md
+
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          else
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+          fi
+
+          if echo "$TAG_NAME" | grep -qE '(alpha|beta|rc|pre)'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine release tag
+        id: release_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag_name }}
-          name: Release ${{ github.event.inputs.tag_name }}
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: Release ${{ steps.release_tag.outputs.tag }}
+          body_path: notes.md
           files: |
-            pybar-arch.zip
-            pybar-ubuntu.zip
+            ./artifacts/pybar-arch.zip
+            ./artifacts/pybar-ubuntu.zip
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
