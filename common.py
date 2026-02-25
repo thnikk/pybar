@@ -14,8 +14,10 @@ import math
 import cairo
 import logging
 gi.require_version('Gtk', '4.0')
+gi.require_version('Gsk', '4.0')
+gi.require_version('Graphene', '1.0')
 gi.require_version('Gtk4LayerShell', '1.0')
-from gi.repository import Gtk, Gdk, Gtk4LayerShell, Pango, GObject, GLib  # noqa
+from gi.repository import Gtk, Gdk, Gsk, Graphene, Gtk4LayerShell, Pango, GObject, GLib  # noqa
 
 
 # Alignment mapping for GTK
@@ -71,7 +73,6 @@ def register_fonts(font_dir):
                 color='red'
             )
             # Fall through to try original path anyway
-
     try:
         fontconfig = CDLL('libfontconfig.so.1')
         # FcConfigAppFontAddDir adds a directory to the application's font set
@@ -1234,7 +1235,7 @@ class Widget(Gtk.Popover):
             active = state_manager.get('active_popover')
             if active and active != self:
                 active.popdown()
-            state_manager.update('active_popover', self)
+        state_manager.update('active_popover', self)
 
         # Track workspace and subscribe to workspace visibility changes
         if config.get('popover-hide-on-workspace-change', True):
@@ -1632,3 +1633,164 @@ def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     if style:
         window.get_style_context().add_class(style)
     return window
+
+
+_capturing = False
+
+
+def capture_widget_to_png(widget, filename):
+    """
+    Capture a GTK widget to a PNG file with transparency support.
+    Automatically includes visible popovers and handles content bounds.
+    """
+    try:
+        # Get actual dimensions of the main widget
+        w = widget.get_allocated_width()
+        h = widget.get_allocated_height()
+
+        # Helper to find all visible popovers recursively
+        def find_popovers(parent):
+            found = []
+            if isinstance(parent, Gtk.MenuButton):
+                pop = parent.get_popover()
+                if pop and pop.get_visible():
+                    found.append(pop)
+            
+            child = parent.get_first_child()
+            while child:
+                found.extend(find_popovers(child))
+                child = child.get_next_sibling()
+            return found
+
+        # Find all relevant popovers
+        popovers = find_popovers(widget)
+        
+        # Also check global active popover if it's not already found
+        active_pop = state_manager.get('active_popover')
+        if active_pop and active_pop.get_visible() and active_pop not in popovers:
+            # Verify if it's related to our widget
+            res = active_pop.translate_coordinates(widget, 0, 0)
+            if res:
+                popovers.append(active_pop)
+
+        # Initial bounding box from main widget
+        min_x, min_y = 0.0, 0.0
+        max_x, max_y = float(w), float(h)
+
+        popover_data = []
+        for pop in popovers:
+            res = pop.translate_coordinates(widget, 0, 0)
+            if res:
+                px, py = res
+                pw = pop.get_allocated_width()
+                ph = pop.get_allocated_height()
+                min_x = min(min_x, float(px))
+                min_y = min(min_y, float(py))
+                max_x = max(max_x, float(px + pw))
+                max_y = max(max_y, float(py + ph))
+                popover_data.append((pop, float(px), float(py), float(pw), float(ph)))
+
+        # Calculate final dimensions
+        final_width = int(max_x - min_x)
+        final_height = int(max_y - min_y)
+
+        if final_width <= 0 or final_height <= 0:
+            return False
+
+        print_debug(f"Capture dimensions: {final_width}x{final_height} (offset: {min_x}, {min_y})")
+
+        # Create a snapshot for the combined rendering
+        snapshot = Gtk.Snapshot()
+        
+        # Adjust coordinate system to include everything
+        # We need to shift everything so min_x, min_y becomes 0, 0
+        offset = Graphene.Point()
+        offset.init(-min_x, -min_y)
+        snapshot.translate(offset)
+
+        # Snapshot the main widget
+        paintable = Gtk.WidgetPaintable.new(widget)
+        paintable.snapshot(snapshot, w, h)
+
+        # Snapshot all detected popovers
+        for pop, px, py, pw, ph in popover_data:
+            snapshot.save()
+            p_offset = Graphene.Point()
+            p_offset.init(px, py)
+            snapshot.translate(p_offset)
+            pop_paintable = Gtk.WidgetPaintable.new(pop)
+            pop_paintable.snapshot(snapshot, pw, ph)
+            snapshot.restore()
+
+        # Get the root render node from the snapshot
+        node = snapshot.to_node()
+        if not node:
+            return False
+
+        # Use CairoRenderer to convert the node into a texture
+        renderer = Gsk.CairoRenderer()
+        native = widget.get_native()
+        if not native:
+            return False
+
+        surface = native.get_surface()
+        renderer.realize(surface)
+
+        # Render the node to a Gdk.Texture
+        viewport = Graphene.Rect()
+        viewport.init(0, 0, final_width, final_height)
+        texture = renderer.render_texture(node, viewport)
+        if not texture:
+            renderer.unrealize()
+            return False
+
+        # Save the texture to a file
+        success = texture.save_to_png(filename)
+
+        # Cleanup
+        renderer.unrealize()
+        return success
+    except Exception as e:
+        print_debug(f"Screenshot error: {e}", color='red')
+        return False
+
+
+def take_screenshot(widget):
+    """
+    Helper to take a screenshot of a widget with a default filename and
+    notification. Returns False to be safe for GLib timeout handlers.
+    """
+    global _capturing
+    if _capturing:
+        return False
+    _capturing = True
+
+    try:
+        from subprocess import run
+        import os
+
+        # Ensure Screenshots directory exists
+        screenshot_dir = os.path.expanduser("~/Pictures/Screenshots")
+        try:
+            os.makedirs(screenshot_dir, exist_ok=True)
+        except Exception:
+            # Fallback to home if Pictures doesn't exist/work
+            screenshot_dir = os.path.expanduser("~")
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = os.path.join(screenshot_dir, f"pybar_{timestamp}.png")
+
+        if capture_widget_to_png(widget, filename):
+            print_debug(f"Screenshot saved to {filename}", color='green')
+            try:
+                run([
+                    "notify-send",
+                    "-i", "camera-photo",
+                    "Screenshot Captured",
+                    f"Saved to {filename}"
+                ])
+            except Exception:
+                pass
+    finally:
+        _capturing = False
+    return False

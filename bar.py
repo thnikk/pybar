@@ -712,6 +712,12 @@ class Bar:
         reload_btn.connect('clicked', self._reload_bar, popover)
         menu_box.append(reload_btn)
 
+        # Screenshot button
+        screenshot_btn = c.icon_button(' ', 'Screenshot')
+        screenshot_btn.get_style_context().add_class('flat')
+        screenshot_btn.connect('clicked', self._take_screenshot, popover)
+        menu_box.append(screenshot_btn)
+
         # Inspector button
         inspector_btn = c.icon_button('', 'Inspector')
         inspector_btn.get_style_context().add_class('flat')
@@ -742,6 +748,13 @@ class Bar:
         popover.popdown()
         # Reload configuration and rebuild bars without spawning new process
         GLib.idle_add(self.display.reload)
+
+    def _take_screenshot(self, btn, popover):
+        """ Take a screenshot of the bar """
+        popover.popdown()
+        # Small delay to ensure popover is gone
+        # take_screenshot returns False, stopping the timeout
+        GLib.timeout_add(500, lambda: c.take_screenshot(self.bar))
 
     def _open_inspector(self, btn, popover):
         """ Open GTK Inspector """
