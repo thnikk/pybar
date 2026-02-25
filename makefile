@@ -12,7 +12,7 @@ APP_NAME := pybar
 
 help:
 	@echo "Available targets:"
-	@echo "  install      - Install executable to ~/.local/bin/"
+	@echo "  install      - Symlink binary to ~/.local/bin/"
 	@echo "  dev-install  - Install development dependencies"
 	@echo "  build        - Build executable with PyInstaller"
 	@echo "  clean        - Remove build artifacts"
@@ -23,16 +23,15 @@ help:
 
 install: build
 	@mkdir -p $(INSTALL_DIR)
-	@rm -f $(INSTALL_DIR)/$(APP_NAME)
-	cp $(DIST_DIR)/$(APP_NAME) $(INSTALL_DIR)/
-	@echo "Installed $(APP_NAME) to $(INSTALL_DIR)"
+	ln -sf $(CURDIR)/$(DIST_DIR)/$(APP_NAME)/$(APP_NAME) $(INSTALL_DIR)/$(APP_NAME)
+	@echo "Linked $(APP_NAME) to $(INSTALL_DIR)"
 
 dev-install:
 	$(PIP) install -r requirements.txt
 	$(PIP) install -r requirements-dev.txt
 
 build:
-	$(VENV)/bin/pyinstaller $(SPEC_FILE)
+	$(VENV)/bin/pyinstaller $(SPEC_FILE) --noconfirm
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
