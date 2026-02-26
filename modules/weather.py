@@ -411,7 +411,7 @@ class Weather(c.BaseModule):
         hourly_box = c.box('h')
         hour_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
         for hour in data['Hourly']['info']:
-            hour_box = c.box('v', style='inner-box-wide')
+            hour_box = c.box('v', style='inner-box')
             hour_group.add_widget(hour_box)
 
             h_widgets = {}
