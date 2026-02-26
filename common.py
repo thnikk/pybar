@@ -1614,6 +1614,123 @@ def image(file_path=None, style=None, width=None, height=None):
     return widget
 
 
+class HScrollGradientBox(Gtk.Overlay):
+    """
+    Wraps a horizontal ScrolledWindow with edge-fade gradients and
+    an overscroll flash effect when the boundary is reached.
+    """
+
+    GRADIENT_WIDTH = 30
+    # #2b303b as floats for the 'box' background colour
+    BG = (0.169, 0.188, 0.231)
+
+    def __init__(self, scroll_widget):
+        super().__init__()
+        self._scroll = scroll_widget
+        self._flash_opacity = 0.0
+        self._flash_dir = 0   # -1 = left edge, +1 = right edge
+        self._anim_id = None
+        self.set_child(scroll_widget)
+
+        self._overlay = Gtk.DrawingArea()
+        self._overlay.set_can_target(False)
+        self._overlay.set_draw_func(self._draw)
+        self.add_overlay(self._overlay)
+
+        adj = scroll_widget.get_hadjustment()
+        adj.connect(
+            "value-changed", lambda *_: self._overlay.queue_draw())
+        adj.connect(
+            "changed", lambda *_: self._overlay.queue_draw())
+
+    def scroll_by(self, delta):
+        """
+        Advance the horizontal scroll by *delta* pixels.
+        Triggers an edge flash when the boundary is already reached.
+        """
+        adj = self._scroll.get_hadjustment()
+        val = adj.get_value()
+        upper = adj.get_upper()
+        page = adj.get_page_size()
+        max_val = upper - page
+        new_val = val + delta
+
+        if new_val < 0 and val <= 0:
+            self._start_flash(-1)
+        elif new_val > max_val and val >= max_val - 1:
+            self._start_flash(1)
+
+        adj.set_value(max(0.0, min(new_val, max_val)))
+
+    def _start_flash(self, direction):
+        """Animate a brief edge-flash to signal an overscroll attempt."""
+        if self._anim_id:
+            GLib.source_remove(self._anim_id)
+        self._flash_opacity = 0.7
+        self._flash_dir = direction
+
+        def _fade():
+            self._flash_opacity -= 0.05
+            if self._flash_opacity <= 0.0:
+                self._flash_opacity = 0.0
+                self._anim_id = None
+                self._overlay.queue_draw()
+                return False
+            self._overlay.queue_draw()
+            return True
+
+        self._anim_id = GLib.timeout_add(16, _fade)
+
+    def _rounded_rect(self, cr, x, y, w, h, r):
+        """Trace a rounded rectangle path."""
+        cr.new_sub_path()
+        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        cr.arc(x + w - r, y + r, r, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        cr.close_path()
+
+    def _draw(self, _area, cr, width, height, *_args):
+        adj = self._scroll.get_hadjustment()
+        val = adj.get_value()
+        upper = adj.get_upper()
+        page = adj.get_page_size()
+        gw = self.GRADIENT_WIDTH
+        fade_px = 40.0
+        r, g, b = self.BG
+        radius = 10
+
+        left_op = min(val / fade_px, 1.0)
+        right_op = min((upper - page - val) / fade_px, 1.0)
+
+        if self._flash_dir == -1:
+            left_op = max(left_op, self._flash_opacity)
+        elif self._flash_dir == 1:
+            right_op = max(right_op, self._flash_opacity)
+
+        cr.save()
+        self._rounded_rect(cr, 0, 0, width, height, radius)
+        cr.clip()
+
+        if left_op > 0:
+            pat = cairo.LinearGradient(0, 0, gw, 0)
+            pat.add_color_stop_rgba(0, r, g, b, left_op)
+            pat.add_color_stop_rgba(1, r, g, b, 0.0)
+            cr.rectangle(0, 0, gw, height)
+            cr.set_source(pat)
+            cr.fill()
+
+        if right_op > 0:
+            pat = cairo.LinearGradient(width - gw, 0, width, 0)
+            pat.add_color_stop_rgba(0, r, g, b, 0.0)
+            pat.add_color_stop_rgba(1, r, g, b, right_op)
+            cr.rectangle(width - gw, 0, gw, height)
+            cr.set_source(pat)
+            cr.fill()
+
+        cr.restore()
+
+
 def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     """ Create scrollable window """
     window = Gtk.ScrolledWindow(hexpand=hexpand, vexpand=vexpand)

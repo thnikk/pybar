@@ -395,14 +395,14 @@ class Weather(c.BaseModule):
             hourly_container.append(time_box)
 
         hourly_scroll = c.scroll(width=400, style='box')
+        hourly_scroll_wrapper = c.HScrollGradientBox(hourly_scroll)
 
         # Convert vertical scroll to horizontal scroll
         scroll_controller = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL)
 
         def on_scroll(_, _dx, dy):
-            adj = hourly_scroll.get_hadjustment()
-            adj.set_value(adj.get_value() + (dy * 50))
+            hourly_scroll_wrapper.scroll_by(dy * 50)
             return True
 
         scroll_controller.connect("scroll", on_scroll)
@@ -441,7 +441,7 @@ class Weather(c.BaseModule):
             widget_obj.popover_widgets['hourly'].append(h_widgets)
 
         hourly_scroll.set_child(hourly_box)
-        hourly_container.append(hourly_scroll)
+        hourly_container.append(hourly_scroll_wrapper)
         widget.append(hourly_container)
 
         daily_container = c.box('v', spacing=10)
