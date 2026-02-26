@@ -214,6 +214,7 @@ class Weather(c.BaseModule):
                     "time": target_day.strftime('%A'),
                     "high": round(w['daily']['temperature_2m_max'][d]),
                     "low": round(w['daily']['temperature_2m_min'][d]),
+                    "wind": round(w['daily']['wind_speed_10m_max'][d]),
                     "description": self.lookup(
                         w['daily']['weathercode'][d], 1),
                     "icon": self.lookup(w['daily']['weathercode'][d], 0)
@@ -447,26 +448,46 @@ class Weather(c.BaseModule):
         daily_container.append(c.label(
             'Daily forecast', style='title', ha='start'))
         daily_box = c.box('v', style='box')
+        day_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+        icon_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+        wind_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
+        hl_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
 
         for day in data['Daily']['info']:
-            day_box = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
+            day_box = c.box('h', spacing=10)
             day_box.get_style_context().add_class('inner-box')
 
             d_widgets = {}
-            time_lbl = c.label(day['time'])
-            day_box.set_start_widget(time_lbl)
+
+            # 1. Day
+            time_lbl = c.label(day['time'], ha='start')
+            time_lbl.set_xalign(0.0)
+            day_group.add_widget(time_lbl)
+            day_box.append(time_lbl)
             d_widgets['time'] = time_lbl
 
-            hl_lbl = c.label(f"{day['high']}° / {day['low']}°")
-            day_box.set_end_widget(hl_lbl)
-            d_widgets['hl'] = hl_lbl
-
-            icon = c.label(day['icon'])
-            day_box.set_center_widget(icon)
+            # 2. Icon
+            icon = c.label(day['icon'], ha='center', he=True)
+            icon_group.add_widget(icon)
+            day_box.append(icon)
             d_widgets['icon'] = icon
             d_widgets['description'] = day['description']
             c.set_hover_popover(
                 icon, lambda w=d_widgets: w['description'])
+
+            # 3. Wind
+            wind_lbl = c.label(
+                f" {day.get('wind', 0)}mph", style="gray", ha='center', he=True)
+            wind_group.add_widget(wind_lbl)
+            day_box.append(wind_lbl)
+            d_widgets['wind'] = wind_lbl
+
+            # 4. HL
+            hl_lbl = c.label(f"{day['high']}° / {day['low']}°", ha='end')
+            hl_lbl.set_xalign(1.0)
+            hl_group.add_widget(hl_lbl)
+            day_box.append(hl_lbl)
+            d_widgets['hl'] = hl_lbl
 
             daily_box.append(day_box)
             if day != data['Daily']['info'][-1]:
@@ -552,6 +573,9 @@ class Weather(c.BaseModule):
                     d_widgets['time'].set_text(d_data['time'])
                     d_widgets['hl'].set_text(
                         f"{d_data['high']}° / {d_data['low']}°")
+                    if 'wind' in d_widgets:
+                        d_widgets['wind'].set_text(
+                            f" {d_data.get('wind', 0)}mph")
                     d_widgets['icon'].set_text(d_data['icon'])
                     d_widgets['description'] = d_data['description']
 
