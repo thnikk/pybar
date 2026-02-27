@@ -1566,6 +1566,12 @@ def slider(value, min=0, max=100, style=None, scrollable=True):
     if style:
         widget.get_style_context().add_class(style)
 
+    # Disable the built-in long-press gesture that triggers touch fine-adjust
+    # mode, which doesn't function correctly with a mouse.
+    for controller in widget.observe_controllers():
+        if isinstance(controller, Gtk.GestureLongPress):
+            controller.set_propagation_phase(Gtk.PropagationPhase.NONE)
+
     if not scrollable:
         scroll_controller = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL)
