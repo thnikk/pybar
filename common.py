@@ -1456,8 +1456,12 @@ def button(label=None, style=None, ha=None, length=None):
         if isinstance(child, Gtk.Label):
             child.set_max_width_chars(length)
             child.set_ellipsize(Pango.EllipsizeMode.END)
-            if len(label) > length:
-                widget.set_tooltip_text(label)
+            # Use a callable so the popover always reflects the
+            # current label, returning None when not truncated.
+            def _hover_text(w=widget, lim=length):
+                t = w.get_label()
+                return t if t and len(t) > lim else None
+            set_hover_popover(widget, _hover_text)
     return widget
 
 
