@@ -116,19 +116,28 @@ class Weather(c.BaseModule):
         except (ValueError, IndexError, AttributeError):
             return str(time_string)
 
+    def _get_session(self):
+        # Reuse a single session to avoid accumulating connections.
+        if not hasattr(self, '_session') or self._session is None:
+            self._session = requests.Session()
+        return self._session
+
     def fetch_data(self):
         """ Fetch weather data from OpenMeteo """
         zip_code = self.config.get('zip_code', "94102")
         night_icons = self.config.get('night_icons', True)
         hours_to_show = 24
+        session = self._get_session()
 
         try:
             # Geocode
-            geo = requests.get(
+            with session.get(
                 "https://geocoding-api.open-meteo.com/v1/search", params={
                     "name": zip_code, "count": 1,
                     "language": "en", "format": "json"
-                }, timeout=5).json()
+                }, timeout=5
+            ) as _r:
+                geo = _r.json()
 
             if not geo.get('results'):
                 return {}
@@ -138,24 +147,31 @@ class Weather(c.BaseModule):
                 res['timezone'], res['name']
 
             # Weather
-            w = requests.get("https://api.open-meteo.com/v1/forecast", params={
-                "latitude": lat, "longitude": lon,
-                "temperature_unit": "fahrenheit", "timezone": tz,
-                "hourly": [
-                    "temperature_2m", "relativehumidity_2m", "weathercode",
-                    "apparent_temperature", "windspeed_10m"],
-                "daily": [
-                    "weathercode", "temperature_2m_max", "temperature_2m_min",
-                    "sunrise", "sunset", "wind_speed_10m_max"]
-            }, timeout=5).json()
+            with session.get(
+                "https://api.open-meteo.com/v1/forecast", params={
+                    "latitude": lat, "longitude": lon,
+                    "temperature_unit": "fahrenheit", "timezone": tz,
+                    "hourly": [
+                        "temperature_2m", "relativehumidity_2m",
+                        "weathercode", "apparent_temperature",
+                        "windspeed_10m"],
+                    "daily": [
+                        "weathercode", "temperature_2m_max",
+                        "temperature_2m_min", "sunrise", "sunset",
+                        "wind_speed_10m_max"]
+                }, timeout=5
+            ) as _r:
+                w = _r.json()
 
             # Pollution
-            p = requests.get(
+            with session.get(
                 "https://air-quality-api.open-meteo.com/v1/air-quality",
                 params={
                     "latitude": lat, "longitude": lon,
                     "hourly": "us_aqi", "timezone": tz
-                }, timeout=5).json()
+                }, timeout=5
+            ) as _r:
+                p = _r.json()
 
             now = datetime.now()
             hour_now = now.hour
@@ -526,16 +542,22 @@ class Weather(c.BaseModule):
         if data.get('stale'):
             c.add_style(widget, 'stale')
 
-        # Optimization: Don't update if data hasn't changed
-        compare_data = data.copy()
-        # Weather data doesn't have a timestamp field usually, but just in case
-        compare_data.pop('timestamp', None)
-
+        # Fingerprint with lightweight scalars to avoid storing a full
+        # copy of the weather payload (hourly/daily arrays) on the widget.
+        today_info = data.get('Today', {}).get('info', [{}])[0]
+        hourly = data.get('Hourly', {})
+        fingerprint = (
+            data.get('City'),
+            today_info.get('temperature'),
+            today_info.get('description'),
+            len(hourly.get('info', [])),
+            hourly.get('temperatures', [None])[-1]
+        )
         if (widget.get_popover() and
-                getattr(widget, 'last_popover_data', None) == compare_data):
+                getattr(widget, '_popover_fingerprint', None) == fingerprint):
             return
 
-        widget.last_popover_data = compare_data
+        widget._popover_fingerprint = fingerprint
 
         needs_rebuild = False
         if not widget.get_popover() or not hasattr(widget, 'popover_widgets'):

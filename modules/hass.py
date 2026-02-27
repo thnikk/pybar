@@ -69,17 +69,24 @@ class HASS(c.BaseModule):
         }
     }
 
+    def _get_session(self):
+        # Reuse a single session to avoid accumulating connections.
+        if not hasattr(self, '_session') or self._session is None:
+            self._session = requests.Session()
+        return self._session
+
     def get_ha_data(self, server, sensor, bearer_token):
         try:
-            response = requests.get(
+            session = self._get_session()
+            with session.get(
                 f"http://{server}/api/states/{sensor}",
                 headers={
                     "Authorization": bearer_token,
                     "content-type": "application/json",
                 },
                 timeout=3
-            ).json()
-            return response
+            ) as response:
+                return response.json()
         except Exception as e:
             c.print_debug(f"HASS fetch failed: {e}", color='red')
             return None
@@ -191,14 +198,18 @@ class HASS(c.BaseModule):
         widget.set_visible(bool(data.get('text')))
 
         if not widget.get_active():
-            # Optimization: Don't rebuild popover if data hasn't changed
-            compare_data = data.copy()
-            compare_data.pop('timestamp', None)
-            
-            if getattr(widget, 'last_popover_data', None) == compare_data:
+            # Build a lightweight fingerprint to avoid storing a full
+            # data copy (including the history list) on the widget.
+            history = data.get('history', [])
+            fingerprint = (
+                data.get('state'),
+                len(history),
+                history[-1] if history else None
+            )
+            if getattr(widget, '_popover_fingerprint', None) == fingerprint:
                 return
 
-            widget.last_popover_data = compare_data
+            widget._popover_fingerprint = fingerprint
             widget.set_widget(self.build_popover(widget, data))
         else:
             if widget.graph:

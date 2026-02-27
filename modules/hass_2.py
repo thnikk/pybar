@@ -3,6 +3,7 @@
 Description: Home Assistant dashboard module refactored for unified state
 Author: thnikk
 """
+import weakref
 import requests
 import common as c
 import gi
@@ -47,15 +48,22 @@ class HASS2(c.BaseModule):
         }
     }
 
+    def _get_session(self):
+        # Reuse a single session to avoid accumulating connections.
+        if not hasattr(self, '_session') or self._session is None:
+            self._session = requests.Session()
+        return self._session
+
     def get_ha_state(self, server, entity, token):
         try:
-            res = requests.get(
+            with self._get_session().get(
                 f"http://{server}/api/states/{entity}",
                 headers={
                     "Authorization": token,
                     "content-type": "application/json"},
-                timeout=3).json()
-            return res
+                timeout=3
+            ) as response:
+                return response.json()
         except Exception:
             return None
 
@@ -91,12 +99,14 @@ class HASS2(c.BaseModule):
         try:
             domain = eid.split('.')[0]
             # Always use toggle service for simplicity
-            requests.post(
+            with self._get_session().post(
                 f"http://{server}/api/services/{domain}/toggle",
                 headers={
                     "Authorization": token,
                     "content-type": "application/json"},
-                json={"entity_id": eid}, timeout=3)
+                json={"entity_id": eid}, timeout=3
+            ):
+                pass
         except Exception:
             pass
         return False
@@ -164,8 +174,16 @@ class HASS2(c.BaseModule):
         m.set_icon('')
         m.set_visible(False)
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        # Use a weak reference to avoid a reference cycle between the
+        # StateManager callback closure and the widget itself.
+        widget_ref = weakref.ref(m)
+
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
         return m
 
@@ -175,11 +193,16 @@ class HASS2(c.BaseModule):
         widget.set_visible(bool(data.get('sections')))
 
         if not widget.get_active():
-            # Skip rebuild when nothing has changed
-            compare = {k: v for k, v in data.items() if k != 'timestamp'}
-            if getattr(widget, 'last_popover_data', None) == compare:
+            # Fingerprint by section names and per-device state strings
+            # to avoid storing a full copy of the data dict on the widget.
+            sections = data.get('sections', {})
+            fingerprint = tuple(
+                (sec, tuple(d['state'] for d in devs))
+                for sec, devs in sections.items()
+            )
+            if getattr(widget, '_popover_fingerprint', None) == fingerprint:
                 return
-            widget.last_popover_data = compare
+            widget._popover_fingerprint = fingerprint
 
             new_popover = self.build_popover(data)
             # Disconnect all signals before the old tree is released
