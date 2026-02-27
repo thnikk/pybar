@@ -34,7 +34,7 @@ class Updates(c.BaseModule):
             'default': [],
             'label': 'Alerts',
             'description': 'List of packages to prioritize in package list'
-            }
+        }
     }
 
     manager_config = {
@@ -178,7 +178,7 @@ class Updates(c.BaseModule):
             for package in packages:
                 package_box = c.box('h', style='inner-box', spacing=20)
                 package_label = c.button(
-                    package[0], style='minimal', length=25)
+                    package[0], style='minimal', length=20)
                 if manager in urls:
                     package_label.connect(
                         'clicked', self.click_link,
@@ -187,7 +187,7 @@ class Updates(c.BaseModule):
                 package_box.append(
                     c.label(
                         package[1], style='green-fg', ha='end', he=True,
-                        length=15))
+                        length=10))
                 packages_box.append(package_box)
                 if package != packages[-1]:
                     packages_box.append(c.sep('h'))
@@ -231,12 +231,12 @@ class Updates(c.BaseModule):
         total = data.get('total', 0)
         widget.set_label(data.get('text', ''))
         widget.set_visible(bool(total))
-        
+
         if not widget.get_active():
             # Optimization: Don't rebuild popover if data hasn't changed
             compare_data = data.copy()
             compare_data.pop('timestamp', None)
-            
+
             if getattr(widget, 'last_popover_data', None) == compare_data:
                 return
 
