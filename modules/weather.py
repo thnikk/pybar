@@ -395,8 +395,9 @@ class Weather(c.BaseModule):
             time_box.append(hours_lbl)
             hourly_container.append(time_box)
 
-        hourly_scroll = c.scroll(width=400, style='box')
+        hourly_scroll = c.scroll(width=400)
         hourly_scroll_wrapper = c.HScrollGradientBox(hourly_scroll)
+        c.add_style(hourly_scroll_wrapper, 'box')
 
         # Convert vertical scroll to horizontal scroll
         scroll_controller = Gtk.EventControllerScroll.new(
