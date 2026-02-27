@@ -54,7 +54,7 @@ class Debug(c.BaseModule):
         processed = processed[-10:]
         while len(processed) < 10:
             processed.append({'level': 'INFO', 'text': ""})
-        
+
         self.last_lines = processed
         return processed
 
@@ -69,7 +69,9 @@ class Debug(c.BaseModule):
             # Check modification time to avoid redundant reads
             mtime = os.path.getmtime(log_path)
             if mtime <= self.last_mtime:
-                return {'lines': self.last_lines, 'is_empty': self.last_lines_empty}
+                return {
+                    'lines': self.last_lines,
+                    'is_empty': self.last_lines_empty}
             self.last_mtime = mtime
 
             # Read only the end of the file
@@ -84,14 +86,14 @@ class Debug(c.BaseModule):
                 # Read last 4KB, usually enough for 10 lines
                 buffer_size = min(filesize, 4096)
                 f.seek(max(0, filesize - buffer_size))
-                
+
                 content = f.read().decode('utf-8', errors='replace')
                 lines = content.splitlines()
-                
+
                 self.last_lines = self._pad_data(lines)
                 self.last_lines_empty = False
                 return {'lines': self.last_lines, 'is_empty': False}
-                
+
         except Exception as e:
             c.print_debug(f"Error reading log: {e}", color='red')
             data = [{'level': 'ERROR', 'text': f"Error: {e}"}]
@@ -116,13 +118,14 @@ class Debug(c.BaseModule):
 
         # Log display in scrollbox
         # Height 0 allows it to grow to fit its content (exactly 10 labels)
-        log_scroll = c.scroll(width=400, height=0, style='box')
-        log_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
-        
+        log_scroll = c.scroll(width=400, height=0)
+        log_scroll_wrapper = c.HScrollGradientBox(log_scroll)
+        c.add_style(log_scroll_wrapper, 'box')
+
         # Inner box for padding
         log_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         log_inner.get_style_context().add_class('inner-box')
-        
+
         # Container for the 10 lines
         lines_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         m.log_labels = []
@@ -132,23 +135,18 @@ class Debug(c.BaseModule):
             lbl.set_wrap(False)
             lines_box.append(lbl)
             m.log_labels.append(lbl)
-            
+
         log_inner.append(lines_box)
         log_scroll.set_child(log_inner)
-        main_box.append(log_scroll)
+        main_box.append(log_scroll_wrapper)
 
-        # Redirect vertical scroll to horizontal scroll
+        # Convert vertical scroll to horizontal scroll
         scroll_controller = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL)
-        scroll_ref = weakref.ref(log_scroll)
 
-        def on_scroll(_controller, _dx, dy):
-            scroll = scroll_ref()
-            if scroll:
-                adj = scroll.get_hadjustment()
-                adj.set_value(adj.get_value() + (dy * 50))
-                return True
-            return False
+        def on_scroll(_, _dx, dy):
+            log_scroll_wrapper.scroll_by(dy * 50)
+            return True
 
         scroll_controller.connect("scroll", on_scroll)
         log_scroll.add_controller(scroll_controller)
@@ -160,7 +158,7 @@ class Debug(c.BaseModule):
 
         # Get font size from config
         font_size = self.config.get('log_font_size', 13)
-        
+
         # Use weak references for the state change callback
         labels_ref = [weakref.ref(lbl) for lbl in m.log_labels]
 
@@ -187,20 +185,20 @@ class Debug(c.BaseModule):
                                 '&', '&amp;').replace(
                                 '<', '&lt;').replace(
                                 '>', '&gt;')
-                            
-                            # Use non-breaking space for empty lines to 
+
+                            # Use non-breaking space for empty lines to
                             # preserve height
                             if not escaped.strip():
                                 escaped = "&#160;"
-                                
+
                             markup = (f"<span font_family='monospace' "
-                                     f"size='{font_size * 1024}'>")
-                            
+                                      f"size='{font_size * 1024}'>")
+
                             if is_empty and escaped.strip() and escaped != "&#160;":
                                 markup += f"<span foreground='#888'><i>{escaped}</i></span>"
                             else:
                                 markup += f"<span foreground='{color}'>{escaped}</span>"
-                                
+
                             markup += "</span>"
                             label.set_markup(markup)
 
