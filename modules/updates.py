@@ -3,6 +3,7 @@
 Description: Package updates module refactored for unified state
 Author: thnikk
 """
+import weakref
 import subprocess
 import concurrent.futures
 from subprocess import Popen
@@ -212,8 +213,14 @@ class Updates(c.BaseModule):
         m.set_position(bar.position)
         m.set_visible(False)
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        widget_ref = weakref.ref(m)
+
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
         return m
 

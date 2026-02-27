@@ -87,23 +87,40 @@ class HASS2(c.BaseModule):
             "token": token
         }
 
-    def toggle_ha(self, data, eid, _state):
+    def toggle_ha(self, server, token, eid, _state):
         try:
             domain = eid.split('.')[0]
             # Always use toggle service for simplicity
             requests.post(
-                f"http://{data['server']}/api/services/{domain}/toggle",
+                f"http://{server}/api/services/{domain}/toggle",
                 headers={
-                    "Authorization": data['token'],
+                    "Authorization": token,
                     "content-type": "application/json"},
                 json={"entity_id": eid}, timeout=3)
         except Exception:
             pass
         return False
 
+    @staticmethod
+    def _disconnect_signals(widget):
+        """Recursively disconnect signals from a widget tree."""
+        from gi.repository import GObject
+        try:
+            GObject.signal_handlers_destroy(widget)
+        except Exception:
+            pass
+        child = widget.get_first_child()
+        while child:
+            HASS2._disconnect_signals(child)
+            child = child.get_next_sibling()
+
     def build_popover(self, data):
-        box = c.box('v', spacing=20)
-        box.append(c.label('Home Assistant', style='heading'))
+        # Capture only what toggle needs to keep closures small
+        server = data['server']
+        token = data['token']
+
+        outer = c.box('v', spacing=20)
+        outer.append(c.label('Home Assistant', style='heading'))
 
         for section, devices in data.get('sections', {}).items():
             sec_box = c.box('v', spacing=10)
@@ -124,9 +141,12 @@ class HASS2(c.BaseModule):
                     sw = Gtk.Switch.new()
                     sw.set_active(dev['state'] == 'on')
                     sw.set_valign(Gtk.Align.CENTER)
+                    # Capture only server/token/eid, not the full data dict
                     sw.connect(
-                        'state-set', lambda _s, st, d=data, eid=dev['id']:
-                        self.toggle_ha(d, eid, st))
+                        'state-set',
+                        lambda _s, st, srv=server, tok=token,
+                        eid=dev['id']:
+                        self.toggle_ha(srv, tok, eid, st))
                     row.append(sw)
 
                 ibox.append(row)
@@ -134,9 +154,9 @@ class HASS2(c.BaseModule):
                     ibox.append(c.sep('h'))
 
             sec_box.append(ibox)
-            box.append(sec_box)
+            outer.append(sec_box)
 
-        return box
+        return outer
 
     def create_widget(self, bar):
         m = c.Module(True, False)
@@ -152,13 +172,23 @@ class HASS2(c.BaseModule):
     def update_ui(self, widget, data):
         if not data:
             return
-        if data.get('sections'):
-            widget.set_visible(True)
-        else:
-            widget.set_visible(True)  # Force visible
+        widget.set_visible(bool(data.get('sections')))
 
         if not widget.get_active():
-            widget.set_widget(self.build_popover(data))
+            # Skip rebuild when nothing has changed
+            compare = {k: v for k, v in data.items() if k != 'timestamp'}
+            if getattr(widget, 'last_popover_data', None) == compare:
+                return
+            widget.last_popover_data = compare
+
+            new_popover = self.build_popover(data)
+            # Disconnect all signals before the old tree is released
+            old_popover = widget.get_popover()
+            if old_popover and hasattr(old_popover, 'get_child'):
+                child = old_popover.get_child()
+                if child:
+                    self._disconnect_signals(child)
+            widget.set_widget(new_popover)
 
 
 module_map = {

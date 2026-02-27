@@ -3,6 +3,7 @@
 Description: Clock widget using Gtk.Calendar
 Author: thnikk
 """
+import weakref
 import common as c
 from datetime import datetime
 import os
@@ -243,8 +244,14 @@ class Clock(c.BaseModule):
         m.set_icon('')
         m.set_widget(self.widget_content())
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        widget_ref = weakref.ref(m)
+
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
         return m
 

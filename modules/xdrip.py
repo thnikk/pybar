@@ -3,6 +3,7 @@
 Description: XDrip module refactored for unified state
 Author: thnikk
 """
+import weakref
 import requests
 from datetime import datetime, timezone
 import common as c
@@ -173,8 +174,14 @@ class XDrip(c.BaseModule):
         m = c.Module()
         m.set_position(bar.position)
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        widget_ref = weakref.ref(m)
+
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
         return m
 

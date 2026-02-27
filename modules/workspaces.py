@@ -7,6 +7,7 @@ from subprocess import Popen, PIPE, STDOUT, DEVNULL, run, CalledProcessError
 import socket
 import json
 import os
+import weakref
 import common as c
 import gi
 gi.require_version('Gtk', '4.0')
@@ -206,8 +207,14 @@ class Workspaces(c.BaseModule):
             box.indicators.append(indicator)
             overlay.add_overlay(indicator)
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(box, data))
+        box_ref = weakref.ref(box)
+
+        def update_callback(data):
+            widget = box_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         box._subscriptions = [sub_id]
 
         def cleanup():

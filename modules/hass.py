@@ -92,6 +92,11 @@ class HASS(c.BaseModule):
         if not all([server, sensor, token]):
             return {}
 
+        # Prune stale keys from global history when sensor changes
+        stale = [k for k in HISTORY if k != sensor]
+        for k in stale:
+            del HISTORY[k]
+
         data = self.get_ha_data(server, sensor, token)
         if not data or data.get('state') == 'unavailable':
             return {}
@@ -159,14 +164,24 @@ class HASS(c.BaseModule):
         return main_box
 
     def create_widget(self, bar):
+        import weakref
         m = c.Module()
         m.set_position(bar.position)
         m.graph = None
         m.duration_label = None
 
-        sub_id = c.state_manager.subscribe(
-            self.name, lambda data: self.update_ui(m, data))
+        # Use a weak reference to avoid a reference cycle between the
+        # StateManager callback closure and the widget itself.
+        widget_ref = weakref.ref(m)
+
+        def update_callback(data):
+            widget = widget_ref()
+            if widget is not None:
+                self.update_ui(widget, data)
+
+        sub_id = c.state_manager.subscribe(self.name, update_callback)
         m._subscriptions.append(sub_id)
+        m._update_callback = update_callback
         return m
 
     def update_ui(self, widget, data):
