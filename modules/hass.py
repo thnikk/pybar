@@ -13,6 +13,16 @@ from gi.repository import Gtk  # noqa
 HISTORY = {}
 
 
+def format_duration(seconds):
+    """ Format a duration using only the largest applicable unit. """
+    seconds = int(seconds)
+    if seconds >= 3600:
+        return f"{seconds // 3600}h"
+    if seconds >= 60:
+        return f"{seconds // 60}m"
+    return f"{seconds}s"
+
+
 class HASS(c.BaseModule):
     SCHEMA = {
         'server': {
@@ -161,7 +171,9 @@ class HASS(c.BaseModule):
 
             # Time legend below graph
             time_box = c.box('h')
-            duration_str = f"{data.get('duration', 0):.0f}s ago"
+            duration_str = (
+                format_duration(data.get('duration', 0)) + ' ago'
+            )
             widget.duration_label = c.label(
                 duration_str, style='gray', ha='start', he=True)
             time_box.append(widget.duration_label)
@@ -217,7 +229,7 @@ class HASS(c.BaseModule):
                     data.get('history', []), data.get('state'))
             if widget.duration_label:
                 widget.duration_label.set_text(
-                    f"{data.get('duration', 0):.0f}s ago")
+                    format_duration(data.get('duration', 0)) + ' ago')
 
 
 module_map = {
