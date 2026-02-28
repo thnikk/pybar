@@ -199,7 +199,6 @@ class Updates(c.BaseModule):
             large = len(packages) > 5
             pkg_scroll = c.scroll(style='scroll')
             pkg_scroll.set_overflow(False)
-            c.add_style(pkg_scroll, 'box')
             # c.scroll sets vertical policy to NEVER when height is 0
             pkg_scroll.set_policy(
                 Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -208,7 +207,9 @@ class Updates(c.BaseModule):
                 pkg_scroll.set_vexpand(True)
                 pkg_scroll.set_max_content_height(200)
             pkg_scroll.set_child(packages_box)
-            manager_box.append(pkg_scroll)
+            vsgb = c.VScrollGradientBox(pkg_scroll, gradient_size=60)
+            c.add_style(vsgb, 'box')
+            manager_box.append(vsgb)
             content_box.append(manager_box)
 
         main_box.append(content_box)

@@ -1681,9 +1681,13 @@ class HScrollGradientBox(Gtk.Overlay):
     # #2b303b as floats for the 'box' background colour
     BG = (0.169, 0.188, 0.231)
 
-    def __init__(self, scroll_widget):
+    def __init__(self, scroll_widget, gradient_size=None):
         super().__init__()
         self._scroll = scroll_widget
+        self._gradient_size = (
+            gradient_size if gradient_size is not None
+            else self.GRADIENT_WIDTH
+        )
         self._flash_opacity = 0.0
         self._flash_dir = 0   # -1 = left edge, +1 = right edge
         self._anim_id = None
@@ -1752,7 +1756,7 @@ class HScrollGradientBox(Gtk.Overlay):
         val = adj.get_value()
         upper = adj.get_upper()
         page = adj.get_page_size()
-        gw = self.GRADIENT_WIDTH
+        gw = self._gradient_size
         fade_px = 40.0
         r, g, b = self.BG
         radius = 10
@@ -1782,6 +1786,127 @@ class HScrollGradientBox(Gtk.Overlay):
             pat.add_color_stop_rgba(0, r, g, b, 0.0)
             pat.add_color_stop_rgba(1, r, g, b, right_op)
             cr.rectangle(width - gw, 0, gw, height)
+            cr.set_source(pat)
+            cr.fill()
+
+        cr.restore()
+
+
+class VScrollGradientBox(Gtk.Overlay):
+    """
+    Wraps a vertical ScrolledWindow with edge-fade gradients and
+    an overscroll flash effect when the boundary is reached.
+    """
+
+    GRADIENT_HEIGHT = 30
+    # #2b303b as floats for the 'box' background colour
+    BG = (0.169, 0.188, 0.231)
+
+    def __init__(self, scroll_widget, gradient_size=None):
+        super().__init__()
+        self._scroll = scroll_widget
+        self._gradient_size = (
+            gradient_size if gradient_size is not None
+            else self.GRADIENT_HEIGHT
+        )
+        self._flash_opacity = 0.0
+        self._flash_dir = 0   # -1 = top edge, +1 = bottom edge
+        self._anim_id = None
+        self.set_child(scroll_widget)
+
+        self._overlay = Gtk.DrawingArea()
+        self._overlay.set_can_target(False)
+        self._overlay.set_draw_func(self._draw)
+        self.add_overlay(self._overlay)
+
+        adj = scroll_widget.get_vadjustment()
+        adj.connect(
+            "value-changed", lambda *_: self._overlay.queue_draw())
+        adj.connect(
+            "changed", lambda *_: self._overlay.queue_draw())
+
+    def scroll_by(self, delta):
+        """
+        Advance the vertical scroll by *delta* pixels.
+        Triggers an edge flash when the boundary is already reached.
+        """
+        adj = self._scroll.get_vadjustment()
+        val = adj.get_value()
+        upper = adj.get_upper()
+        page = adj.get_page_size()
+        max_val = upper - page
+        new_val = val + delta
+
+        if new_val < 0 and val <= 0:
+            self._start_flash(-1)
+        elif new_val > max_val and val >= max_val - 1:
+            self._start_flash(1)
+
+        adj.set_value(max(0.0, min(new_val, max_val)))
+
+    def _start_flash(self, direction):
+        """Animate a brief edge-flash to signal an overscroll attempt."""
+        if self._anim_id:
+            GLib.source_remove(self._anim_id)
+        self._flash_opacity = 0.7
+        self._flash_dir = direction
+
+        def _fade():
+            self._flash_opacity -= 0.05
+            if self._flash_opacity <= 0.0:
+                self._flash_opacity = 0.0
+                self._anim_id = None
+                self._overlay.queue_draw()
+                return False
+            self._overlay.queue_draw()
+            return True
+
+        self._anim_id = GLib.timeout_add(16, _fade)
+
+    def _rounded_rect(self, cr, x, y, w, h, r):
+        """Trace a rounded rectangle path."""
+        cr.new_sub_path()
+        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        cr.arc(x + w - r, y + r, r, 3 * math.pi / 2, 2 * math.pi)
+        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        cr.close_path()
+
+    def _draw(self, _area, cr, width, height, *_args):
+        adj = self._scroll.get_vadjustment()
+        val = adj.get_value()
+        upper = adj.get_upper()
+        page = adj.get_page_size()
+        gh = self._gradient_size
+        fade_px = 40.0
+        r, g, b = self.BG
+        radius = 10
+
+        top_op = min(val / fade_px, 1.0)
+        bottom_op = min((upper - page - val) / fade_px, 1.0)
+
+        if self._flash_dir == -1:
+            top_op = max(top_op, self._flash_opacity)
+        elif self._flash_dir == 1:
+            bottom_op = max(bottom_op, self._flash_opacity)
+
+        cr.save()
+        self._rounded_rect(cr, 0, 0, width, height, radius)
+        cr.clip()
+
+        if top_op > 0:
+            pat = cairo.LinearGradient(0, 0, 0, gh)
+            pat.add_color_stop_rgba(0, r, g, b, top_op)
+            pat.add_color_stop_rgba(1, r, g, b, 0.0)
+            cr.rectangle(0, 0, width, gh)
+            cr.set_source(pat)
+            cr.fill()
+
+        if bottom_op > 0:
+            pat = cairo.LinearGradient(0, height - gh, 0, height)
+            pat.add_color_stop_rgba(0, r, g, b, 0.0)
+            pat.add_color_stop_rgba(1, r, g, b, bottom_op)
+            cr.rectangle(0, height - gh, width, gh)
             cr.set_source(pat)
             cr.fill()
 
