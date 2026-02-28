@@ -576,27 +576,48 @@ class StateManager:
         self.data = {'debug': False}
         self.subscribers = {}
         self._next_id = 0
+        # Track sub IDs that already have a pending idle callback so we
+        # never queue more than one per subscriber at a time.  The fired
+        # callback always reads the *latest* data rather than the snapshot
+        # captured when it was scheduled.
+        self._pending = set()
 
     def _generate_id(self):
         """Generate unique subscription ID"""
         self._next_id += 1
         return self._next_id
 
+    def _dispatch(self, sub_id, name, callback):
+        """Fire callback with latest data; called from GLib main loop."""
+        self._pending.discard(sub_id)
+        # Only fire if the subscription still exists (not unsubscribed
+        # while the idle was waiting).
+        if sub_id not in self.subscribers.get(name, {}):
+            return False
+        data = self.data.get(name)
+        if data is not None:
+            try:
+                callback(data)
+            except Exception as e:
+                print_debug(
+                    f"Callback failed for {name}: {e}", color='red'
+                )
+        return False
+
     def update(self, name, new_data):
         self.data[name] = new_data
-        if name in self.subscribers:
-            # Make a copy to avoid issues if dict changes during iteration
-            for sub_id, callback in list(self.subscribers[name].items()):
-                try:
-                    # Use idle_add with priority to ensure cleanup happens
-                    GLib.idle_add(
-                        callback, new_data,
-                        priority=GLib.PRIORITY_DEFAULT_IDLE
-                    )
-                except Exception as e:
-                    print_debug(
-                        f"Callback failed for {name}: {e}", color='red'
-                    )
+        if name not in self.subscribers:
+            return
+        for sub_id, callback in list(self.subscribers[name].items()):
+            # Skip if a callback is already queued for this subscriber.
+            # When that callback fires it will read the latest data.
+            if sub_id in self._pending:
+                continue
+            self._pending.add(sub_id)
+            GLib.idle_add(
+                self._dispatch, sub_id, name, callback,
+                priority=GLib.PRIORITY_DEFAULT_IDLE
+            )
 
     def subscribe(self, name, callback):
         """Subscribe to updates for a name, returns subscription ID"""
@@ -604,8 +625,14 @@ class StateManager:
         if name not in self.subscribers:
             self.subscribers[name] = {}
         self.subscribers[name][sub_id] = callback
-        if name in self.data:
-            GLib.idle_add(callback, self.data[name])
+        # Fire immediately with the current value if one exists, using the
+        # same deduplication path so we never double-queue.
+        if name in self.data and sub_id not in self._pending:
+            self._pending.add(sub_id)
+            GLib.idle_add(
+                self._dispatch, sub_id, name, callback,
+                priority=GLib.PRIORITY_DEFAULT_IDLE
+            )
         print_debug(
             f"Subscribe: {name} -> ID:{sub_id} "
             f"(total: {len(self.subscribers[name])})")
@@ -613,6 +640,9 @@ class StateManager:
 
     def unsubscribe(self, sub_id):
         """Unsubscribe using the subscription ID returned by subscribe()"""
+        # Remove from pending so the queued idle is a no-op if it fires
+        # after unsubscription.
+        self._pending.discard(sub_id)
         for name, subs in list(self.subscribers.items()):
             if sub_id in subs:
                 del subs[sub_id]
@@ -642,6 +672,8 @@ class StateManager:
                 )
         self.data.clear()
         self.subscribers.clear()
+        # Any in-flight idle callbacks will find no subscriber and no-op.
+        self._pending.clear()
 
     def get(self, name):
         return self.data.get(name)
@@ -1306,16 +1338,28 @@ class HoverPopover(Gtk.Popover):
         self.set_has_arrow(False)
         self._timeout_id = None
         self._pending_text = None
+        self._invalid = False
+        # Cancel any pending timeout when the parent widget goes away so
+        # the GLib source does not hold a reference to this object.
+        parent.connect("destroy", self._on_parent_destroy)
+
+    def _on_parent_destroy(self, _widget):
+        """Invalidate and cancel pending timeout on parent destruction."""
+        self._invalid = True
+        if self._timeout_id:
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
 
     def popdown(self):
         if self._timeout_id:
             GLib.source_remove(self._timeout_id)
             self._timeout_id = None
         self._pending_text = None
-        super().popdown()
+        if not self._invalid:
+            super().popdown()
 
     def show_text(self, text, x, y, offset=0, delay=0):
-        if not text:
+        if self._invalid or not text:
             self.popdown()
             return
 
@@ -1340,6 +1384,9 @@ class HoverPopover(Gtk.Popover):
         self._pending_coords = (x, y, offset)
 
         def do_show():
+            if self._invalid:
+                self._timeout_id = None
+                return False
             px, py, poff = self._pending_coords
             self.label.set_text(self._pending_text)
             rect = Gdk.Rectangle()

@@ -3,6 +3,7 @@
 Description: CPU module showing total and per-core usage
 Author: thnikk
 """
+from collections import deque
 import common as c
 import psutil
 import gi
@@ -46,9 +47,10 @@ class CPU(c.BaseModule):
 
     def __init__(self, name, config):
         super().__init__(name, config)
-        self.history = []
-        self.per_cpu_history = []
         self.max_history = config.get('history_length', 60)
+        # Use deque with maxlen to avoid O(n) pop(0) and manual truncation.
+        self.history = deque(maxlen=self.max_history)
+        self.per_cpu_history = []
         self.cpu_name = self._get_cpu_name()
 
     def _get_cpu_name(self):
@@ -139,24 +141,24 @@ class CPU(c.BaseModule):
         temp = self._get_cpu_temp()
 
         self.history.append(total_percent)
-        if len(self.history) > self.max_history:
-            self.history.pop(0)
+        # deque(maxlen=...) handles truncation automatically.
 
         if not self.per_cpu_history:
-            self.per_cpu_history = [[] for _ in range(len(per_cpu))]
+            self.per_cpu_history = [
+                deque(maxlen=self.max_history) for _ in range(len(per_cpu))
+            ]
 
         for i, cpu_percent in enumerate(per_cpu):
             if i < len(self.per_cpu_history):
                 self.per_cpu_history[i].append(cpu_percent)
-                if len(self.per_cpu_history[i]) > self.max_history:
-                    self.per_cpu_history[i].pop(0)
 
         return {
             "text": f"{round(total_percent)}",
             "total": total_percent,
             "per_cpu": per_cpu,
-            "history": self.history.copy(),
-            "per_cpu_history": [h.copy() for h in self.per_cpu_history],
+            # Convert deques to lists for a thread-safe snapshot.
+            "history": list(self.history),
+            "per_cpu_history": [list(h) for h in self.per_cpu_history],
             "cpu_count": len(per_cpu),
             "freq": freq.current if freq else None,
             "temp": temp,
