@@ -1593,6 +1593,7 @@ def label(
     if isinstance(length, int):
         text = TruncatedLabel(max_length=length, label=str(input_text))
         text.set_max_width_chars(length)
+        text.set_width_chars(1)
         text.set_ellipsize(Pango.EllipsizeMode.END)
     else:
         text = Gtk.Label(label=str(input_text))
@@ -1655,6 +1656,19 @@ def level(min=0, max=100, value=0, style=None):
     return widget
 
 
+def _suppress_overshoot(scrolled_window):
+    """
+    Hide the built-in overshoot highlight on a ScrolledWindow.
+    GTK renders the effect via the 'overshoot' CSS node; making it
+    fully transparent removes the visual without touching behaviour.
+    """
+    provider = Gtk.CssProvider()
+    provider.load_from_data(
+        b"overshoot { background: none; box-shadow: none; }")
+    scrolled_window.get_style_context().add_provider(
+        provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
 def _parse_color(color):
     """
     Convert a color to an (r, g, b) float tuple.
@@ -1693,7 +1707,7 @@ class _ScrollGradientBase(Gtk.Overlay):
     # #2b303b as floats for the 'box' background colour
     BG = (0.169, 0.188, 0.231)
     # Light default flash colour
-    FLASH = (0.7, 0.76, 0.87)
+    FLASH = (0.3, 0.36, 0.47)
 
     def __init__(
             self, child, gradient_size=None,
@@ -1729,6 +1743,31 @@ class _ScrollGradientBase(Gtk.Overlay):
         adj.connect(
             "changed", lambda *_: self._canvas.queue_draw())
 
+        # Add scroll controller to trigger flash on overscroll
+        self._scroll_controller = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.BOTH_AXES)
+        self._scroll_controller.connect("scroll", self._on_scroll_event)
+        self._scroll.add_controller(self._scroll_controller)
+
+    def _on_scroll_event(self, _controller, dx, dy):
+        # Use dy for vertical boxes, dx for horizontal
+        delta = dy if hasattr(self, '_sw_height') else dx
+        if delta == 0:
+            return False
+
+        adj = self._get_adjustment()
+        val = adj.get_value()
+        max_val = adj.get_upper() - adj.get_page_size()
+
+        if max_val <= 0:
+            return False
+
+        if delta < 0 and val <= 0:
+            self._start_flash(-1)
+        elif delta > 0 and val >= max_val - 0.1:
+            self._start_flash(1)
+        return False
+
     def _make_scroll(self):
         """Create and configure the inner ScrolledWindow."""
         raise NotImplementedError
@@ -1744,6 +1783,8 @@ class _ScrollGradientBase(Gtk.Overlay):
         upper = adj.get_upper()
         page = adj.get_page_size()
         max_val = upper - page
+        if max_val <= 0:
+            return
         new_val = val + delta
         if new_val < 0 and val <= 0:
             self._start_flash(-1)
@@ -1805,8 +1846,9 @@ class HScrollGradientBox(_ScrollGradientBase):
         sw.set_policy(
             Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         sw.set_propagate_natural_width(True)
-        # Disable GTK's built-in kinetic overscroll effect
+        # Disable kinetic scrolling and suppress the overshoot visual
         sw.set_kinetic_scrolling(False)
+        _suppress_overshoot(sw)
         if self._sw_height > 0:
             sw.set_min_content_height(self._sw_height)
             sw.set_max_content_height(self._sw_height)
@@ -1895,12 +1937,14 @@ class VScrollGradientBox(_ScrollGradientBase):
         sw.set_policy(
             Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         sw.set_propagate_natural_height(True)
-        # Disable GTK's built-in kinetic overscroll effect
+        # Disable kinetic scrolling and suppress the overshoot visual
         sw.set_kinetic_scrolling(False)
+        _suppress_overshoot(sw)
         if self._sw_width > 0:
             sw.set_min_content_width(self._sw_width)
             sw.set_max_content_width(self._sw_width)
-            sw.set_propagate_natural_width(True)
+            sw.set_propagate_natural_width(False)
+            self.set_size_request(self._sw_width, -1)
         if self._sw_height > 0:
             sw.set_min_content_height(self._sw_height)
             sw.set_max_content_height(self._sw_height)
