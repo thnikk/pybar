@@ -174,7 +174,6 @@ class CPU(c.BaseModule):
         if compact:
             # Compact grid mode using Gtk.Grid for perfect alignment
             grid = Gtk.Grid()
-            grid.get_style_context().add_class('box')
             grid.set_column_homogeneous(False)
             grid.set_row_homogeneous(False)
             grid.set_vexpand(True)
@@ -244,7 +243,7 @@ class CPU(c.BaseModule):
             return grid
         else:
             # Normal list mode
-            cores_list = c.box('v', style='box')
+            cores_list = c.box('v')
             for i in range(cpu_count):
                 row = c.box('h', style='inner-box')
 
@@ -426,7 +425,9 @@ class CPU(c.BaseModule):
         cores_ui = self.build_cores_ui(widget, data)
         scroll.set_child(cores_ui)
 
-        cores_section.append(scroll)
+        vsgb = c.VScrollGradientBox(scroll)
+        c.add_style(vsgb, 'box')
+        cores_section.append(vsgb)
         main_box.append(cores_section)
 
         widget.popover_widgets['total_val'] = total_val

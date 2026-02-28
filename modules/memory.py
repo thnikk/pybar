@@ -366,7 +366,7 @@ class Memory(c.BaseModule):
 
         scroll = c.scroll(height=250, width=400, style='scroll')
         scroll.set_overflow(Gtk.Overflow.HIDDEN)
-        proc_list = c.box('v', style='box')
+        proc_list = c.box('v')
 
         for i in range(10):
             row = c.box('h', style='p-row')
@@ -445,7 +445,9 @@ class Memory(c.BaseModule):
             widget.popover_widgets[f'p_kill_{i}'] = kill_btn
 
         scroll.set_child(proc_list)
-        proc_section.append(scroll)
+        vsgb = c.VScrollGradientBox(scroll)
+        c.add_style(vsgb, 'box')
+        proc_section.append(vsgb)
         main_box.append(proc_section)
 
         widget.popover_widgets.update({

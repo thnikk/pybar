@@ -114,7 +114,7 @@ class Volume(c.BaseModule):
                             break
                         except Exception:
                             pass
-                            
+
                         # Check stop flag
                         import module
                         stop_event = module._worker_stop_flags.get(self.name)
@@ -262,7 +262,8 @@ class Volume(c.BaseModule):
         row.append(top)
 
         # Volume slider - disable scroll to allow container to scroll
-        slider = c.slider(round(device.get('volume', 0) * 100), scrollable=False)
+        slider = c.slider(
+            round(device.get('volume', 0) * 100), scrollable=False)
         handler_id = slider.connect(
             'value-changed', lambda s: self.set_dev_volume(
                 section, device['index'], s.get_value()))
@@ -296,7 +297,7 @@ class Volume(c.BaseModule):
 
             section_box = c.box('v', spacing=10)
             section_box.append(c.label(name, style='title', ha='start'))
-            devices_box = c.box('v', style='box')
+            devices_box = c.box('v')
 
             # Filter monitors before iterating so separator logic is correct
             if name != 'Programs':
@@ -314,13 +315,22 @@ class Volume(c.BaseModule):
                 if i != len(visible) - 1:
                     devices_box.append(c.sep('h'))
 
-            section_box.append(devices_box)
+            large = len(visible) > 3
+            dev_scroll = c.scroll(style='scroll')
+            dev_scroll.set_overflow(Gtk.Overflow.HIDDEN)
+            dev_scroll.set_policy(
+                Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            dev_scroll.set_propagate_natural_height(True)
+            if large:
+                dev_scroll.set_vexpand(True)
+                dev_scroll.set_max_content_height(250)
+            dev_scroll.set_child(devices_box)
+            vsgb = c.VScrollGradientBox(dev_scroll, gradient_size=60)
+            c.add_style(vsgb, 'box')
+            section_box.append(vsgb)
             content_box.append(section_box)
 
-        scroll = c.scroll(height=400, style='scroll')
-        scroll.set_overflow(Gtk.Overflow.HIDDEN)
-        scroll.set_child(content_box)
-        main_box.append(scroll)
+        main_box.append(content_box)
         return main_box
 
     def create_widget(self, bar):
@@ -431,21 +441,23 @@ class Volume(c.BaseModule):
                     idx = d['index']
                     if idx in widget.popover_widgets[section]:
                         ctrls = widget.popover_widgets[section][idx]
-                        
+
                         # Update mute
                         if ctrls['mute'].get_active() != (not d['mute']):
                             ctrls['mute'].handler_block(ctrls['mute_handler'])
                             ctrls['mute'].set_active(not d['mute'])
-                            ctrls['mute'].handler_unblock(ctrls['mute_handler'])
-                        
+                            ctrls['mute'].handler_unblock(
+                                ctrls['mute_handler'])
+
                         # Update volume
                         new_vol = round(d['volume'] * 100)
                         if abs(ctrls['volume'].get_value() - new_vol) > 1:
-                            ctrls['volume'].handler_block(ctrls['volume_handler'])
+                            ctrls['volume'].handler_block(
+                                ctrls['volume_handler'])
                             ctrls['volume'].set_value(new_vol)
                             ctrls['volume'].handler_unblock(
                                 ctrls['volume_handler'])
-                        
+
                         # Update style for muted
                         if d['mute']:
                             c.add_style(ctrls['volume'], 'muted')

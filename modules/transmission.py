@@ -198,7 +198,7 @@ class Transmission(c.BaseModule):
                 continue
             sec = c.box('v', spacing=10)
             sec.append(c.label(title, style='title', ha='start'))
-            ibox = c.box('v', style='box')
+            ibox = c.box('v')
             ibox.set_overflow(Gtk.Overflow.HIDDEN)
             ibox.set_size_request(350, -1)
             for i, item in enumerate(items):
@@ -275,7 +275,19 @@ class Transmission(c.BaseModule):
                 ibox.append(item_row)
                 if i < len(items) - 1:
                     ibox.append(c.sep('h'))
-            sec.append(ibox)
+            large = len(items) > 3
+            pkg_scroll = c.scroll(style='scroll')
+            pkg_scroll.set_overflow(Gtk.Overflow.HIDDEN)
+            pkg_scroll.set_policy(
+                Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            pkg_scroll.set_propagate_natural_height(True)
+            if large:
+                pkg_scroll.set_vexpand(True)
+                pkg_scroll.set_max_content_height(200)
+            pkg_scroll.set_child(ibox)
+            vsgb = c.VScrollGradientBox(pkg_scroll)
+            c.add_style(vsgb, 'box')
+            sec.append(vsgb)
             box.append(sec)
 
         # Bottom button
