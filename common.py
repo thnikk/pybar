@@ -1655,6 +1655,21 @@ def level(min=0, max=100, value=0, style=None):
     return widget
 
 
+def _parse_color(color):
+    """
+    Convert a color to an (r, g, b) float tuple.
+    Accepts: float tuple, byte tuple (0-255), or hex string.
+    """
+    if isinstance(color, str):
+        # Strip leading '#' and parse 6 hex digits
+        h = color.lstrip('#')
+        return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    # Distinguish byte tuples from float tuples by range
+    if any(v > 1.0 for v in color):
+        return tuple(v / 255.0 for v in color)
+    return tuple(color)
+
+
 def image(file_path=None, style=None, width=None, height=None):
     """ Create image widget """
     if file_path:
@@ -1681,12 +1696,21 @@ class HScrollGradientBox(Gtk.Overlay):
     # #2b303b as floats for the 'box' background colour
     BG = (0.169, 0.188, 0.231)
 
-    def __init__(self, scroll_widget, gradient_size=None):
+    # Light default flash colour
+    FLASH = (0.7, 0.76, 0.87)
+
+    def __init__(
+            self, scroll_widget, gradient_size=None,
+            bg_color=None, flash_color=None):
         super().__init__()
         self._scroll = scroll_widget
         self._gradient_size = (
             gradient_size if gradient_size is not None
             else self.GRADIENT_WIDTH
+        )
+        self._bg_color = _parse_color(bg_color) if bg_color else self.BG
+        self._flash_color = (
+            _parse_color(flash_color) if flash_color else self.FLASH
         )
         self._flash_opacity = 0.0
         self._flash_dir = 0   # -1 = left edge, +1 = right edge
@@ -1758,21 +1782,18 @@ class HScrollGradientBox(Gtk.Overlay):
         page = adj.get_page_size()
         gw = self._gradient_size
         fade_px = 40.0
-        r, g, b = self.BG
+        r, g, b = self._bg_color
+        fr, fg, fb = self._flash_color
         radius = 10
 
         left_op = min(val / fade_px, 1.0)
         right_op = min((upper - page - val) / fade_px, 1.0)
 
-        if self._flash_dir == -1:
-            left_op = max(left_op, self._flash_opacity)
-        elif self._flash_dir == 1:
-            right_op = max(right_op, self._flash_opacity)
-
         cr.save()
         self._rounded_rect(cr, 0, 0, width, height, radius)
         cr.clip()
 
+        # Edge fade gradients using background colour
         if left_op > 0:
             pat = cairo.LinearGradient(0, 0, gw, 0)
             pat.add_color_stop_rgba(0, r, g, b, left_op)
@@ -1789,6 +1810,23 @@ class HScrollGradientBox(Gtk.Overlay):
             cr.set_source(pat)
             cr.fill()
 
+        # Overscroll flash drawn separately with flash colour
+        if self._flash_opacity > 0:
+            if self._flash_dir == -1:
+                pat = cairo.LinearGradient(0, 0, gw, 0)
+                pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
+                cr.rectangle(0, 0, gw, height)
+                cr.set_source(pat)
+                cr.fill()
+            elif self._flash_dir == 1:
+                pat = cairo.LinearGradient(width - gw, 0, width, 0)
+                pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
+                pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
+                cr.rectangle(width - gw, 0, gw, height)
+                cr.set_source(pat)
+                cr.fill()
+
         cr.restore()
 
 
@@ -1802,12 +1840,21 @@ class VScrollGradientBox(Gtk.Overlay):
     # #2b303b as floats for the 'box' background colour
     BG = (0.169, 0.188, 0.231)
 
-    def __init__(self, scroll_widget, gradient_size=None):
+    # Light default flash colour
+    FLASH = (0.7, 0.76, 0.87)
+
+    def __init__(
+            self, scroll_widget, gradient_size=None,
+            bg_color=None, flash_color=None):
         super().__init__()
         self._scroll = scroll_widget
         self._gradient_size = (
             gradient_size if gradient_size is not None
             else self.GRADIENT_HEIGHT
+        )
+        self._bg_color = _parse_color(bg_color) if bg_color else self.BG
+        self._flash_color = (
+            _parse_color(flash_color) if flash_color else self.FLASH
         )
         self._flash_opacity = 0.0
         self._flash_dir = 0   # -1 = top edge, +1 = bottom edge
@@ -1879,21 +1926,18 @@ class VScrollGradientBox(Gtk.Overlay):
         page = adj.get_page_size()
         gh = self._gradient_size
         fade_px = 40.0
-        r, g, b = self.BG
+        r, g, b = self._bg_color
+        fr, fg, fb = self._flash_color
         radius = 10
 
         top_op = min(val / fade_px, 1.0)
         bottom_op = min((upper - page - val) / fade_px, 1.0)
 
-        if self._flash_dir == -1:
-            top_op = max(top_op, self._flash_opacity)
-        elif self._flash_dir == 1:
-            bottom_op = max(bottom_op, self._flash_opacity)
-
         cr.save()
         self._rounded_rect(cr, 0, 0, width, height, radius)
         cr.clip()
 
+        # Edge fade gradients using background colour
         if top_op > 0:
             pat = cairo.LinearGradient(0, 0, 0, gh)
             pat.add_color_stop_rgba(0, r, g, b, top_op)
@@ -1909,6 +1953,23 @@ class VScrollGradientBox(Gtk.Overlay):
             cr.rectangle(0, height - gh, width, gh)
             cr.set_source(pat)
             cr.fill()
+
+        # Overscroll flash drawn separately with flash colour
+        if self._flash_opacity > 0:
+            if self._flash_dir == -1:
+                pat = cairo.LinearGradient(0, 0, 0, gh)
+                pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
+                cr.rectangle(0, 0, width, gh)
+                cr.set_source(pat)
+                cr.fill()
+            elif self._flash_dir == 1:
+                pat = cairo.LinearGradient(0, height - gh, 0, height)
+                pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
+                pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
+                cr.rectangle(0, height - gh, width, gh)
+                cr.set_source(pat)
+                cr.fill()
 
         cr.restore()
 
