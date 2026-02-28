@@ -814,6 +814,14 @@ class TrayIcon(Gtk.Box):
         self.popover_menu.set_has_arrow(True)
         self.popover_menu.connect("map", lambda p: c.handle_popover_edge(p))
 
+        # Keep the revealer open while a context menu is visible
+        if hasattr(self.module, 'notify_menu_opened'):
+            self.module.notify_menu_opened()
+            self.popover_menu.connect(
+                "closed",
+                lambda _: self.module.notify_menu_closed()
+            )
+
         if self.module.config.get("position", "bottom") == "bottom":
             self.popover_menu.set_position(Gtk.PositionType.TOP)
         else:
@@ -986,8 +994,17 @@ class TrayModuleWidget(Gtk.Box):
         self.user_wants_expanded = not is_collapsed
         self.revealer.set_reveal_child(not is_collapsed)
 
+        # Auto-reveal hover state tracking; must be set before
+        # _update_ui_state() so the auto_reveal branch can read them
+        self._is_hovering = False
+        self._open_menus = 0
+        self._auto_revealed = False
+
         self.icons = {}
         self._update_ui_state()
+
+        if config.get("auto_reveal", False):
+            self._setup_auto_reveal()
 
         TrayHost.get_instance().add_module(self)
         self.connect("destroy", self._on_destroy)
@@ -1006,6 +1023,49 @@ class TrayModuleWidget(Gtk.Box):
     def _on_destroy(self, _widget):
         self.cleanup()
 
+    def _setup_auto_reveal(self):
+        """Configure hover-based auto reveal, disabling the toggle button."""
+        # Disable the toggle button; hover controls reveal instead
+        self.toggle_btn.set_sensitive(False)
+
+        motion = Gtk.EventControllerMotion.new()
+        # Capture phase ensures leave fires even when hovering child widgets
+        motion.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        motion.connect("enter", self._on_hover_enter)
+        motion.connect("leave", self._on_hover_leave)
+        self.add_controller(motion)
+
+    def _on_hover_enter(self, _ctrl, _x, _y):
+        """Reveal icons when hovering over the module."""
+        self._is_hovering = True
+        self._set_auto_revealed(True)
+
+    def _on_hover_leave(self, _ctrl):
+        """Hide icons on hover leave unless a menu is open."""
+        self._is_hovering = False
+        if self._open_menus == 0:
+            self._set_auto_revealed(False)
+
+    def _set_auto_revealed(self, revealed):
+        """Show or hide the revealer in auto-reveal mode."""
+        has_icons = len(self.icons) > 0
+        self._auto_revealed = revealed and has_icons
+        self.revealer.set_visible(has_icons)
+        self.revealer.set_reveal_child(self._auto_revealed)
+        self.set_spacing(5 if self._auto_revealed else 0)
+        self._update_ui_state()
+
+    def notify_menu_opened(self):
+        """Called by a TrayIcon when its context menu opens."""
+        self._open_menus += 1
+
+    def notify_menu_closed(self):
+        """Called by a TrayIcon when its context menu closes."""
+        self._open_menus = max(0, self._open_menus - 1)
+        # Collapse if the mouse has also left the module
+        if self._open_menus == 0 and not self._is_hovering:
+            self._set_auto_revealed(False)
+
     def _on_toggle(self, _btn):
         self.user_wants_expanded = not self.user_wants_expanded
         self._update_ui_state()
@@ -1016,25 +1076,32 @@ class TrayModuleWidget(Gtk.Box):
         # Hide revealer completely when no icons to prevent width change
         self.revealer.set_visible(has_icons)
 
-        # Only actually reveal if user wants it expanded AND there are icons
-        should_reveal = self.user_wants_expanded and has_icons
-        self.revealer.set_reveal_child(should_reveal)
-
-        # Only add spacing if revealed AND there are icons
-        self.set_spacing(5 if should_reveal else 0)
+        auto_reveal = self.config.get("auto_reveal", False)
+        if auto_reveal:
+            # Reveal/spacing are owned by _set_auto_revealed; only
+            # ensure spacing is 0 on startup before any hover occurs.
+            if not self._auto_revealed:
+                self.set_spacing(0)
+            expanded = self._auto_revealed
+        else:
+            # Only reveal if user wants expanded AND there are icons
+            should_reveal = self.user_wants_expanded and has_icons
+            self.revealer.set_reveal_child(should_reveal)
+            self.set_spacing(5 if should_reveal else 0)
+            expanded = self.user_wants_expanded
 
         label_text = ""
         if self.direction == "right":
-            label_text = "" if self.user_wants_expanded else ""
+            label_text = "" if expanded else ""
         else:
-            label_text = "" if self.user_wants_expanded else ""
+            label_text = "" if expanded else ""
 
         self.toggle_label.set_text(label_text)
 
         # Only change CSS class when there are icons to prevent padding
         # changes
         if has_icons:
-            if self.user_wants_expanded:
+            if expanded:
                 self.get_style_context().remove_class("collapsed")
             else:
                 self.get_style_context().add_class("collapsed")
@@ -1141,6 +1208,15 @@ class Tray(c.BaseModule):
             'label': 'Blacklist',
             'description': 'List of partial process names to hide from tray',
             'element_type': 'string'
+        },
+        'auto_reveal': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Auto Reveal',
+            'description': (
+                'Reveal tray icons on hover and hide on leave; '
+                'disables the toggle button'
+            )
         }
     }
 
