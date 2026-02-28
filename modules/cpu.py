@@ -417,16 +417,12 @@ class CPU(c.BaseModule):
         compact_height = max(100, num_rows * 34)
         compact_height = min(compact_height, 600)
 
-        scroll = c.scroll(height=compact_height, width=400, style='scroll')
-        scroll.set_overflow(Gtk.Overflow.HIDDEN)
-        scroll.set_propagate_natural_height(True)
-        widget.cores_scroll = scroll
-
         cores_ui = self.build_cores_ui(widget, data)
-        scroll.set_child(cores_ui)
-
-        vsgb = c.VScrollGradientBox(scroll)
+        vsgb = c.VScrollGradientBox(
+            cores_ui, height=compact_height, width=400)
         c.add_style(vsgb, 'box')
+        # Expose inner scroll so toggle_compact can swap the child
+        widget.cores_scroll = vsgb._scroll
         cores_section.append(vsgb)
         main_box.append(cores_section)
 

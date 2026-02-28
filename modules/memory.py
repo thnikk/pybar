@@ -364,8 +364,6 @@ class Memory(c.BaseModule):
         proc_section.append(
             c.label('Top Processes', style='title', ha='start'))
 
-        scroll = c.scroll(height=250, width=400, style='scroll')
-        scroll.set_overflow(Gtk.Overflow.HIDDEN)
         proc_list = c.box('v')
 
         for i in range(10):
@@ -444,8 +442,7 @@ class Memory(c.BaseModule):
             widget.popover_widgets[f'p_rev_{i}'] = rev
             widget.popover_widgets[f'p_kill_{i}'] = kill_btn
 
-        scroll.set_child(proc_list)
-        vsgb = c.VScrollGradientBox(scroll)
+        vsgb = c.VScrollGradientBox(proc_list, height=250, width=400)
         c.add_style(vsgb, 'box')
         proc_section.append(vsgb)
         main_box.append(proc_section)

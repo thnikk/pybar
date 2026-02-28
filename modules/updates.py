@@ -9,8 +9,7 @@ import concurrent.futures
 from subprocess import Popen
 import common as c
 import gi
-gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+gi.require_version('Gtk', '4.0')  # noqa
 
 
 class Updates(c.BaseModule):
@@ -197,19 +196,10 @@ class Updates(c.BaseModule):
             # Large lists expand to fill remaining space and scroll;
             # small lists stay at natural height with no wasted space.
             large = len(packages) > 5
-            pkg_scroll = c.scroll(style='scroll')
-            pkg_scroll.set_overflow(False)
-            # c.scroll sets vertical policy to NEVER when height is 0
-            pkg_scroll.set_policy(
-                Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            pkg_scroll.set_propagate_natural_height(True)
-            if large:
-                pkg_scroll.set_vexpand(True)
-                pkg_scroll.set_max_content_height(180)
-            pkg_scroll.set_child(packages_box)
-            vsgb = c.VScrollGradientBox(pkg_scroll, gradient_size=60)
+            vsgb = c.VScrollGradientBox(
+                packages_box, gradient_size=60,
+                max_height=180 if large else None)
             c.add_style(vsgb, 'box')
-            vsgb.set_overflow(Gtk.Overflow.HIDDEN)
             manager_box.append(vsgb)
             content_box.append(manager_box)
 

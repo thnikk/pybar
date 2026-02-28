@@ -118,9 +118,6 @@ class Debug(c.BaseModule):
 
         # Log display in scrollbox
         # Height 0 allows it to grow to fit its content (exactly 10 labels)
-        log_scroll = c.scroll(width=400, height=0)
-        log_scroll_wrapper = c.HScrollGradientBox(log_scroll)
-        c.add_style(log_scroll_wrapper, 'box')
 
         # Inner box for padding
         log_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -137,7 +134,8 @@ class Debug(c.BaseModule):
             m.log_labels.append(lbl)
 
         log_inner.append(lines_box)
-        log_scroll.set_child(log_inner)
+        log_scroll_wrapper = c.HScrollGradientBox(log_inner, max_width=400)
+        c.add_style(log_scroll_wrapper, 'box')
         main_box.append(log_scroll_wrapper)
 
         # Convert vertical scroll to horizontal scroll
@@ -149,7 +147,7 @@ class Debug(c.BaseModule):
             return True
 
         scroll_controller.connect("scroll", on_scroll)
-        log_scroll.add_controller(scroll_controller)
+        log_scroll_wrapper._scroll.add_controller(scroll_controller)
 
         # Inspector button at the bottom
         inspector_btn = c.button(label=" Open Inspector", style="normal")

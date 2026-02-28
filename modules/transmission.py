@@ -276,16 +276,8 @@ class Transmission(c.BaseModule):
                 if i < len(items) - 1:
                     ibox.append(c.sep('h'))
             large = len(items) > 3
-            pkg_scroll = c.scroll(style='scroll')
-            pkg_scroll.set_overflow(Gtk.Overflow.HIDDEN)
-            pkg_scroll.set_policy(
-                Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            pkg_scroll.set_propagate_natural_height(True)
-            if large:
-                pkg_scroll.set_vexpand(True)
-                pkg_scroll.set_max_content_height(200)
-            pkg_scroll.set_child(ibox)
-            vsgb = c.VScrollGradientBox(pkg_scroll)
+            vsgb = c.VScrollGradientBox(
+                ibox, max_height=200 if large else None)
             c.add_style(vsgb, 'box')
             sec.append(vsgb)
             box.append(sec)

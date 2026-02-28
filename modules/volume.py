@@ -316,16 +316,9 @@ class Volume(c.BaseModule):
                     devices_box.append(c.sep('h'))
 
             large = len(visible) > 3
-            dev_scroll = c.scroll(style='scroll')
-            dev_scroll.set_overflow(Gtk.Overflow.HIDDEN)
-            dev_scroll.set_policy(
-                Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            dev_scroll.set_propagate_natural_height(True)
-            if large:
-                dev_scroll.set_vexpand(True)
-                dev_scroll.set_max_content_height(250)
-            dev_scroll.set_child(devices_box)
-            vsgb = c.VScrollGradientBox(dev_scroll, gradient_size=60)
+            vsgb = c.VScrollGradientBox(
+                devices_box, gradient_size=60,
+                max_height=250 if large else None)
             c.add_style(vsgb, 'box')
             section_box.append(vsgb)
             content_box.append(section_box)

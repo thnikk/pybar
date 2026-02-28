@@ -1686,65 +1686,69 @@ def image(file_path=None, style=None, width=None, height=None):
     return widget
 
 
-class HScrollGradientBox(Gtk.Overlay):
-    """
-    Wraps a horizontal ScrolledWindow with edge-fade gradients and
-    an overscroll flash effect when the boundary is reached.
-    """
+class _ScrollGradientBase(Gtk.Overlay):
+    """Shared base for scroll gradient overlay boxes."""
 
-    GRADIENT_WIDTH = 30
+    GRADIENT_SIZE = 30
     # #2b303b as floats for the 'box' background colour
     BG = (0.169, 0.188, 0.231)
-
     # Light default flash colour
     FLASH = (0.7, 0.76, 0.87)
 
     def __init__(
-            self, scroll_widget, gradient_size=None,
+            self, child, gradient_size=None,
             bg_color=None, flash_color=None):
         super().__init__()
-        self._scroll = scroll_widget
         self._gradient_size = (
             gradient_size if gradient_size is not None
-            else self.GRADIENT_WIDTH
+            else self.GRADIENT_SIZE
         )
         self._bg_color = _parse_color(bg_color) if bg_color else self.BG
         self._flash_color = (
             _parse_color(flash_color) if flash_color else self.FLASH
         )
         self._flash_opacity = 0.0
-        self._flash_dir = 0   # -1 = left edge, +1 = right edge
+        self._flash_dir = 0
         self._anim_id = None
-        self.set_child(scroll_widget)
+        # Clip overlay contents to rounded rectangle bounds
+        self.set_overflow(Gtk.Overflow.HIDDEN)
 
-        self._overlay = Gtk.DrawingArea()
-        self._overlay.set_can_target(False)
-        self._overlay.set_draw_func(self._draw)
-        self.add_overlay(self._overlay)
+        # _make_scroll() reads subclass-set attrs; call after base init
+        self._scroll = self._make_scroll()
+        self._scroll.set_child(child)
+        self.set_child(self._scroll)
 
-        adj = scroll_widget.get_hadjustment()
+        self._canvas = Gtk.DrawingArea()
+        self._canvas.set_can_target(False)
+        self._canvas.set_draw_func(self._draw)
+        self.add_overlay(self._canvas)
+
+        adj = self._get_adjustment()
         adj.connect(
-            "value-changed", lambda *_: self._overlay.queue_draw())
+            "value-changed", lambda *_: self._canvas.queue_draw())
         adj.connect(
-            "changed", lambda *_: self._overlay.queue_draw())
+            "changed", lambda *_: self._canvas.queue_draw())
+
+    def _make_scroll(self):
+        """Create and configure the inner ScrolledWindow."""
+        raise NotImplementedError
+
+    def _get_adjustment(self):
+        """Return the axis-specific Gtk.Adjustment."""
+        raise NotImplementedError
 
     def scroll_by(self, delta):
-        """
-        Advance the horizontal scroll by *delta* pixels.
-        Triggers an edge flash when the boundary is already reached.
-        """
-        adj = self._scroll.get_hadjustment()
+        """Scroll by delta pixels, flashing at boundaries."""
+        adj = self._get_adjustment()
         val = adj.get_value()
         upper = adj.get_upper()
         page = adj.get_page_size()
         max_val = upper - page
         new_val = val + delta
-
         if new_val < 0 and val <= 0:
             self._start_flash(-1)
         elif new_val > max_val and val >= max_val - 1:
             self._start_flash(1)
-
         adj.set_value(max(0.0, min(new_val, max_val)))
 
     def _start_flash(self, direction):
@@ -1759,9 +1763,9 @@ class HScrollGradientBox(Gtk.Overlay):
             if self._flash_opacity <= 0.0:
                 self._flash_opacity = 0.0
                 self._anim_id = None
-                self._overlay.queue_draw()
+                self._canvas.queue_draw()
                 return False
-            self._overlay.queue_draw()
+            self._canvas.queue_draw()
             return True
 
         self._anim_id = GLib.timeout_add(16, _fade)
@@ -1776,11 +1780,50 @@ class HScrollGradientBox(Gtk.Overlay):
         cr.close_path()
 
     def _draw(self, _area, cr, width, height, *_args):
-        adj = self._scroll.get_hadjustment()
+        raise NotImplementedError
+
+
+class HScrollGradientBox(_ScrollGradientBase):
+    """
+    Wraps a child widget in a horizontal ScrolledWindow with
+    edge-fade gradients and an overscroll flash effect.
+    """
+
+    def __init__(
+            self, child, max_width=None, height=0,
+            gradient_size=None, bg_color=None, flash_color=None):
+        # Store before super().__init__() calls _make_scroll()
+        self._max_width = max_width
+        self._sw_height = height
+        super().__init__(
+            child, gradient_size=gradient_size,
+            bg_color=bg_color, flash_color=flash_color)
+
+    def _make_scroll(self):
+        sw = Gtk.ScrolledWindow(hexpand=True)
+        sw.set_overflow(Gtk.Overflow.HIDDEN)
+        sw.set_policy(
+            Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        sw.set_propagate_natural_width(True)
+        # Disable GTK's built-in kinetic overscroll effect
+        sw.set_kinetic_scrolling(False)
+        if self._sw_height > 0:
+            sw.set_min_content_height(self._sw_height)
+            sw.set_max_content_height(self._sw_height)
+        if self._max_width is not None:
+            sw.set_min_content_width(self._max_width)
+            sw.set_max_content_width(self._max_width)
+        return sw
+
+    def _get_adjustment(self):
+        return self._scroll.get_hadjustment()
+
+    def _draw(self, _area, cr, width, height, *_args):
+        adj = self._get_adjustment()
         val = adj.get_value()
         upper = adj.get_upper()
         page = adj.get_page_size()
-        gw = self._gradient_size
+        gs = self._gradient_size
         fade_px = 40.0
         r, g, b = self._bg_color
         fr, fg, fb = self._flash_color
@@ -1795,136 +1838,86 @@ class HScrollGradientBox(Gtk.Overlay):
 
         # Edge fade gradients using background colour
         if left_op > 0:
-            pat = cairo.LinearGradient(0, 0, gw, 0)
+            pat = cairo.LinearGradient(0, 0, gs, 0)
             pat.add_color_stop_rgba(0, r, g, b, left_op)
             pat.add_color_stop_rgba(1, r, g, b, 0.0)
-            cr.rectangle(0, 0, gw, height)
+            cr.rectangle(0, 0, gs, height)
             cr.set_source(pat)
             cr.fill()
-
         if right_op > 0:
-            pat = cairo.LinearGradient(width - gw, 0, width, 0)
+            pat = cairo.LinearGradient(width - gs, 0, width, 0)
             pat.add_color_stop_rgba(0, r, g, b, 0.0)
             pat.add_color_stop_rgba(1, r, g, b, right_op)
-            cr.rectangle(width - gw, 0, gw, height)
+            cr.rectangle(width - gs, 0, gs, height)
             cr.set_source(pat)
             cr.fill()
 
-        # Overscroll flash drawn separately with flash colour
+        # Overscroll flash drawn on top with flash colour
         if self._flash_opacity > 0:
             if self._flash_dir == -1:
-                pat = cairo.LinearGradient(0, 0, gw, 0)
+                pat = cairo.LinearGradient(0, 0, gs, 0)
                 pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
                 pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
-                cr.rectangle(0, 0, gw, height)
+                cr.rectangle(0, 0, gs, height)
                 cr.set_source(pat)
                 cr.fill()
             elif self._flash_dir == 1:
-                pat = cairo.LinearGradient(width - gw, 0, width, 0)
+                pat = cairo.LinearGradient(width - gs, 0, width, 0)
                 pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
                 pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
-                cr.rectangle(width - gw, 0, gw, height)
+                cr.rectangle(width - gs, 0, gs, height)
                 cr.set_source(pat)
                 cr.fill()
 
         cr.restore()
 
 
-class VScrollGradientBox(Gtk.Overlay):
+class VScrollGradientBox(_ScrollGradientBase):
     """
-    Wraps a vertical ScrolledWindow with edge-fade gradients and
-    an overscroll flash effect when the boundary is reached.
+    Wraps a child widget in a vertical ScrolledWindow with
+    edge-fade gradients and an overscroll flash effect.
     """
-
-    GRADIENT_HEIGHT = 30
-    # #2b303b as floats for the 'box' background colour
-    BG = (0.169, 0.188, 0.231)
-
-    # Light default flash colour
-    FLASH = (0.7, 0.76, 0.87)
 
     def __init__(
-            self, scroll_widget, gradient_size=None,
-            bg_color=None, flash_color=None):
-        super().__init__()
-        self._scroll = scroll_widget
-        self._gradient_size = (
-            gradient_size if gradient_size is not None
-            else self.GRADIENT_HEIGHT
-        )
-        self._bg_color = _parse_color(bg_color) if bg_color else self.BG
-        self._flash_color = (
-            _parse_color(flash_color) if flash_color else self.FLASH
-        )
-        self._flash_opacity = 0.0
-        self._flash_dir = 0   # -1 = top edge, +1 = bottom edge
-        self._anim_id = None
-        self.set_child(scroll_widget)
+            self, child, height=0, max_height=None, width=0,
+            gradient_size=None, bg_color=None, flash_color=None):
+        # Store before super().__init__() calls _make_scroll()
+        self._sw_height = height
+        self._max_height = max_height
+        self._sw_width = width
+        super().__init__(
+            child, gradient_size=gradient_size,
+            bg_color=bg_color, flash_color=flash_color)
 
-        self._overlay = Gtk.DrawingArea()
-        self._overlay.set_can_target(False)
-        self._overlay.set_draw_func(self._draw)
-        self.add_overlay(self._overlay)
+    def _make_scroll(self):
+        sw = Gtk.ScrolledWindow(hexpand=True)
+        sw.set_overflow(Gtk.Overflow.HIDDEN)
+        sw.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sw.set_propagate_natural_height(True)
+        # Disable GTK's built-in kinetic overscroll effect
+        sw.set_kinetic_scrolling(False)
+        if self._sw_width > 0:
+            sw.set_min_content_width(self._sw_width)
+            sw.set_max_content_width(self._sw_width)
+            sw.set_propagate_natural_width(True)
+        if self._sw_height > 0:
+            sw.set_min_content_height(self._sw_height)
+            sw.set_max_content_height(self._sw_height)
+        if self._max_height is not None:
+            sw.set_vexpand(True)
+            sw.set_max_content_height(self._max_height)
+        return sw
 
-        adj = scroll_widget.get_vadjustment()
-        adj.connect(
-            "value-changed", lambda *_: self._overlay.queue_draw())
-        adj.connect(
-            "changed", lambda *_: self._overlay.queue_draw())
-
-    def scroll_by(self, delta):
-        """
-        Advance the vertical scroll by *delta* pixels.
-        Triggers an edge flash when the boundary is already reached.
-        """
-        adj = self._scroll.get_vadjustment()
-        val = adj.get_value()
-        upper = adj.get_upper()
-        page = adj.get_page_size()
-        max_val = upper - page
-        new_val = val + delta
-
-        if new_val < 0 and val <= 0:
-            self._start_flash(-1)
-        elif new_val > max_val and val >= max_val - 1:
-            self._start_flash(1)
-
-        adj.set_value(max(0.0, min(new_val, max_val)))
-
-    def _start_flash(self, direction):
-        """Animate a brief edge-flash to signal an overscroll attempt."""
-        if self._anim_id:
-            GLib.source_remove(self._anim_id)
-        self._flash_opacity = 0.7
-        self._flash_dir = direction
-
-        def _fade():
-            self._flash_opacity -= 0.05
-            if self._flash_opacity <= 0.0:
-                self._flash_opacity = 0.0
-                self._anim_id = None
-                self._overlay.queue_draw()
-                return False
-            self._overlay.queue_draw()
-            return True
-
-        self._anim_id = GLib.timeout_add(16, _fade)
-
-    def _rounded_rect(self, cr, x, y, w, h, r):
-        """Trace a rounded rectangle path."""
-        cr.new_sub_path()
-        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
-        cr.arc(x + w - r, y + r, r, 3 * math.pi / 2, 2 * math.pi)
-        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
-        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
-        cr.close_path()
+    def _get_adjustment(self):
+        return self._scroll.get_vadjustment()
 
     def _draw(self, _area, cr, width, height, *_args):
-        adj = self._scroll.get_vadjustment()
+        adj = self._get_adjustment()
         val = adj.get_value()
         upper = adj.get_upper()
         page = adj.get_page_size()
-        gh = self._gradient_size
+        gs = self._gradient_size
         fade_px = 40.0
         r, g, b = self._bg_color
         fr, fg, fb = self._flash_color
@@ -1939,35 +1932,34 @@ class VScrollGradientBox(Gtk.Overlay):
 
         # Edge fade gradients using background colour
         if top_op > 0:
-            pat = cairo.LinearGradient(0, 0, 0, gh)
+            pat = cairo.LinearGradient(0, 0, 0, gs)
             pat.add_color_stop_rgba(0, r, g, b, top_op)
             pat.add_color_stop_rgba(1, r, g, b, 0.0)
-            cr.rectangle(0, 0, width, gh)
+            cr.rectangle(0, 0, width, gs)
             cr.set_source(pat)
             cr.fill()
-
         if bottom_op > 0:
-            pat = cairo.LinearGradient(0, height - gh, 0, height)
+            pat = cairo.LinearGradient(0, height - gs, 0, height)
             pat.add_color_stop_rgba(0, r, g, b, 0.0)
             pat.add_color_stop_rgba(1, r, g, b, bottom_op)
-            cr.rectangle(0, height - gh, width, gh)
+            cr.rectangle(0, height - gs, width, gs)
             cr.set_source(pat)
             cr.fill()
 
-        # Overscroll flash drawn separately with flash colour
+        # Overscroll flash drawn on top with flash colour
         if self._flash_opacity > 0:
             if self._flash_dir == -1:
-                pat = cairo.LinearGradient(0, 0, 0, gh)
+                pat = cairo.LinearGradient(0, 0, 0, gs)
                 pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
                 pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
-                cr.rectangle(0, 0, width, gh)
+                cr.rectangle(0, 0, width, gs)
                 cr.set_source(pat)
                 cr.fill()
             elif self._flash_dir == 1:
-                pat = cairo.LinearGradient(0, height - gh, 0, height)
+                pat = cairo.LinearGradient(0, height - gs, 0, height)
                 pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
                 pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
-                cr.rectangle(0, height - gh, width, gh)
+                cr.rectangle(0, height - gs, width, gs)
                 cr.set_source(pat)
                 cr.fill()
 
