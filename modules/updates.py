@@ -205,10 +205,11 @@ class Updates(c.BaseModule):
             pkg_scroll.set_propagate_natural_height(True)
             if large:
                 pkg_scroll.set_vexpand(True)
-                pkg_scroll.set_max_content_height(200)
+                pkg_scroll.set_max_content_height(180)
             pkg_scroll.set_child(packages_box)
             vsgb = c.VScrollGradientBox(pkg_scroll, gradient_size=60)
             c.add_style(vsgb, 'box')
+            vsgb.set_overflow(Gtk.Overflow.HIDDEN)
             manager_box.append(vsgb)
             content_box.append(manager_box)
 
