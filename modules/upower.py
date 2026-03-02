@@ -363,3 +363,7 @@ class UPower(c.BaseModule):
 module_map = {
     'upower': UPower
 }
+# Alias to old power supply module
+alias_map = {
+    'power_supply': UPower
+}
