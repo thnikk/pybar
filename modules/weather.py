@@ -10,7 +10,7 @@ import requests
 import common as c
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+from gi.repository import Gtk, Pango  # noqa
 
 
 class Weather(c.BaseModule):
@@ -412,7 +412,8 @@ class Weather(c.BaseModule):
                 hover_labels=hover_labels,
                 smooth=True,
                 secondary_data=data['Hourly']['humidities'],
-                icon_data=icon_data
+                icon_data=icon_data,
+                pin_first_to_edge=True
             )
             graph_box.append(graph)
             widget_obj.popover_widgets['graph'] = graph
@@ -441,6 +442,10 @@ class Weather(c.BaseModule):
             h_widgets['description'] = hour['description']
 
             time_lbl = c.label(hour['time'], ha='center')
+            # Bold via Pango attrs; no separate CSS class needed.
+            attrs = Pango.AttrList()
+            attrs.insert(Pango.attr_weight_new(Pango.Weight.BOLD))
+            time_lbl.set_attributes(attrs)
             time_cell.append(time_lbl)
             h_widgets['time'] = time_lbl
 

@@ -98,7 +98,8 @@ class Graph(Gtk.DrawingArea):
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=False,
             time_markers=None, time_labels=None, hover_labels=None,
-            colors=None, secondary_data=None, icon_data=None):
+            colors=None, secondary_data=None, icon_data=None,
+            pin_first_to_edge=False):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -116,6 +117,8 @@ class Graph(Gtk.DrawingArea):
         self.colors = colors or [(0.56, 0.63, 0.75), (0.2, 0.5, 0.8)]
         # List of icon strings, one per data point; only drawn on change
         self.icon_data = icon_data or []
+        # Pin point 0 to x=0; subsequent points centred in equal bins
+        self.pin_first_to_edge = pin_first_to_edge
         self.hover_index = -1
         self.set_draw_func(self.on_draw)
 
@@ -136,7 +139,17 @@ class Graph(Gtk.DrawingArea):
         series = self.data[0] if isinstance(self.data[0], list) else self.data
         num_points = len(series)
 
-        idx = round((x / width) * (num_points - 1))
+        if self.pin_first_to_edge and num_points > 1:
+            # Invert the pin_first_to_edge layout:
+            #   i=0 → x=0, i>=1 → x=(i-0.5)/(n-1)*w
+            # Midpoint between i=0 and i=1 is at 0.25/(n-1)*w
+            threshold = 0.25 / (num_points - 1) * width
+            if x < threshold:
+                idx = 0
+            else:
+                idx = round(x * (num_points - 1) / width + 0.5)
+        else:
+            idx = round((x / width) * (num_points - 1))
         idx = max(0, min(idx, num_points - 1))
         if idx != self.hover_index:
             self.hover_index = idx
@@ -271,7 +284,14 @@ class Graph(Gtk.DrawingArea):
         range_val = max_val - min_val if max_val != min_val else 1
 
         def get_coords(i, series):
-            x = (i / (len(series) - 1)) * w
+            n = len(series)
+            # When pin_first_to_edge is set, point 0 sits at the left
+            # edge and points 1..n-1 are centred in equal-width bins so
+            # they line up with the hour columns below the graph.
+            if self.pin_first_to_edge and n > 1:
+                x = 0 if i == 0 else (i - 0.5) / (n - 1) * w
+            else:
+                x = (i / (n - 1)) * w
             val = series[i]
             val = max(min(val, max_val), min_val)
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
@@ -321,7 +341,12 @@ class Graph(Gtk.DrawingArea):
                     x1, y1 = get_coords(i, series)
                     x2, y2 = get_coords(i + 1, series)
                     cr.curve_to(
-                        x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
+                        x1 + (x2 - x1) / 2, y1,
+                        x1 + (x2 - x1) / 2, y2, x2, y2)
+
+            # Extend to the right edge so the line doesn't abruptly end.
+            _, last_y = get_coords(len(series) - 1, series)
+            cr.line_to(w, last_y)
 
             cr.set_line_width(2)
             cr.set_source_rgb(*color)
@@ -349,7 +374,11 @@ class Graph(Gtk.DrawingArea):
             s_range = 100
 
             def get_s_coords(i):
-                x = (i / (len(s_series) - 1)) * w
+                n = len(s_series)
+                if self.pin_first_to_edge and n > 1:
+                    x = 0 if i == 0 else (i - 0.5) / (n - 1) * w
+                else:
+                    x = (i / (n - 1)) * w
                 val = s_series[i]
                 y = 10 + (h - 20) - ((val - s_min) / s_range) * (h - 20)
                 return x, y
@@ -369,6 +398,10 @@ class Graph(Gtk.DrawingArea):
                     x2, y2 = get_s_coords(i + 1)
                     cr.line_to(x2, y2)
 
+            # Extend to the right edge so the line doesn't abruptly end.
+            _, s_last_y = get_s_coords(len(s_series) - 1)
+            cr.line_to(w, s_last_y)
+
             cr.set_line_width(1)
             cr.set_source_rgba(s_color[0], s_color[1], s_color[2], 0.5)
             cr.stroke()
@@ -383,7 +416,11 @@ class Graph(Gtk.DrawingArea):
             for i, (marker_pos, label) in enumerate(
                     zip(self.time_markers, self.time_labels)):
                 if 0 <= marker_pos <= num_points - 1:
-                    x = (marker_pos / (num_points - 1)) * w
+                    if self.pin_first_to_edge and num_points > 1:
+                        x = (0 if marker_pos == 0
+                             else (marker_pos - 0.5) / (num_points - 1) * w)
+                    else:
+                        x = (marker_pos / (num_points - 1)) * w
                     cr.move_to(x, 0)
                     cr.line_to(x, h)
                     cr.stroke()
@@ -411,11 +448,19 @@ class Graph(Gtk.DrawingArea):
             num_icon_pts = len(self.icon_data)
             prev = None
             for i, icon in enumerate(self.icon_data):
+                # Skip the first point ("Now"); start from hour 1.
+                if i == 0:
+                    prev = icon
+                    continue
                 if icon == prev:
                     continue
                 prev = icon
                 if num_icon_pts > 1:
-                    ix = (i / (num_icon_pts - 1)) * w
+                    if self.pin_first_to_edge:
+                        ix = (0 if i == 0
+                              else (i - 0.5) / (num_icon_pts - 1) * w)
+                    else:
+                        ix = (i / (num_icon_pts - 1)) * w
                 else:
                     ix = w / 2
 
@@ -475,7 +520,11 @@ class Graph(Gtk.DrawingArea):
         # Draw hover line and label
         if self.hover_index != -1:
             num_points = len(series_list[0])
-            x = (self.hover_index / (num_points - 1)) * w
+            if self.pin_first_to_edge and num_points > 1:
+                hi = self.hover_index
+                x = 0 if hi == 0 else (hi - 0.5) / (num_points - 1) * w
+            else:
+                x = (self.hover_index / (num_points - 1)) * w
             hover_color = (0.56, 0.63, 0.75)
             cr.set_source_rgba(
                 hover_color[0], hover_color[1], hover_color[2], 0.8)
