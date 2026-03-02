@@ -67,5 +67,8 @@ class VM(c.BaseModule):
 
 
 module_map = {
+    'libvirt': VM
+}
+alias_map = {
     'vm': VM
 }
