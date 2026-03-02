@@ -334,6 +334,7 @@ class Volume(c.BaseModule):
         m.set_label('...')
         m.text.set_width_chars(5)
         m.set_icon('')
+        c.add_style(m.icon, 'icon-volume')
 
         # Add scroll controller
         scroll_controller = Gtk.EventControllerScroll.new(
