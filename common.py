@@ -99,7 +99,7 @@ class Graph(Gtk.DrawingArea):
             max_config=None, height=120, width=300, smooth=False,
             time_markers=None, time_labels=None, hover_labels=None,
             colors=None, secondary_data=None, icon_data=None,
-            pin_first_to_edge=False):
+            pin_first_to_edge=False, center_in_bins=False):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -119,6 +119,8 @@ class Graph(Gtk.DrawingArea):
         self.icon_data = icon_data or []
         # Pin point 0 to x=0; subsequent points centred in equal bins
         self.pin_first_to_edge = pin_first_to_edge
+        # Centre every point in its own equal-width bin (no edge pinning)
+        self.center_in_bins = center_in_bins
         self.hover_index = -1
         self.set_draw_func(self.on_draw)
 
@@ -139,10 +141,11 @@ class Graph(Gtk.DrawingArea):
         series = self.data[0] if isinstance(self.data[0], list) else self.data
         num_points = len(series)
 
-        if self.pin_first_to_edge and num_points > 1:
-            # Invert the pin_first_to_edge layout:
-            #   i=0 → x=0, i>=1 → x=(i-0.5)/(n-1)*w
-            # Midpoint between i=0 and i=1 is at 0.25/(n-1)*w
+        if self.center_in_bins and num_points > 0:
+            # Invert (i+0.5)/n*w → i = x*n/w - 0.5
+            idx = int(x * num_points / width)
+        elif self.pin_first_to_edge and num_points > 1:
+            # Invert pin_first_to_edge layout
             threshold = 0.25 / (num_points - 1) * width
             if x < threshold:
                 idx = 0
@@ -259,6 +262,16 @@ class Graph(Gtk.DrawingArea):
                 else:
                     cr.line_to(point[0], point[1])
 
+    def _point_x(self, i, n, w):
+        """Convert data index to x coordinate based on layout mode."""
+        if self.center_in_bins and n > 0:
+            # Each of n points centred in an equal bin: no empty edges.
+            return (i + 0.5) / n * w
+        if self.pin_first_to_edge and n > 1:
+            # Point 0 at left edge; points 1..n-1 centred in their bins.
+            return 0 if i == 0 else (i - 0.5) / (n - 1) * w
+        return (i / (n - 1)) * w if n > 1 else w / 2
+
     def on_draw(self, area, cr, width, height, *args):
         if not self.data:
             return
@@ -284,16 +297,8 @@ class Graph(Gtk.DrawingArea):
         range_val = max_val - min_val if max_val != min_val else 1
 
         def get_coords(i, series):
-            n = len(series)
-            # When pin_first_to_edge is set, point 0 sits at the left
-            # edge and points 1..n-1 are centred in equal-width bins so
-            # they line up with the hour columns below the graph.
-            if self.pin_first_to_edge and n > 1:
-                x = 0 if i == 0 else (i - 0.5) / (n - 1) * w
-            else:
-                x = (i / (n - 1)) * w
-            val = series[i]
-            val = max(min(val, max_val), min_val)
+            x = self._point_x(i, len(series), w)
+            val = max(min(series[i], max_val), min_val)
             y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             return x, y
 
@@ -329,14 +334,21 @@ class Graph(Gtk.DrawingArea):
         for s_idx, series in enumerate(series_list):
             color = self.colors[s_idx % len(self.colors)]
 
+            _, first_y = get_coords(0, series)
+            _, last_y = get_coords(len(series) - 1, series)
+
             cr.new_path()
             if self.smooth:
-                points = [get_coords(i, series) for i in range(len(series))]
+                # Prepend (0, first_y) so the spline extends flush to
+                # the left edge without an abrupt start.
+                points = (
+                    [(0, first_y)]
+                    + [get_coords(i, series) for i in range(len(series))]
+                )
                 self._draw_catmull_rom_spline(
                     cr, points, n_points_per_segment=25)
             else:
-                x0, y0 = get_coords(0, series)
-                cr.move_to(x0, y0)
+                cr.move_to(0, first_y)
                 for i in range(len(series) - 1):
                     x1, y1 = get_coords(i, series)
                     x2, y2 = get_coords(i + 1, series)
@@ -345,7 +357,6 @@ class Graph(Gtk.DrawingArea):
                         x1 + (x2 - x1) / 2, y2, x2, y2)
 
             # Extend to the right edge so the line doesn't abruptly end.
-            _, last_y = get_coords(len(series) - 1, series)
             cr.line_to(w, last_y)
 
             cr.set_line_width(2)
@@ -379,10 +390,7 @@ class Graph(Gtk.DrawingArea):
             bar_w = 6
             radius = bar_w / 2
             for i, val in enumerate(s_series):
-                if self.pin_first_to_edge and n > 1:
-                    bx = 0 if i == 0 else (i - 0.5) / (n - 1) * w
-                else:
-                    bx = (i / (n - 1)) * w if n > 1 else w / 2
+                bx = self._point_x(i, n, w)
                 # Graph content sits between y=10 and y=h-10;
                 # scale bars to that same range.
                 graph_h = h - 20
@@ -414,11 +422,7 @@ class Graph(Gtk.DrawingArea):
             for i, (marker_pos, label) in enumerate(
                     zip(self.time_markers, self.time_labels)):
                 if 0 <= marker_pos <= num_points - 1:
-                    if self.pin_first_to_edge and num_points > 1:
-                        x = (0 if marker_pos == 0
-                             else (marker_pos - 0.5) / (num_points - 1) * w)
-                    else:
-                        x = (marker_pos / (num_points - 1)) * w
+                    x = self._point_x(marker_pos, num_points, w)
                     cr.move_to(x, 0)
                     cr.line_to(x, h)
                     cr.stroke()
@@ -453,14 +457,7 @@ class Graph(Gtk.DrawingArea):
                 if icon == prev:
                     continue
                 prev = icon
-                if num_icon_pts > 1:
-                    if self.pin_first_to_edge:
-                        ix = (0 if i == 0
-                              else (i - 0.5) / (num_icon_pts - 1) * w)
-                    else:
-                        ix = (i / (num_icon_pts - 1)) * w
-                else:
-                    ix = w / 2
+                ix = self._point_x(i, num_icon_pts, w)
 
                 layout = PangoCairo.create_layout(cr)
                 layout.set_font_description(icon_font)
@@ -529,11 +526,7 @@ class Graph(Gtk.DrawingArea):
         # Draw hover line and label
         if self.hover_index != -1:
             num_points = len(series_list[0])
-            if self.pin_first_to_edge and num_points > 1:
-                hi = self.hover_index
-                x = 0 if hi == 0 else (hi - 0.5) / (num_points - 1) * w
-            else:
-                x = (self.hover_index / (num_points - 1)) * w
+            x = self._point_x(self.hover_index, num_points, w)
             hover_color = (0.56, 0.63, 0.75)
             cr.set_source_rgba(
                 hover_color[0], hover_color[1], hover_color[2], 0.8)

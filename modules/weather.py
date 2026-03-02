@@ -376,34 +376,29 @@ class Weather(c.BaseModule):
             # Sort by absolute time
             time_markers_data.sort(key=lambda x: x[2])
 
-            # Separate into parallel arrays
             time_markers = [marker[0] for marker in time_markers_data]
             time_labels = [marker[1] for marker in time_markers_data]
 
-            descriptions = (
-                [today['description']]
-                + [h['description'] for h in data['Hourly']['info']]
-            )
+            # Drop the "Now" (index 0) point; graph shows hours 1-24.
+            graph_temps = data['Hourly']['temperatures'][1:]
+            graph_hums = data['Hourly']['humidities'][1:]
+            descriptions = [
+                h['description'] for h in data['Hourly']['info']]
             hover_labels = [
                 f"{t}° {l}\n{hu}% humidity\n{d}"
                 for t, hu, l, d in zip(
-                    data['Hourly']['temperatures'],
-                    data['Hourly']['humidities'],
-                    ["Now"] + [
-                        h['time'] for h in data['Hourly']['info']],
+                    graph_temps,
+                    graph_hums,
+                    [h['time'] for h in data['Hourly']['info']],
                     descriptions
                 )
             ]
 
-            # Build icon list: current icon + one per forecast hour;
-            # graph renders only where the icon changes.
-            icon_data = (
-                [today['icon']]
-                + [h['icon'] for h in data['Hourly']['info']]
-            )
+            # Icons for hours 1-24 only.
+            icon_data = [h['icon'] for h in data['Hourly']['info']]
 
             graph = c.Graph(
-                data['Hourly']['temperatures'],
+                graph_temps,
                 height=120,
                 min_config=data['Hourly'].get('min'),
                 max_config=data['Hourly'].get('max'),
@@ -411,9 +406,9 @@ class Weather(c.BaseModule):
                 time_labels=time_labels,
                 hover_labels=hover_labels,
                 smooth=True,
-                secondary_data=data['Hourly']['humidities'],
+                secondary_data=graph_hums,
                 icon_data=icon_data,
-                pin_first_to_edge=True
+                center_in_bins=True
             )
             graph_box.append(graph)
             widget_obj.popover_widgets['graph'] = graph
@@ -664,27 +659,23 @@ class Weather(c.BaseModule):
 
                 time_markers_data.sort(key=lambda x: x[2])
 
-                new_icons = (
-                    [today['icon']]
-                    + [h['icon'] for h in data['Hourly']['info']]
-                )
+                new_icons = [
+                    h['icon'] for h in data['Hourly']['info']]
+                graph_temps = data['Hourly']['temperatures'][1:]
+                graph_hums = data['Hourly']['humidities'][1:]
                 w['graph'].update_data(
-                    data['Hourly']['temperatures'], None,
-                    icon_data=new_icons)
-                w['graph'].secondary_data = data['Hourly']['humidities']
+                    graph_temps, None, icon_data=new_icons)
+                w['graph'].secondary_data = graph_hums
                 w['graph'].time_markers = [m[0] for m in time_markers_data]
                 w['graph'].time_labels = [m[1] for m in time_markers_data]
-                new_descs = (
-                    [today['description']]
-                    + [h['description'] for h in data['Hourly']['info']]
-                )
+                new_descs = [
+                    h['description'] for h in data['Hourly']['info']]
                 w['graph'].hover_labels = [
                     f"{t}° {l}\n{hu}% humidity\n{d}"
                     for t, hu, l, d in zip(
-                        data['Hourly']['temperatures'],
-                        data['Hourly']['humidities'],
-                        ["Now"] + [
-                            h['time'] for h in data['Hourly']['info']],
+                        graph_temps,
+                        graph_hums,
+                        [h['time'] for h in data['Hourly']['info']],
                         new_descs
                     )
                 ]
