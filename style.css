@@ -277,41 +277,6 @@ button.normal:checked {
 	color: @black;
 }
 
-/* mockup */
-popover.mockup-widget {
-	background-color: transparent;
-	padding: 0;
-}
-
-popover.mockup-widget contents {
-	background-color: alpha(#2b303b, 0.9);
-	padding: 0;
-	border: 2px solid @blue;
-	border-radius: 20px;
-	box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-popover.mockup-widget arrow {
-	background-color: alpha(#2b303b, 0.8);
-	border: 2px solid @blue;
-}
-
-.mockup-heading {
-	color: @white;
-	padding: 5px 10px;
-	font-weight: normal;
-	font-size: 24px;
-}
-
-.mockup-content {
-	background-color: rgba(0,0,0, 0.4);
-	border-radius: 20px;
-	padding: 20px;
-	color: @white;
-	border-top: 1px solid rgba(255,255,255,0.1);
-	margin: 0;
-}
-
 /* Grouped buttons */
 .group-button {
 	border-radius: 0;
