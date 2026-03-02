@@ -108,13 +108,14 @@ class Debug(c.BaseModule):
         m.set_position(bar.position)
         m.set_icon(self.config.get('icon', ''))
 
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
 
         # Debug Heading
         main_box.append(c.label("Debug", style="heading"))
 
+        log_box = c.box('v', spacing=10)
         # Log title
-        main_box.append(c.label("Log", style="title", ha='start'))
+        log_box.append(c.label("Log", style="title", ha='start'))
 
         # Log display in scrollbox
         # Height 0 allows it to grow to fit its content (exactly 10 labels)
@@ -136,7 +137,8 @@ class Debug(c.BaseModule):
         log_inner.append(lines_box)
         log_scroll_wrapper = c.HScrollGradientBox(log_inner, max_width=400)
         c.add_style(log_scroll_wrapper, 'box')
-        main_box.append(log_scroll_wrapper)
+        log_box.append(log_scroll_wrapper)
+        main_box.append(log_box)
 
         # Convert vertical scroll to horizontal scroll
         scroll_controller = Gtk.EventControllerScroll.new(

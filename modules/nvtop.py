@@ -74,18 +74,21 @@ class NVTop(c.BaseModule):
         devices = data.get('devices', [])
         widget.popover_widgets = []
 
-        main_box = c.box('v', spacing=10)
+        main_box = c.box('v', spacing=20)
         main_box.append(c.label('GPU info', style="heading"))
 
-        devices_box = c.box('v', spacing=10)
+        devices_box = c.box('v', spacing=20)
 
         for i in range(len(devices)):
-            card_box = c.box('v', spacing=0)
+            card_box = c.box('v', spacing=10)
 
             # Device title
             dev_name = devices[i].get('device_name', f'Device {i}')
             device_label = c.label(dev_name, style='title', ha='start', he=True)
             card_box.append(device_label)
+
+            # Box for stats and graph
+            stat_box = c.box('v')
 
             info_outer_box = c.box('v', spacing=0, style='gpu-info')
             inner_info_box = c.box('v', spacing=10, style='inner-box')
@@ -197,7 +200,7 @@ class NVTop(c.BaseModule):
 
             inner_info_box.append(inline_box)
             info_outer_box.append(inner_info_box)
-            card_box.append(info_outer_box)
+            stat_box.append(info_outer_box)
 
             # Add graph
             if hasattr(self, 'history'):
@@ -219,8 +222,10 @@ class NVTop(c.BaseModule):
                     smooth=False,
                 )
                 graph_box.append(graph)
-                card_box.append(graph_box)
+                stat_box.append(graph_box)
                 device_widgets['graph'] = graph
+
+            card_box.append(stat_box)
 
             devices_box.append(card_box)
             widget.popover_widgets.append(device_widgets)
