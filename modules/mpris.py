@@ -21,6 +21,25 @@ gi.require_version('GdkPixbuf', '2.0')
 from gi.repository import Gtk, Gdk, Pango, GdkPixbuf, GLib  # noqa
 
 
+class VisualizerBG(Gtk.DrawingArea):
+    """ Background gradient for the visualizer """
+    def __init__(self, height=56):
+        super().__init__()
+        self.set_overflow(Gtk.Overflow.HIDDEN)
+        c.add_style(self, 'visualizer')
+        self.set_content_height(height)
+        self.set_hexpand(True)
+        self.set_draw_func(self._draw)
+
+    def _draw(self, _area, cr, width, height, *_args):
+        bg = cairo.LinearGradient(0, 0, 0, height)
+        bg.add_color_stop_rgba(0, 0.0, 0.0, 0.0, 0.0)
+        bg.add_color_stop_rgba(1, 0.0, 0.0, 0.0, 0.5)
+        cr.set_source(bg)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+
+
 class Visualizer(Gtk.DrawingArea):
     """ Animated bar visualizer for album art overlay """
 
@@ -80,15 +99,7 @@ class Visualizer(Gtk.DrawingArea):
         return True
 
     def _draw(self, _area, cr, width, height, *_args):
-        """ Draw background gradient then fully-rounded visualizer bars """
-        # Dark gradient behind bars for contrast
-        bg = cairo.LinearGradient(0, 0, 0, height)
-        bg.add_color_stop_rgba(0, 0.0, 0.0, 0.0, 0.0)
-        bg.add_color_stop_rgba(1, 0.0, 0.0, 0.0, 0.5)
-        cr.set_source(bg)
-        cr.rectangle(0, 0, width, height)
-        cr.fill()
-
+        """ Draw fully-rounded visualizer bars """
         n = self.BAR_COUNT
         slot_w = width / n
         bar_w = slot_w * self.BAR_FILL
@@ -505,6 +516,8 @@ class MPRIS(c.BaseModule):
                 hasattr(widget, 'pop_visualizer'):
             is_playing = data.get('status') == 'playing'
             widget.pop_vis_revealer.set_reveal_child(is_playing)
+            if hasattr(widget, 'pop_vis_bg_revealer'):
+                widget.pop_vis_bg_revealer.set_reveal_child(is_playing)
             if is_playing:
                 widget.pop_visualizer.start()
             else:
@@ -549,16 +562,25 @@ class MPRIS(c.BaseModule):
         art_overlay.set_child(art_container)
 
         if self.show_visualizer:
+            # Background layer
+            widget.pop_vis_bg = VisualizerBG()
+            widget.pop_vis_bg_revealer = Gtk.Revealer()
+            widget.pop_vis_bg_revealer.set_transition_type(
+                Gtk.RevealerTransitionType.CROSSFADE
+            )
+            widget.pop_vis_bg_revealer.set_transition_duration(500)
+            widget.pop_vis_bg_revealer.set_child(widget.pop_vis_bg)
+            widget.pop_vis_bg_revealer.set_valign(Gtk.Align.END)
+            widget.pop_vis_bg_revealer.set_halign(Gtk.Align.FILL)
+            art_overlay.add_overlay(widget.pop_vis_bg_revealer)
+
             # Visualizer anchored to the bottom of the art overlay
             widget.pop_visualizer = Visualizer(art_size)
             widget.pop_visualizer.set_valign(Gtk.Align.END)
             widget.pop_visualizer.set_halign(Gtk.Align.FILL)
 
-            # Revealer hides/shows visualizer with a crossfade
+            # Revealer hides/shows visualizer with default slide
             widget.pop_vis_revealer = Gtk.Revealer()
-            widget.pop_vis_revealer.set_transition_type(
-                Gtk.RevealerTransitionType.CROSSFADE
-            )
             widget.pop_vis_revealer.set_transition_duration(300)
             widget.pop_vis_revealer.set_child(widget.pop_visualizer)
             widget.pop_vis_revealer.set_valign(Gtk.Align.END)
@@ -568,6 +590,7 @@ class MPRIS(c.BaseModule):
             # Sync initial visualizer state with playback status
             is_playing = data.get('status') == 'playing'
             widget.pop_vis_revealer.set_reveal_child(is_playing)
+            widget.pop_vis_bg_revealer.set_reveal_child(is_playing)
             if is_playing:
                 widget.pop_visualizer.start()
 
