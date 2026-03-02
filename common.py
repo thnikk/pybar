@@ -553,12 +553,25 @@ class Graph(Gtk.DrawingArea):
                 lx = x - max_w / 2
                 ly = 45  # slightly lower to avoid legend
                 lx = max(5, min(lx, w - max_w - 5))
-                pad = 6
+                pad = 8
+                radius = 6
+                bx = lx - pad
+                by = ly - total_h - pad
+                bw = max_w + pad * 2
+                bh = total_h + pad * 2
 
-                cr.set_source_rgba(0, 0, 0, 0.8)
-                cr.rectangle(
-                    lx - pad, ly - total_h - pad,
-                    max_w + pad * 2, total_h + pad * 2)
+                # Rounded rectangle background
+                cr.new_sub_path()
+                cr.arc(bx + radius, by + radius,
+                       radius, math.pi, 3 * math.pi / 2)
+                cr.arc(bx + bw - radius, by + radius,
+                       radius, 3 * math.pi / 2, 0)
+                cr.arc(bx + bw - radius, by + bh - radius,
+                       radius, 0, math.pi / 2)
+                cr.arc(bx + radius, by + bh - radius,
+                       radius, math.pi / 2, math.pi)
+                cr.close_path()
+                cr.set_source_rgba(0, 0, 0, 0.55)
                 cr.fill()
 
                 cr.set_source_rgb(1, 1, 1)
