@@ -219,7 +219,7 @@ class Weather(c.BaseModule):
                     "description": self.lookup(
                         w['hourly']['weathercode'][idx], 1),
                     "humidity": w['hourly']['relativehumidity_2m'][idx],
-                    "time": target_time.strftime("%l%P").strip(),
+                    "time": target_time.strftime("%l %p").strip(),
                     "temperature": round(w['hourly']['temperature_2m'][idx])
                 })
 
@@ -325,7 +325,7 @@ class Weather(c.BaseModule):
 
         # Add temperature graph
         if 'temperatures' in data['Hourly']:
-            graph_box = c.box('v', style='box')
+            graph_box = c.box('v')
             graph_box.set_overflow(Gtk.Overflow.HIDDEN)
 
             # Calculate time markers for sunrise and sunset
@@ -380,71 +380,85 @@ class Weather(c.BaseModule):
             time_markers = [marker[0] for marker in time_markers_data]
             time_labels = [marker[1] for marker in time_markers_data]
 
+            descriptions = (
+                [today['description']]
+                + [h['description'] for h in data['Hourly']['info']]
+            )
             hover_labels = [
-                f"{t}° {l}\n{hu}% humidity" for t, hu, l in zip(
+                f"{t}° {l}\n{hu}% humidity\n{d}"
+                for t, hu, l, d in zip(
                     data['Hourly']['temperatures'],
                     data['Hourly']['humidities'],
-                    ["Now"] + [h['time'] for h in data['Hourly']['info']]
+                    ["Now"] + [
+                        h['time'] for h in data['Hourly']['info']],
+                    descriptions
                 )
             ]
 
+            # Build icon list: current icon + one per forecast hour;
+            # graph renders only where the icon changes.
+            icon_data = (
+                [today['icon']]
+                + [h['icon'] for h in data['Hourly']['info']]
+            )
+
             graph = c.Graph(
                 data['Hourly']['temperatures'],
-                height=80,
+                height=120,
                 min_config=data['Hourly'].get('min'),
                 max_config=data['Hourly'].get('max'),
                 time_markers=time_markers,
                 time_labels=time_labels,
                 hover_labels=hover_labels,
                 smooth=True,
-                secondary_data=data['Hourly']['humidities']
+                secondary_data=data['Hourly']['humidities'],
+                icon_data=icon_data
             )
             graph_box.append(graph)
-            hourly_container.append(graph_box)
             widget_obj.popover_widgets['graph'] = graph
 
-            # Time legend for forecast
-            time_box = c.box('h')
-            time_box.append(c.label('Now', style='gray', ha='start', he=True))
-            hours_lbl = c.label(
-                f"+{data['Hourly'].get('hours', 5)}h", style='gray', ha='end')
-            time_box.append(hours_lbl)
-            hourly_container.append(time_box)
-
         hourly_box = c.box('h')
+        # Time row sits above the graph, aligned with hour columns.
+        time_row = c.box('h')
         hour_group = Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL)
         for hour in data['Hourly']['info']:
             hour_box = c.box('v', style='inner-box')
             hour_group.add_widget(hour_box)
+
+            # Time cell shares the group so it matches each hour column.
+            time_cell = c.box('v', style='inner-box')
+            hour_group.add_widget(time_cell)
 
             h_widgets = {}
             t_lbl = c.label(f"{hour['temperature']}°")
             hour_box.append(t_lbl)
             h_widgets['temp'] = t_lbl
 
-            h_lbl = c.label(f"{hour['humidity']}%")
+            h_lbl = c.label(f"{hour['humidity']}%", style='blue-fg')
             hour_box.append(h_lbl)
             h_widgets['hum'] = h_lbl
 
-            icon = c.label(hour['icon'], style='icon-small')
-            hour_box.append(icon)
-            h_widgets['icon'] = icon
             h_widgets['description'] = hour['description']
-            c.set_hover_popover(
-                icon, lambda w=h_widgets: w['description'])
 
-            time_lbl = c.label(hour['time'])
-            hour_box.append(time_lbl)
+            time_lbl = c.label(hour['time'], ha='center')
+            time_cell.append(time_lbl)
             h_widgets['time'] = time_lbl
 
             hourly_box.append(hour_box)
-            if hour != data['Hourly']['info'][-1]:
-                hourly_box.append(c.sep('v'))
+            time_row.append(time_cell)
 
             widget_obj.popover_widgets['hourly'].append(h_widgets)
 
+        # Wrap time row, graph, and hourly row together so everything
+        # scrolls together and columns stay aligned.
+        scroll_content = c.box('v')
+        scroll_content.append(time_row)
+        if 'graph' in widget_obj.popover_widgets:
+            scroll_content.append(graph_box)
+        scroll_content.append(hourly_box)
+
         hourly_scroll_wrapper = c.HScrollGradientBox(
-            hourly_box, max_width=400)
+            scroll_content, max_width=400)
         c.add_style(hourly_scroll_wrapper, 'box')
 
         # Convert vertical scroll to horizontal scroll
@@ -590,7 +604,6 @@ class Weather(c.BaseModule):
                     h_data = data['Hourly']['info'][i]
                     h_widgets['temp'].set_text(f"{h_data['temperature']}°")
                     h_widgets['hum'].set_text(f"{h_data['humidity']}%")
-                    h_widgets['icon'].set_text(h_data['icon'])
                     h_widgets['description'] = h_data['description']
                     h_widgets['time'].set_text(h_data['time'])
 
@@ -646,16 +659,28 @@ class Weather(c.BaseModule):
 
                 time_markers_data.sort(key=lambda x: x[2])
 
+                new_icons = (
+                    [today['icon']]
+                    + [h['icon'] for h in data['Hourly']['info']]
+                )
                 w['graph'].update_data(
-                    data['Hourly']['temperatures'], None)
+                    data['Hourly']['temperatures'], None,
+                    icon_data=new_icons)
                 w['graph'].secondary_data = data['Hourly']['humidities']
                 w['graph'].time_markers = [m[0] for m in time_markers_data]
                 w['graph'].time_labels = [m[1] for m in time_markers_data]
+                new_descs = (
+                    [today['description']]
+                    + [h['description'] for h in data['Hourly']['info']]
+                )
                 w['graph'].hover_labels = [
-                    f"{t}° {l}\n{hu}% humidity" for t, hu, l in zip(
+                    f"{t}° {l}\n{hu}% humidity\n{d}"
+                    for t, hu, l, d in zip(
                         data['Hourly']['temperatures'],
                         data['Hourly']['humidities'],
-                        ["Now"] + [h['time'] for h in data['Hourly']['info']]
+                        ["Now"] + [
+                            h['time'] for h in data['Hourly']['info']],
+                        new_descs
                     )
                 ]
 

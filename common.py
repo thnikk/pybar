@@ -17,7 +17,11 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Gsk', '4.0')
 gi.require_version('Graphene', '1.0')
 gi.require_version('Gtk4LayerShell', '1.0')
-from gi.repository import Gtk, Gdk, Gsk, Graphene, Gtk4LayerShell, Pango, GObject, GLib  # noqa
+gi.require_version('PangoCairo', '1.0')
+from gi.repository import (  # noqa
+    Gtk, Gdk, Gsk, Graphene, Gtk4LayerShell,
+    Pango, PangoCairo, GObject, GLib
+)
 
 
 # Alignment mapping for GTK
@@ -94,7 +98,7 @@ class Graph(Gtk.DrawingArea):
             self, data, state=None, unit=None, min_config=None,
             max_config=None, height=120, width=300, smooth=False,
             time_markers=None, time_labels=None, hover_labels=None,
-            colors=None, secondary_data=None):
+            colors=None, secondary_data=None, icon_data=None):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -110,6 +114,8 @@ class Graph(Gtk.DrawingArea):
         self.time_labels = time_labels or []
         self.hover_labels = hover_labels or []
         self.colors = colors or [(0.56, 0.63, 0.75), (0.2, 0.5, 0.8)]
+        # List of icon strings, one per data point; only drawn on change
+        self.icon_data = icon_data or []
         self.hover_index = -1
         self.set_draw_func(self.on_draw)
 
@@ -140,9 +146,11 @@ class Graph(Gtk.DrawingArea):
         self.hover_index = -1
         self.queue_draw()
 
-    def update_data(self, data, state):
+    def update_data(self, data, state, icon_data=None):
         self.data = data
         self.state = state
+        if icon_data is not None:
+            self.icon_data = icon_data
         self.queue_draw()
 
     def _catmull_rom_point(self, p0, p1, p2, p3, t, alpha=0.5):
@@ -393,6 +401,35 @@ class Graph(Gtk.DrawingArea):
                     cr.show_text(label)
                     cr.set_dash([2, 2])
             cr.set_dash([])
+
+        # Draw icons at positions where the icon changes
+        if self.icon_data:
+            # Font for icon glyphs; matches the bar CSS font stack
+            icon_font = Pango.FontDescription(
+                "Nunito SemiBold, Font Awesome 6 Free Solid 11"
+            )
+            num_icon_pts = len(self.icon_data)
+            prev = None
+            for i, icon in enumerate(self.icon_data):
+                if icon == prev:
+                    continue
+                prev = icon
+                if num_icon_pts > 1:
+                    ix = (i / (num_icon_pts - 1)) * w
+                else:
+                    ix = w / 2
+
+                layout = PangoCairo.create_layout(cr)
+                layout.set_font_description(icon_font)
+                layout.set_text(icon)
+                _, lext = layout.get_pixel_extents()
+                # Center the glyph horizontally on ix and vertically in h
+                tx = ix - (lext.x + lext.width / 2)
+                ty = h / 2 - (lext.y + lext.height / 2)
+
+                cr.set_source_rgba(1, 1, 1, 0.75)
+                cr.move_to(tx, ty)
+                PangoCairo.show_layout(cr, layout)
 
         # Draw Legend (Min/Max values)
         legend_color = (0.56, 0.63, 0.75)
