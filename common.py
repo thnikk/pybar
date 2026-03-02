@@ -443,7 +443,7 @@ class Graph(Gtk.DrawingArea):
         if self.icon_data:
             # Font for icon glyphs; matches the bar CSS font stack
             icon_font = Pango.FontDescription(
-                "Nunito SemiBold, Font Awesome 6 Free Solid 11"
+                "Nunito SemiBold, Font Awesome 6 Free Solid 16"
             )
             num_icon_pts = len(self.icon_data)
             prev = None
@@ -468,9 +468,20 @@ class Graph(Gtk.DrawingArea):
                 layout.set_font_description(icon_font)
                 layout.set_text(icon)
                 _, lext = layout.get_pixel_extents()
-                # Center the glyph horizontally on ix and vertically in h
+
+                # Centre horizontally on the data point x.
                 tx = ix - (lext.x + lext.width / 2)
-                ty = h / 2 - (lext.y + lext.height / 2)
+
+                # Place the icon a fixed gap above the temperature
+                # curve; fall back to below if that clips the top edge.
+                gap = 10
+                top_margin = 10
+                _, curve_y = get_coords(i, series_list[0])
+                ty_above = curve_y - gap - (lext.y + lext.height)
+                if ty_above >= top_margin:
+                    ty = ty_above
+                else:
+                    ty = curve_y + gap - lext.y
 
                 cr.set_source_rgba(1, 1, 1, 0.75)
                 cr.move_to(tx, ty)
