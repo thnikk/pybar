@@ -367,44 +367,42 @@ class Graph(Gtk.DrawingArea):
             cr.set_source(linpat)
             cr.fill()
 
-        # Draw secondary data (humidity)
+        # Draw secondary data (humidity) as vertical bars
         if self.secondary_data:
             s_series = self.secondary_data
-            s_min, s_max = 0, 100
-            s_range = 100
-
-            def get_s_coords(i):
-                n = len(s_series)
-                if self.pin_first_to_edge and n > 1:
-                    x = 0 if i == 0 else (i - 0.5) / (n - 1) * w
-                else:
-                    x = (i / (n - 1)) * w
-                val = s_series[i]
-                y = 10 + (h - 20) - ((val - s_min) / s_range) * (h - 20)
-                return x, y
-
+            n = len(s_series)
             s_color = self.colors[1] if len(
                 self.colors) > 1 else (0.2, 0.5, 0.8)
-            cr.new_path()
-            if self.smooth:
-                points = [get_s_coords(i) for i in range(len(s_series))]
-                self._draw_catmull_rom_spline(
-                    cr, points, n_points_per_segment=25)
-            else:
-                x0, y0 = get_s_coords(0)
-                cr.move_to(x0, y0)
-                for i in range(len(s_series) - 1):
-                    x1, y1 = get_s_coords(i)
-                    x2, y2 = get_s_coords(i + 1)
-                    cr.line_to(x2, y2)
 
-            # Extend to the right edge so the line doesn't abruptly end.
-            _, s_last_y = get_s_coords(len(s_series) - 1)
-            cr.line_to(w, s_last_y)
-
-            cr.set_line_width(1)
-            cr.set_source_rgba(s_color[0], s_color[1], s_color[2], 0.5)
-            cr.stroke()
+            # Each bar is centred on its data-point x and grows
+            # symmetrically from the vertical midpoint of the graph.
+            bar_w = 6
+            radius = bar_w / 2
+            for i, val in enumerate(s_series):
+                if self.pin_first_to_edge and n > 1:
+                    bx = 0 if i == 0 else (i - 0.5) / (n - 1) * w
+                else:
+                    bx = (i / (n - 1)) * w if n > 1 else w / 2
+                # Graph content sits between y=10 and y=h-10;
+                # scale bars to that same range.
+                graph_h = h - 20
+                bar_h = max(bar_w, (val / 100) * graph_h)
+                x0 = bx - bar_w / 2
+                y0 = h / 2 - bar_h / 2
+                # Pill shape: rounded rectangle with radius = half-width
+                cr.new_sub_path()
+                cr.arc(x0 + radius, y0 + radius,
+                       radius, math.pi, 3 * math.pi / 2)
+                cr.arc(x0 + bar_w - radius, y0 + radius,
+                       radius, 3 * math.pi / 2, 0)
+                cr.arc(x0 + bar_w - radius, y0 + bar_h - radius,
+                       radius, 0, math.pi / 2)
+                cr.arc(x0 + radius, y0 + bar_h - radius,
+                       radius, math.pi / 2, math.pi)
+                cr.close_path()
+            cr.set_source_rgba(
+                s_color[0], s_color[1], s_color[2], 0.15)
+            cr.fill()
 
         # Draw time marker lines
         if self.time_markers and self.time_labels:
