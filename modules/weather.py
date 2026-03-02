@@ -437,10 +437,6 @@ class Weather(c.BaseModule):
             h_widgets['description'] = hour['description']
 
             time_lbl = c.label(hour['time'], ha='center')
-            # Bold via Pango attrs; no separate CSS class needed.
-            attrs = Pango.AttrList()
-            attrs.insert(Pango.attr_weight_new(Pango.Weight.BOLD))
-            time_lbl.set_attributes(attrs)
             time_cell.append(time_lbl)
             h_widgets['time'] = time_lbl
 
