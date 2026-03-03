@@ -225,9 +225,15 @@ class UPower(c.BaseModule):
                 self.update_state()
 
             def on_device_removed(path):
-                if path in self.proxies:
-                    disconnect_proxy(self.proxies.pop(path))
-                    disconnect_proxy(self.proxies.pop(f"{path}_props"))
+                changed = False
+                proxy = self.proxies.pop(path, None)
+                if proxy:
+                    disconnect_proxy(proxy)
+                    changed = True
+                props = self.proxies.pop(f"{path}_props", None)
+                if props:
+                    disconnect_proxy(props)
+                if changed:
                     self.update_state()
 
             upower_proxy.DeviceAdded.connect(on_device_added)
@@ -260,8 +266,12 @@ class UPower(c.BaseModule):
                 to_remove = [p for p in self.proxies if p.startswith(
                     '/') and p not in current_paths]
                 for p in to_remove:
-                    disconnect_proxy(self.proxies.pop(p))
-                    disconnect_proxy(self.proxies.pop(f"{p}_props"))
+                    proxy = self.proxies.pop(p, None)
+                    if proxy:
+                        disconnect_proxy(proxy)
+                    props = self.proxies.pop(f"{p}_props", None)
+                    if props:
+                        disconnect_proxy(props)
                     changed = True
 
                 if changed:
