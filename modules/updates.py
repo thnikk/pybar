@@ -164,6 +164,8 @@ class Updates(c.BaseModule):
         }
 
         content_box = c.box('v', spacing=20)
+        # Expand to put update button at the bottom of the widget
+        content_box.set_vexpand(True)
 
         for manager, info in data['managers'].items():
             packages = info['packages']
