@@ -132,7 +132,7 @@ def setup_logging(app_level=logging.WARNING, gtk_level=logging.WARNING):
     return log_file
 
 
-def on_activate(app, config, debug_gc=True):
+def on_activate(app, config):
     if hasattr(app, 'started') and app.started:
         return
     app.started = True
@@ -156,7 +156,7 @@ def on_activate(app, config, debug_gc=True):
         module.start_worker(name, module_config)
 
     try:
-        app.display = Display(config, app, debug_gc=debug_gc)
+        app.display = Display(config, app)
         # Draw all bars
         app.display.draw_all()
     except Exception:
@@ -209,7 +209,7 @@ def main():
         flags=flags
     )
     app.config_path = args.config  # Store config path for settings window
-    app.connect('activate', lambda app: on_activate(app, config, True))
+    app.connect('activate', lambda app: on_activate(app, config))
 
     # Use an empty list for argv to prevent GTK from parsing custom args
     app.run([])

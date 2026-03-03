@@ -13,7 +13,6 @@ import logging
 from subprocess import run, CalledProcessError
 import json
 import time
-import gc
 import common as c
 import module
 gi.require_version('Gtk', '4.0')
@@ -26,10 +25,9 @@ from gi.repository import Gio
 
 class Display:
     """ Display class """
-    def __init__(self, config, app, debug_gc=True):
+    def __init__(self, config, app):
         self.app = app
         self.display = Gdk.Display.get_default()
-        self.debug_gc = debug_gc
         monitors = self.display.get_monitors()
         monitors.connect("items-changed", self.on_monitors_changed)
         self.wm = self.get_wm()
@@ -393,174 +391,10 @@ class Display:
             self.draw_bar(monitor)
 
     def reload(self):
-        """ Reload configuration and rebuild all bars """
-        import config as Config
+        """ Reload by replacing the process image """
         import sys
-
-        # Track module changes
-        before_modules = set(sys.modules.keys())
-        before_count = len(before_modules)
-
-        # Log current bar state
-        c.print_debug(
-            f"Reload: Currently have {len(self.bars)} bars: "
-            f"{list(self.bars.keys())}"
-        )
-
-        # Preserve debug state
-        debug_mode = c.state_manager.get('debug')
-
-        # Clear state manager subscribers BEFORE destroying widgets
-        c.state_manager.clear()
-
-        # Restore debug state
-        c.state_manager.update('debug', debug_mode)
-
-        # Destroy existing bars and cleanup modules
-        for plug, bar in list(self.bars.items()):
-            c.print_debug(f"Destroying bar on {plug}")
-            bar.cleanup_modules()
-            bar.window.destroy()
-        self.bars.clear()
-
-        # Stop all module workers
-        module.stop_all_workers()
-
-        # Reset tray singleton to cleanup DBus services
-        try:
-            from modules.tray import TrayHost
-            TrayHost.reset_instance()
-            c.print_debug("Reset TrayHost singleton")
-        except Exception as e:
-            c.print_debug(f"Failed to reset TrayHost: {e}", color='red')
-
-        # Clear module instances (also cleans sys.modules)
-        module.clear_instances()
-
-        # Reload configuration (this imports config module fresh)
-        if 'config' in sys.modules:
-            del sys.modules['config']
-        self.config = Config.load(self.app.config_path)
-        c.state_manager.update('config', self.config)
-
-        # Reload CSS from new config
-        css_path = c.get_resource_path('style.css')
-        try:
-            with open(css_path, 'r') as f:
-                self.default_css_data = f.read()
-        except Exception as e:
-            c.print_debug(
-                f"Failed to reload default CSS: {e}",
-                name='display', color='red'
-            )
-        
-        # Re-apply CSS
-        self.apply_css()
-
-        # Restart module workers with new config
-        unique = set(
-            self.config['modules-left'] +
-            self.config['modules-center'] +
-            self.config['modules-right']
-        )
-        for name in unique:
-            module_config = self.config['modules'].get(name, {})
-            module.start_worker(name, module_config)
-
-        # Check current state BEFORE creating new bars
-        objs_before = gc.get_objects()
-        surviving_modules = [o for o in objs_before if isinstance(o, c.Module)]
-        widgets_before = len([o for o in objs_before if isinstance(o, c.Widget)])
-        
-        # Try to identify which modules are surviving
-        if surviving_modules:
-            c.print_debug(
-                f"WARNING: {len(surviving_modules)} Module objects "
-                f"surviving GC:"
-            )
-            for mod in surviving_modules:
-                # Try to get identifying info
-                mod_id = id(mod)
-                has_subs = len(getattr(mod, '_subscriptions', []))
-                parent = mod.get_parent() if hasattr(mod, 'get_parent') else None
-                c.print_debug(
-                    f"  - Module {mod_id}: {has_subs} subscriptions, "
-                    f"cleaned={getattr(mod, '_cleaned_up', False)}, "
-                    f"has_parent={parent is not None}"
-                )
-        else:
-            c.print_debug(
-                f"Before redraw: Module objs: 0, Widgets: {widgets_before}"
-            )
-
-        # Redraw all bars
-        self.draw_all()
-
-        # Efficiently process pending GTK events
-        while GLib.MainContext.default().pending():
-            GLib.MainContext.default().iteration(False)
-
-        # Force garbage collection to clean up destroyed widgets
-        # We use a triple pass to ensure cycles are broken and everything is finalized
-        collected_1 = gc.collect()
-        collected_2 = gc.collect()  # Double collection for cycles
-        collected_3 = gc.collect()  # Third pass to be thorough
-
-        # Optimization: Only perform detailed debugging if requested
-        if self.debug_gc:
-            # Enable gc debugging to find uncollectable objects
-            gc.set_debug(gc.DEBUG_SAVEALL)
-            
-            # One more pass to catch anything moved to garbage by DEBUG_SAVEALL
-            gc.collect()
-
-            # Check for uncollectable garbage
-            if gc.garbage:
-                c.print_debug(
-                    f"WARNING: {len(gc.garbage)} uncollectable objects",
-                    color='red'
-                )
-                # Sample the types to understand what's leaking
-                type_counts = {}
-                for obj in gc.garbage[:100]:  # Sample first 100
-                    obj_type = type(obj).__name__
-                    type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
-                c.print_debug(
-                    f"Uncollectable types (sample): {type_counts}"
-                )
-                # Clear the garbage list after inspection
-                gc.garbage.clear()
-
-            gc.set_debug(0)
-            
-            objs = gc.get_objects()
-            modules_obj = len([o for o in objs if isinstance(o, c.Module)])
-            widgets = len([o for o in objs if isinstance(o, c.Widget)])
-            
-            c.print_debug(
-                f"GC Stats - Collected: {collected_1}/{collected_2}/"
-                f"{collected_3}, Module objs: {modules_obj}, "
-                f"Widgets: {widgets}"
-            )
-
-        # Track which modules were added
-        after_modules = set(sys.modules.keys())
-        after_count = len(after_modules)
-        added_modules = after_modules - before_modules
-        removed_modules = before_modules - after_modules
-
-        c.print_debug(
-            f"sys.modules: {before_count} -> {after_count} "
-            f"(+{len(added_modules)} -{len(removed_modules)})"
-        )
-        if added_modules:
-            c.print_debug(f"Added modules: {sorted(added_modules)}")
-
-        # Log subscription counts after reload
-        debug_info = c.state_manager.debug_info()
-        c.print_debug(f"After reload: {debug_info}")
-
-        # Signal completion to settings window
+        # Signal completion before exec so the settings window
+        # isn't left waiting for a response that will never come.
         try:
             with open(self.reload_done_file, 'w') as f:
                 f.write('done')
@@ -569,6 +403,7 @@ class Display:
                 f"Failed to signal reload completion: {e}",
                 name='display', color='red'
             )
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _check_reload_signal(self):
         """ Check if settings window has signaled a reload """
