@@ -54,8 +54,12 @@ class Display:
         # Apply initial CSS
         self.apply_css()
 
-        # Track sleep state to prevent operations during suspend
+        # Track sleep/wake state to serialise suspend and wake redraws
         self.is_sleeping = False
+        # Set True between PrepareForSleep(false) and the first successful
+        # post-wake redraw so that on_monitors_changed does not race with
+        # the dedicated wake handler.
+        self._is_waking = False
         self._setup_dbus_sleep_handler()
 
         # Watch for reload signal from settings
@@ -190,15 +194,17 @@ class Display:
             else:
                 logging.info("System waking from sleep - reloading bars")
                 self.is_sleeping = False
+                # Block on_monitors_changed from racing the wake reload
+                self._is_waking = True
                 # Schedule reload on main loop after wake
                 GLib.idle_add(self._on_wake_from_sleep)
 
     def _on_wake_from_sleep(self):
         """ Reload bars after waking from sleep """
         try:
-            # Give the display more time to stabilize after suspend
-            # Display info may not be immediately available
-            GLib.timeout_add_seconds(2, self._safe_reload_after_sleep)
+            # Give the compositor longer to rebuild Wayland/Vulkan surfaces.
+            # 500 ms is not enough; 3 s covers slow GPU/compositor wake paths.
+            GLib.timeout_add_seconds(3, self._safe_reload_after_sleep)
         except Exception as e:
             logging.error(f"Error during wake handling: {e}")
 
@@ -221,8 +227,14 @@ class Display:
             logging.info("Successfully reloaded bars after sleep")
             return False
         except Exception as e:
-            logging.error(f"Error reloading bars after sleep: {e}", exc_info=True)
+            logging.error(
+                f"Error reloading bars after sleep: {e}", exc_info=True
+            )
             return False
+        finally:
+            # Always clear the waking flag so future monitor-change events
+            # are handled normally.
+            self._is_waking = False
 
     def get_monitors(self):
         """ Get monitor objects from gdk """
@@ -292,9 +304,16 @@ class Display:
         """
         Handle monitor changes by redrawing all bars.
         Delay to allow monitor info to become available.
+        Skip during a wake-from-sleep cycle; the dedicated wake handler
+        manages that redraw on a longer, safer timeline.
         """
-        # Give monitors time to report connector info after hotplug
-        # Monitor objects may not have connector names immediately
+        if self._is_waking:
+            logging.debug(
+                "on_monitors_changed skipped: wake-from-sleep in progress"
+            )
+            return
+        # Give monitors time to report connector info after hotplug.
+        # Monitor objects may not have connector names immediately.
         GLib.timeout_add(500, self._redraw_bars)
 
     def draw_bar(self, monitor):
