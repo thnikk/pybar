@@ -75,6 +75,14 @@ def unwrap(val):
     return val
 
 
+def get_prop(proxy, prop, default=None):
+    """ Safely get a DBus property, returning default if unavailable """
+    try:
+        return unwrap(getattr(proxy, prop))
+    except Exception:
+        return default
+
+
 class UPower(c.BaseModule):
     SCHEMA = {
         'ignore': {
@@ -95,17 +103,18 @@ class UPower(c.BaseModule):
     def get_device_data(self, proxy):
         """ Extract relevant data from a device proxy """
         try:
-            # Check if device is present
-            if not unwrap(proxy.IsPresent):
+            # IsPresent is not available on all device types; skip only
+            # if the property exists and explicitly reports not present
+            if get_prop(proxy, 'IsPresent', default=True) is False:
                 return None
 
-            dev_type = unwrap(proxy.Type)
-            # Skip line power (AC adapters)
-            if dev_type == 1:
+            dev_type = get_prop(proxy, 'Type', default=0)
+            # Skip unknown and line power (AC adapters)
+            if dev_type in (0, 1):
                 return None
 
-            model = unwrap(proxy.Model)
-            vendor = unwrap(proxy.Vendor)
+            model = get_prop(proxy, 'Model', default='')
+            vendor = get_prop(proxy, 'Vendor', default='')
 
             # Try to get a decent name
             name = ""
@@ -119,8 +128,8 @@ class UPower(c.BaseModule):
             if any(i in name.lower() for i in self.ignore):
                 return None
 
-            percentage = unwrap(proxy.Percentage)
-            battery_level = unwrap(proxy.BatteryLevel)
+            percentage = get_prop(proxy, 'Percentage', default=0)
+            battery_level = get_prop(proxy, 'BatteryLevel', default=0)
 
             # If percentage is 0 or missing, but we have a battery level enum,
             # use the enum to estimate a percentage for the bar
