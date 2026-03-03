@@ -655,29 +655,34 @@ class TrayIcon(Gtk.Box):
 
         self.update()
 
+    def _get_identifiers(self):
+        """Return lowercase identifier strings for this tray item."""
+        props = self.item.properties
+        candidates = [
+            props.get("Id", ""),
+            props.get("Title", ""),
+            self.item.service_name,
+            getattr(self.item, "proc_name", ""),
+        ]
+        tooltip = props.get("ToolTip")
+        if (
+            tooltip
+            and isinstance(tooltip, (list, tuple))
+            and len(tooltip) >= 3
+        ):
+            # Index 2 is the tooltip title string
+            candidates.append(tooltip[2])
+        return [s.lower() for s in candidates if s]
+
     def _get_custom_icon(self):
         custom_icons = self.module.config.get("custom_icons", {})
         if not custom_icons:
             return None
-
-        # Gather identifiers (consistent with add_item blacklist logic)
-        candidates = []
-        candidates.append(self.item.properties.get("Id", ""))
-        candidates.append(self.item.properties.get("Title", ""))
-        candidates.append(self.item.service_name)
-        candidates.append(getattr(self.item, "proc_name", ""))
-
-        tooltip = self.item.properties.get("ToolTip")
-        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
-            candidates.append(tooltip[2])  # Tooltip title
-
-        # Filter empty and lowercase
-        candidates = [c.lower() for c in candidates if c]
-
+        candidates = self._get_identifiers()
         for match_string, icon_char in custom_icons.items():
-            match_string = match_string.lower()
+            match_lower = match_string.lower()
             for candidate in candidates:
-                if match_string in candidate:
+                if match_lower in candidate:
                     return icon_char
         return None
 
@@ -736,29 +741,6 @@ class TrayIcon(Gtk.Box):
                 return
 
         global_x, global_y = self._get_global_coordinates(x, y)
-
-        item_id = self.item.properties.get("Id", "").lower()
-        item_title = self.item.properties.get("Title", "").lower()
-        proc_name = getattr(self.item, "proc_name", "")
-
-        is_discord = (
-            "discord" in item_id or
-            "discord" in item_title or
-            "discord" in self.item.service_name.lower() or
-            "discord" in proc_name
-        )
-
-        if is_discord:
-            try:
-                native = self.get_native()
-                surface = native.get_surface()
-                display = Gdk.Display.get_default()
-                monitor = display.get_monitor_at_surface(surface)
-                geo = monitor.get_geometry()
-                global_x = global_x - geo.x
-                global_y = global_y - geo.y
-            except Exception:
-                pass
 
         if button == 1:
             self.item.activate(global_x, global_y)
