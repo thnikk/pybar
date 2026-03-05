@@ -747,7 +747,7 @@ class TrayIcon(Gtk.Box):
         elif button == 2:
             self.item.secondary_action(global_x, global_y)
         elif button == 3:
-            if "telegram" in item_id or "telegram" in item_title:
+            if "telegram" in item_id or "telegram" in title:
                 self._show_dbus_menu()
                 return
 
