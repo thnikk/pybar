@@ -15,6 +15,7 @@ import json
 import time
 import common as c
 import module
+import ipc
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
 from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib  # noqa
@@ -68,6 +69,10 @@ class Display:
             '~/.cache/pybar/.reload_done'
         )
         GLib.timeout_add_seconds(1, self._check_reload_signal)
+
+        # Start IPC socket server
+        self.ipc = ipc.IPCServer(self)
+        self.ipc.start()
 
     def get_wm(self):
         try:
@@ -462,6 +467,9 @@ class Bar:
         self.window.set_child(self.bar)
         self.monitor = monitor
 
+        # Widget registry for IPC lookups (name -> widget)
+        self.module_widgets = {}
+
         # Add right-click handler for settings
         right_click = Gtk.GestureClick()
         right_click.set_button(3)  # Right click
@@ -519,6 +527,8 @@ class Bar:
                 loaded_module = module.module(self, name, self.config)
                 if loaded_module:
                     section.append(loaded_module)
+                    # Track widget by name for IPC lookups
+                    self.module_widgets[name] = loaded_module
                 else:
                     logging.warning(
                         f"Module '{name}' could not be loaded and will "
