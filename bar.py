@@ -29,6 +29,7 @@ class Display:
     def __init__(self, config, app):
         self.app = app
         self.display = Gdk.Display.get_default()
+        self.display.connect('closed', self._on_display_closed)
         monitors = self.display.get_monitors()
         monitors.connect("items-changed", self.on_monitors_changed)
         self.wm = self.get_wm()
@@ -185,6 +186,14 @@ class Display:
         except Exception as e:
             logging.error(f"Failed to setup DBus sleep handler: {e}")
 
+    def _on_display_closed(self, display, is_error):
+        """Restart if the GDK display is closed due to an error."""
+        if not is_error:
+            return
+        import sys
+        logging.warning("GDK display closed with error; restarting")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
     def _on_prepare_for_sleep(self, proxy, sender_name, signal_name, parameters):
         """ Handle PrepareForSleep signal from logind """
         if len(parameters) > 0:
@@ -308,18 +317,30 @@ class Display:
     def on_monitors_changed(self, model, position, removed, added):
         """
         Handle monitor changes by redrawing all bars.
-        Delay to allow monitor info to become available.
         Skip during a wake-from-sleep cycle; the dedicated wake handler
         manages that redraw on a longer, safer timeline.
+        When monitors are added (reconnect), use the same extended-delay
+        path as wake-from-sleep to let the compositor rebuild surfaces.
         """
         if self._is_waking:
             logging.debug(
-                "on_monitors_changed skipped: wake-from-sleep in progress"
+                "on_monitors_changed skipped: "
+                "wake-from-sleep/reconnect in progress"
             )
             return
-        # Give monitors time to report connector info after hotplug.
-        # Monitor objects may not have connector names immediately.
-        GLib.timeout_add(500, self._redraw_bars)
+        if added > 0:
+            # Monitor reconnected; compositor may be rebuilding Wayland
+            # surfaces. Reuse the wake-from-sleep safe-reload path with
+            # the same 3-second delay to avoid surface errors.
+            logging.debug(
+                "on_monitors_changed: %d monitor(s) added, "
+                "using extended-delay reload", added
+            )
+            self._is_waking = True
+            GLib.timeout_add_seconds(3, self._safe_reload_after_sleep)
+        else:
+            # Only removals; a quick redraw is safe.
+            GLib.timeout_add(500, self._redraw_bars)
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """

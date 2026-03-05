@@ -37,6 +37,13 @@ args = parse_args()
 if args.gtk_log_level.upper() == 'DEBUG':
     os.environ['G_MESSAGES_DEBUG'] = 'all'
 
+# Prefer the NGL (OpenGL) renderer over Vulkan. GTK4 defaults to Vulkan
+# on Wayland, but after a prolonged display blank the compositor tears
+# down its render pipeline, leaving Vulkan with no valid surface
+# (VK_ERROR_SURFACE_LOST_KHR). The NGL renderer uses EGL and survives
+# display blank/unblank cycles without errors.
+os.environ.setdefault('GSK_RENDERER', 'ngl')
+
 from ctypes import CDLL
 try:
     CDLL('libgtk4-layer-shell.so')
