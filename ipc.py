@@ -188,14 +188,11 @@ class IPCServer:
                 continue
 
             if action == 'toggle':
-                if popover.get_visible():
-                    popover.popdown()
-                else:
-                    popover.popup()
+                widget.set_active(not popover.get_visible())
             elif action == 'show':
-                popover.popup()
+                widget.set_active(True)
             elif action == 'hide':
-                popover.popdown()
+                widget.set_active(False)
 
             affected.append(plug)
 
