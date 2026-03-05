@@ -8,6 +8,7 @@ import socket
 import threading
 import json
 import logging
+import module as mod
 from gi.repository import GLib
 
 # Default socket path
@@ -24,9 +25,11 @@ class IPCServer:
         {"action": "toggle", "widget": "clock", "monitor": "eDP-1"}
         {"action": "show",   "widget": "clock", "monitor": "eDP-1"}
         {"action": "hide",   "widget": "clock"}
+        {"action": "reload", "module": "clock"}
 
     Responses are a single JSON line:
         {"status": "ok", "affected": ["eDP-1"]}
+        {"status": "ok", "module": "clock"}
         {"status": "error", "message": "..."}
     """
 
@@ -160,6 +163,12 @@ class IPCServer:
             monitor = cmd.get('monitor')
             return self._widget_action(action, widget_name, monitor)
 
+        if action == 'reload':
+            module_name = cmd.get('module')
+            if not module_name:
+                return {'status': 'error', 'message': 'Missing module'}
+            return self._reload_module(module_name)
+
         return {'status': 'error', 'message': f'Unknown action: {action}'}
 
     def _widget_action(self, action, widget_name, monitor=None):
@@ -206,3 +215,12 @@ class IPCServer:
             }
 
         return {'status': 'ok', 'affected': affected}
+
+    def _reload_module(self, module_name):
+        """Force a module worker to update immediately."""
+        if mod.force_update(module_name):
+            return {'status': 'ok', 'module': module_name}
+        return {
+            'status': 'error',
+            'message': f"Module '{module_name}' not found or not running",
+        }
