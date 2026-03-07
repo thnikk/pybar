@@ -302,9 +302,17 @@ class MPRIS(c.BaseModule):
             length = metadata.get('mpris:length', 0) or 0
             position = 0
             try:
-                pos_var = self._player_proxy.get_cached_property('Position')
-                if pos_var:
-                    position = pos_var.unpack() or 0
+                pos_result = self._get_bus().call_sync(
+                    self._active_bus_name,
+                    '/org/mpris/MediaPlayer2',
+                    'org.freedesktop.DBus.Properties',
+                    'Get',
+                    GLib.Variant('(ss)', (PLAYER_IFACE, 'Position')),
+                    GLib.VariantType.new('(v)'),
+                    Gio.DBusCallFlags.NONE, -1, None
+                )
+                if pos_result:
+                    position = pos_result[0] or 0
             except Exception:
                 pass
 
@@ -312,9 +320,17 @@ class MPRIS(c.BaseModule):
 
             volume = 0
             try:
-                vol_var = self._player_proxy.get_cached_property('Volume')
-                if vol_var:
-                    volume = int(vol_var.unpack() * 100)
+                vol_result = self._get_bus().call_sync(
+                    self._active_bus_name,
+                    '/org/mpris/MediaPlayer2',
+                    'org.freedesktop.DBus.Properties',
+                    'Get',
+                    GLib.Variant('(ss)', (PLAYER_IFACE, 'Volume')),
+                    GLib.VariantType.new('(v)'),
+                    Gio.DBusCallFlags.NONE, -1, None
+                )
+                if vol_result and vol_result[0] is not None:
+                    volume = int(vol_result[0] * 100)
             except Exception:
                 pass
 
