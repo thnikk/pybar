@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -u
 """
-Description: MPRIS module for unified state with album art
+Description: MPRIS module using Gio.DBusProxy directly (no dasbus)
 Author: thnikk
 """
 import weakref
@@ -12,13 +12,12 @@ import random
 import cairo
 import requests
 import time
-from dasbus.connection import SessionMessageBus
-from dasbus.client.observer import DBusObserver
-from dasbus.client.proxy import disconnect_proxy
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, Gdk, Pango, GdkPixbuf, GLib  # noqa
+from gi.repository import (  # noqa
+    Gtk, Gdk, Pango, GdkPixbuf, GLib, Gio
+)
 
 
 class VisualizerBG(Gtk.DrawingArea):
@@ -42,20 +41,11 @@ class VisualizerBG(Gtk.DrawingArea):
 
 class Visualizer(Gtk.DrawingArea):
     """ Animated bar visualizer for album art overlay """
-
-    # Number of bars in the visualizer
     BAR_COUNT = 40
-    # How often to tick the animation in milliseconds
     TICK_MS = 40
-    # Fraction of bar area used per bar (rest is gap)
     BAR_FILL = 0.5
-    # Smoothing factor for bar height interpolation
     SMOOTH = 0.25
-    # Probability a bar picks a new random target each tick
     RETARGET_CHANCE = 0.2
-    # Gradient top/bottom alpha values
-    # ALPHA_TOP = 0.95
-    # ALPHA_BOT = 0.25
     ALPHA_TOP = 0.6
     ALPHA_BOT = 0.6
 
@@ -76,22 +66,18 @@ class Visualizer(Gtk.DrawingArea):
     def start(self):
         """ Begin animation ticks """
         if self._timeout_id is None:
-            self._timeout_id = GLib.timeout_add(
-                self.TICK_MS, self._tick
-            )
+            self._timeout_id = GLib.timeout_add(self.TICK_MS, self._tick)
 
     def stop(self):
-        """ Stop animation tick; bar heights are preserved for the revealer """
+        """ Stop animation tick """
         if self._timeout_id is not None:
             GLib.source_remove(self._timeout_id)
             self._timeout_id = None
 
     def _tick(self):
-        """ Advance animation one frame """
         for i in range(self.BAR_COUNT):
             if random.random() < self.RETARGET_CHANCE:
                 self._targets[i] = random.uniform(0.05, 1.0)
-            # Ease bar height towards target
             self._heights[i] += (
                 (self._targets[i] - self._heights[i]) * self.SMOOTH
             )
@@ -99,27 +85,19 @@ class Visualizer(Gtk.DrawingArea):
         return True
 
     def _draw(self, _area, cr, width, height, *_args):
-        """ Draw fully-rounded visualizer bars """
         n = self.BAR_COUNT
         slot_w = width / n
         bar_w = slot_w * self.BAR_FILL
         gap_w = slot_w * (1.0 - self.BAR_FILL)
-        # Radius is half bar width so the top is a perfect semicircle
         r = bar_w / 2
         for i, h in enumerate(self._heights):
-            # Minimum bar height is one full diameter so cap is always visible
             bar_h = max(bar_w, h * height * 0.92)
             x = i * slot_w + gap_w / 2
             y = height - bar_h
             grad = cairo.LinearGradient(x, y, x, height)
-            grad.add_color_stop_rgba(
-                0, 1.0, 1.0, 1.0, self.ALPHA_TOP
-            )
-            grad.add_color_stop_rgba(
-                1, 1.0, 1.0, 1.0, self.ALPHA_BOT
-            )
+            grad.add_color_stop_rgba(0, 1.0, 1.0, 1.0, self.ALPHA_TOP)
+            grad.add_color_stop_rgba(1, 1.0, 1.0, 1.0, self.ALPHA_BOT)
             cr.set_source(grad)
-            # Full semicircle top, square bottom
             cr.new_sub_path()
             cr.arc(x + r, y + r, r, math.pi, 2 * math.pi)
             cr.line_to(x + bar_w, height)
@@ -130,27 +108,26 @@ class Visualizer(Gtk.DrawingArea):
 
 CACHE_DIR = os.path.expanduser('~/.cache/pybar')
 
+PLAYER_IFACE = 'org.mpris.MediaPlayer2.Player'
+PLAYER_PATH = '/org/mpris/MediaPlayer2'
+PROPS_IFACE = 'org.freedesktop.DBus.Properties'
+DBUS_SERVICE = 'org.freedesktop.DBus'
+DBUS_PATH = '/org/freedesktop/DBus'
+DBUS_IFACE = 'org.freedesktop.DBus'
 
-def unwrap(val):
-    if hasattr(val, 'unpack'):
-        val = val.unpack()
-    if hasattr(val, 'value'):
-        val = val.value
 
-    if isinstance(val, dict):
-        return {k: unwrap(v) for k, v in val.items()}
-    if isinstance(val, (list, tuple)):
-        return [unwrap(v) for v in val]
-    return val
+def _unpack(variant):
+    """ Recursively unpack a GLib.Variant to a Python object """
+    if variant is None:
+        return None
+    return variant.unpack()
 
 
 def format_time(microseconds):
     """ Format microseconds to MM:SS or HH:MM:SS """
     seconds = int(microseconds / 1000000)
-    minutes = seconds // 60
-    seconds %= 60
-    hours = minutes // 60
-    minutes %= 60
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
     if hours > 0:
         return f"{hours}:{minutes:02d}:{seconds:02d}"
     return f"{minutes:02d}:{seconds:02d}"
@@ -162,8 +139,8 @@ class MPRIS(c.BaseModule):
             'type': 'list',
             'default': [],
             'label': 'Players',
-            'description': 'List of player names to show.'
-                           'Empty for any player.'
+            'description': (
+                'List of player names to show. Empty for any player.')
         },
         'art_size': {
             'type': 'integer',
@@ -189,209 +166,211 @@ class MPRIS(c.BaseModule):
 
     def __init__(self, name, config):
         super().__init__(name, config)
-        # Handle both string (single player) and list (multiple players)
         players = config.get('players', config.get('player', []))
         if isinstance(players, str):
             players = [players]
         self.target_players = [p.lower() for p in players]
-        self.bus = SessionMessageBus()
-        self.active_player_bus_name = None
-        self.active_player_proxy = None
-        self.active_player_props_proxy = None
-        self.player_observer = None
-        self.last_used_player = None
         self.art_size = config.get('art_size', 300)
         self.show_title = config.get('show_title', True)
         self.show_visualizer = config.get('visualizer', True)
 
-    def find_player(self):
-        """ Find a player matching the config """
+        # Gio DBus state
+        self._bus = None
+        self._player_proxy = None
+        self._active_bus_name = None
+        self._last_used_player = None
+        self._name_owner_sub = None
+
+    def _get_bus(self):
+        """ Get or create the session bus connection """
+        if self._bus is None:
+            self._bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        return self._bus
+
+    def _list_names(self):
+        """ List all DBus service names on the session bus """
         try:
-            names = self.bus.proxy.ListNames()
-            mpris_players = [n for n in names if n.startswith(
-                'org.mpris.MediaPlayer2.')]
-
-            if not mpris_players:
-                return None
-
-            if self.target_players:
-                # Check each target in order of priority
-                for target in self.target_players:
-                    for p in mpris_players:
-                        if target in p.lower():
-                            return p
-                return None
-
-            # No targets specified: use last used player or first available
-            # First, check if any player is playing
-            for p in mpris_players:
-                try:
-                    proxy = self.bus.get_proxy(p, '/org/mpris/MediaPlayer2')
-                    status = unwrap(proxy.PlaybackStatus)
-                    if status == 'Playing':
-                        self.last_used_player = p
-                        return p
-                except Exception:
-                    continue
-
-            # If none are playing, use last used player if it's still alive
-            if self.last_used_player in mpris_players:
-                return self.last_used_player
-
-            # Otherwise pick the first one
-            self.last_used_player = mpris_players[0]
-            return mpris_players[0]
+            result = self._get_bus().call_sync(
+                DBUS_SERVICE, DBUS_PATH, DBUS_IFACE, 'ListNames',
+                None, GLib.VariantType.new('(as)'),
+                Gio.DBusCallFlags.NONE, -1, None
+            )
+            return result[0]
         except Exception as e:
-            c.print_debug(f"MPRIS find_player error: {e}", color='red')
+            c.print_debug(f"MPRIS ListNames error: {e}", color='red')
+            return []
+
+    def find_player(self):
+        """ Find a matching MPRIS player bus name """
+        names = self._list_names()
+        players = [n for n in names if n.startswith(
+            'org.mpris.MediaPlayer2.')]
+        if not players:
             return None
+
+        if self.target_players:
+            for target in self.target_players:
+                for p in players:
+                    if target in p.lower():
+                        return p
+            return None
+
+        # Prefer a playing player
+        for p in players:
+            try:
+                proxy = Gio.DBusProxy.new_sync(
+                    self._get_bus(), Gio.DBusProxyFlags.NONE, None,
+                    p, PLAYER_PATH, PLAYER_IFACE, None
+                )
+                status = _unpack(proxy.get_cached_property('PlaybackStatus'))
+                if status == 'Playing':
+                    self._last_used_player = p
+                    return p
+            except Exception:
+                continue
+
+        if self._last_used_player in players:
+            return self._last_used_player
+        self._last_used_player = players[0]
+        return players[0]
 
     def setup_player(self, bus_name):
-        """ Setup proxies and signals for a player """
-        if self.active_player_proxy:
-            disconnect_proxy(self.active_player_proxy)
-        if self.active_player_props_proxy:
-            disconnect_proxy(self.active_player_props_proxy)
-
-        self.active_player_bus_name = bus_name
+        """ Create a Gio.DBusProxy for the given player bus name """
+        self._player_proxy = None
+        self._active_bus_name = bus_name
         if not bus_name:
-            self.active_player_proxy = None
-            self.active_player_props_proxy = None
             return
-
         try:
-            self.active_player_proxy = self.bus.get_proxy(
-                bus_name, '/org/mpris/MediaPlayer2')
-            self.active_player_props_proxy = self.bus.get_proxy(
-                bus_name, '/org/mpris/MediaPlayer2',
-                interface_name='org.freedesktop.DBus.Properties'
+            self._player_proxy = Gio.DBusProxy.new_sync(
+                self._get_bus(), Gio.DBusProxyFlags.NONE, None,
+                bus_name, PLAYER_PATH, PLAYER_IFACE, None
             )
-
-            # Connect to PropertiesChanged signal
-            self.active_player_props_proxy.PropertiesChanged.connect(
-                self.on_properties_changed)
-
-            c.print_debug(f"MPRIS: Connected to {bus_name}", color='green')
+            # g-properties-changed fires when the player changes metadata
+            self._player_proxy.connect(
+                'g-properties-changed', self._on_properties_changed)
+            c.print_debug(
+                f"MPRIS: Connected to {bus_name}", color='green')
         except Exception as e:
-            c.print_debug(f"MPRIS setup_player error: {e}", color='red')
-            self.active_player_proxy = None
-            self.active_player_props_proxy = None
+            c.print_debug(
+                f"MPRIS setup_player error: {e}", color='red')
+            self._player_proxy = None
 
-    def on_properties_changed(
-            self, interface, changed_props, invalidated_props):
-        """ Handle MPRIS property changes """
-        if interface == 'org.mpris.MediaPlayer2.Player':
-            self.update_state()
+    def _on_properties_changed(self, _proxy, _changed, _invalidated):
+        self.update_state()
+
+    def _on_name_owner_changed(
+            self, _conn, _sender, _path, _iface, _signal, params, _data):
+        """ Handle DBus name owner changes to detect player start/stop """
+        name, _old, _new = params
+        if name.startswith('org.mpris.MediaPlayer2.'):
+            best = self.find_player()
+            if best != self._active_bus_name:
+                self.setup_player(best)
+                self.update_state()
 
     def update_state(self):
-        """ Fetch current state and update state manager """
+        """ Fetch current state and push to state manager """
         data = self.get_mpris_status()
-        if data:
-            c.state_manager.update(self.name, data)
-        else:
-            c.state_manager.update(self.name, {})
+        c.state_manager.update(self.name, data if data else {})
 
     def get_mpris_status(self):
-        if not self.active_player_proxy:
+        """ Read current MPRIS properties from the active player proxy """
+        if not self._player_proxy:
             return None
-
         try:
-            status = unwrap(self.active_player_proxy.PlaybackStatus)
+            status = _unpack(
+                self._player_proxy.get_cached_property('PlaybackStatus'))
             if not status:
                 return None
             status = str(status).lower()
 
-            metadata = unwrap(self.active_player_proxy.Metadata)
-            if not isinstance(metadata, dict):
-                metadata = {}
+            metadata = _unpack(
+                self._player_proxy.get_cached_property('Metadata')) or {}
 
             title = str(metadata.get('xesam:title', 'Unknown Song'))
             artists = metadata.get('xesam:artist', [])
-            artist = ""
             if isinstance(artists, list) and artists:
                 artist = str(artists[0])
             elif isinstance(artists, str):
                 artist = artists
+            else:
+                artist = ''
 
-            art_url = metadata.get('mpris:artUrl', '')
-            if art_url:
-                art_url = str(art_url)
+            art_url = str(metadata.get('mpris:artUrl', '') or '')
             art_path = self.get_art_path(art_url)
 
-            length = metadata.get('mpris:length', 0)
-            if not isinstance(length, (int, float)):
-                length = 0
-
+            length = metadata.get('mpris:length', 0) or 0
             position = 0
             try:
-                position = unwrap(self.active_player_proxy.Position)
-                if not isinstance(position, (int, float)):
-                    position = 0
+                pos_var = self._player_proxy.get_cached_property('Position')
+                if pos_var:
+                    position = pos_var.unpack() or 0
             except Exception:
                 pass
 
-            percent = 0
-            if length > 0:
-                percent = int((position / length) * 100)
+            percent = int((position / length) * 100) if length > 0 else 0
 
             volume = 0
             try:
-                volume = int(unwrap(self.active_player_proxy.Volume) * 100)
+                vol_var = self._player_proxy.get_cached_property('Volume')
+                if vol_var:
+                    volume = int(vol_var.unpack() * 100)
             except Exception:
                 pass
 
-            # Try to get human readable name
             player_identity = None
             try:
-                player_identity = unwrap(self.active_player_proxy.Identity)
+                # Identity is on the root MediaPlayer2 interface
+                root_proxy = Gio.DBusProxy.new_sync(
+                    self._get_bus(), Gio.DBusProxyFlags.NONE, None,
+                    self._active_bus_name, PLAYER_PATH,
+                    'org.mpris.MediaPlayer2', None
+                )
+                id_var = root_proxy.get_cached_property('Identity')
+                if id_var:
+                    player_identity = id_var.unpack()
             except Exception:
                 pass
 
             if not player_identity:
-                player_identity = self.active_player_bus_name.split(
-                    '.')[-1].capitalize()
+                player_identity = (
+                    self._active_bus_name.split('.')[-1].capitalize())
 
             return {
-                "status": status,
-                "song": title,
-                "artist": artist,
-                "art": art_path,
-                "percent": percent,
-                "volume": volume,
-                "position_str": format_time(position),
-                "length_str": format_time(length),
-                "text": title,
-                "player": self.active_player_bus_name,
-                "player_name": str(player_identity)
+                'status': status,
+                'song': title,
+                'artist': artist,
+                'art': art_path,
+                'percent': percent,
+                'volume': volume,
+                'position_str': format_time(position),
+                'length_str': format_time(length),
+                'text': title,
+                'player': self._active_bus_name,
+                'player_name': str(player_identity)
             }
         except Exception as e:
             c.print_debug(f"MPRIS get_status error: {e}", color='red')
-            # Player might have disappeared
-            self.active_player_bus_name = None
-            self.active_player_proxy = None
+            self._active_bus_name = None
+            self._player_proxy = None
             return None
 
     def get_art_path(self, art_url):
+        """ Resolve art URL to a local file path, downloading if needed """
         if not art_url:
             return None
-
         if art_url.startswith('file://'):
             return art_url[7:]
-
         if art_url.startswith('http'):
-            if not os.path.exists(CACHE_DIR):
-                os.makedirs(CACHE_DIR, exist_ok=True)
-
-            art_filename = \
-                f"mpris_{hashlib.md5(art_url.encode()).hexdigest()}.jpg"
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            art_filename = (
+                f"mpris_{hashlib.md5(art_url.encode()).hexdigest()}.jpg")
             art_path = os.path.join(CACHE_DIR, art_filename)
-
             if not os.path.exists(art_path):
                 try:
-                    # Clear old mpris art files
                     for f in os.listdir(CACHE_DIR):
                         if f.startswith('mpris_') and f.endswith('.jpg'):
                             os.remove(os.path.join(CACHE_DIR, f))
-
                     response = requests.get(art_url, timeout=5)
                     if response.status_code == 200:
                         with open(art_path, 'wb') as f:
@@ -401,30 +380,28 @@ class MPRIS(c.BaseModule):
                 except Exception:
                     return None
             return art_path
-
         return None
 
-    def fetch_data(self):
-        return self.get_mpris_status()
+    def _call_player(self, method, params=None):
+        """ Call a method on the active player """
+        if not self._player_proxy:
+            return
+        try:
+            self._player_proxy.call_sync(
+                method, params, Gio.DBusCallFlags.NONE, -1, None)
+        except Exception as e:
+            c.print_debug(f"MPRIS call {method} error: {e}")
 
     def run_worker(self):
-        """ Background worker for mpris """
-        def on_name_owner_changed(name, old_owner, new_owner):
-            if name.startswith('org.mpris.MediaPlayer2.'):
-                # Re-evaluate best player when player names change
-                player = self.find_player()
-                if player != self.active_player_bus_name:
-                    self.setup_player(player)
-                    self.update_state()
+        """ Background worker for MPRIS """
+        bus = self._get_bus()
 
-        try:
-            # Listen for players appearing/disappearing
-            dbus_proxy = self.bus.get_proxy(
-                'org.freedesktop.DBus', '/org/freedesktop/DBus')
-            dbus_proxy.NameOwnerChanged.connect(on_name_owner_changed)
-        except Exception as e:
-            c.print_debug(f"MPRIS: Failed to connect to DBus signals: {e}",
-                          color='red')
+        # Subscribe to NameOwnerChanged so we detect players starting/stopping
+        self._name_owner_sub = bus.signal_subscribe(
+            DBUS_SERVICE, DBUS_IFACE, 'NameOwnerChanged', DBUS_PATH,
+            None, Gio.DBusSignalFlags.NONE,
+            self._on_name_owner_changed, None
+        )
 
         player = self.find_player()
         self.setup_player(player)
@@ -432,34 +409,34 @@ class MPRIS(c.BaseModule):
 
         while True:
             try:
-                # Periodic check for best player
-                best_player = self.find_player()
-                if best_player != self.active_player_bus_name:
-                    self.setup_player(best_player)
+                best = self.find_player()
+                if best != self._active_bus_name:
+                    self.setup_player(best)
                     self.update_state()
-
-                if self.active_player_proxy:
-                    # Periodically check position for seekbar if playing
-                    status = unwrap(self.active_player_proxy.PlaybackStatus)
+                elif self._player_proxy:
+                    status = _unpack(
+                        self._player_proxy.get_cached_property(
+                            'PlaybackStatus'))
                     if status == 'Playing':
                         self.update_state()
             except Exception:
                 pass
             time.sleep(1)
 
-    def update_popover_widgets(self, widget, data):
-        """ Update existing popover widgets """
-        # Update Art
-        art_path = data.get('art')
-        last_art = getattr(widget, 'last_art_path', None)
+    # ------------------------------------------------------------------ #
+    # Widget / UI — identical to original, just wiring player calls
+    # ------------------------------------------------------------------ #
 
-        if hasattr(widget, 'pop_art') and art_path != last_art:
+    def update_popover_widgets(self, widget, data):
+        """ Update existing popover widgets in-place """
+        art_path = data.get('art')
+        if hasattr(widget, 'pop_art') and art_path != getattr(
+                widget, 'last_art_path', None):
             widget.last_art_path = art_path
             if art_path and os.path.exists(art_path):
                 try:
-                    art_size = self.art_size
                     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                        art_path, art_size, art_size, True)
+                        art_path, self.art_size, self.art_size, True)
                     texture = Gdk.Texture.new_for_pixbuf(pixbuf)
                     widget.pop_art.set_from_paintable(texture)
                     widget.pop_art.set_visible(True)
@@ -472,15 +449,13 @@ class MPRIS(c.BaseModule):
                 if hasattr(widget, 'pop_art_placeholder'):
                     widget.pop_art_placeholder.set_visible(True)
 
-        # Update labels
         player_name = data.get('player_name', 'Unknown')
-        if hasattr(widget, 'pop_player_name') and \
-                widget.pop_player_name.get_text() != player_name:
+        if hasattr(widget, 'pop_player_name') and (
+                widget.pop_player_name.get_text() != player_name):
             widget.pop_player_name.set_text(player_name)
 
         song = data.get('song', 'Unknown Song')
         artist = data.get('artist', '')
-
         if hasattr(widget, 'pop_song') and widget.pop_song.get_text() != song:
             widget.pop_song.set_text(song)
         if hasattr(widget, 'pop_artist'):
@@ -488,32 +463,29 @@ class MPRIS(c.BaseModule):
                 widget.pop_artist.set_text(artist)
             widget.pop_artist.set_visible(bool(artist))
 
-        # Update seekbar
         if hasattr(widget, 'pop_seekbar'):
             widget.pop_seekbar.handler_block(widget.pop_seekbar_handler)
             widget.pop_seekbar.set_value(data.get('percent', 0))
             widget.pop_seekbar.handler_unblock(widget.pop_seekbar_handler)
 
         if hasattr(widget, 'pop_time'):
-            pos = data.get('position_str', '00:00')
-            length = data.get('length_str', '00:00')
-            widget.pop_time.set_text(f"{pos} / {length}")
+            widget.pop_time.set_text(
+                f"{data.get('position_str', '00:00')} / "
+                f"{data.get('length_str', '00:00')}"
+            )
 
-        # Update volume bar
         if hasattr(widget, 'pop_volume'):
             widget.pop_volume.handler_block(widget.pop_volume_handler)
             widget.pop_volume.set_value(data.get('volume', 0))
             widget.pop_volume.handler_unblock(widget.pop_volume_handler)
 
-        # Update play/pause button
         if hasattr(widget, 'pop_play_btn'):
-            label = '' if data.get('status') == 'playing' else ''
+            label = '' if data.get('status') == 'playing' else ''
             if widget.pop_play_btn.get_label() != label:
                 widget.pop_play_btn.set_label(label)
 
-        # Show/hide visualizer overlay based on playback state
-        if hasattr(widget, 'pop_vis_revealer') and \
-                hasattr(widget, 'pop_visualizer'):
+        if hasattr(widget, 'pop_vis_revealer') and hasattr(
+                widget, 'pop_visualizer'):
             is_playing = data.get('status') == 'playing'
             widget.pop_vis_revealer.set_reveal_child(is_playing)
             if hasattr(widget, 'pop_vis_bg_revealer'):
@@ -524,10 +496,9 @@ class MPRIS(c.BaseModule):
                 widget.pop_visualizer.stop()
 
     def build_popover(self, widget, data):
-        """ Build mpris popover """
+        """ Build the MPRIS popover widget """
         main_box = c.box('v', spacing=10, style='small-widget')
 
-        # Player Name at the very top
         player_name = data.get('player_name', 'Unknown')
         widget.pop_player_name = c.label(player_name, style='heading')
         main_box.append(widget.pop_player_name)
@@ -535,7 +506,6 @@ class MPRIS(c.BaseModule):
         art_size = self.art_size
         art_path = data.get('art')
 
-        # Album Art Container
         art_container = c.box('v', style='cover-art')
         art_container.set_size_request(art_size, art_size)
         art_container.set_overflow(Gtk.Overflow.HIDDEN)
@@ -544,42 +514,32 @@ class MPRIS(c.BaseModule):
         art_container.set_hexpand(False)
         art_container.set_vexpand(False)
 
-        # Art Image
         widget.pop_art = Gtk.Image()
         widget.pop_art.set_pixel_size(art_size)
-
-        # Placeholder
         widget.pop_art_placeholder = c.label(
-            '', style='large-text', va='center', ha='center', he=True)
+            '', style='large-text', va='center', ha='center', he=True)
         widget.pop_art_placeholder.set_size_request(art_size, art_size)
-
         art_container.append(widget.pop_art)
         art_container.append(widget.pop_art_placeholder)
 
-        # Wrap art in Gtk.Overlay so visualizer can float on top
         art_overlay = Gtk.Overlay()
         art_overlay.set_halign(Gtk.Align.CENTER)
         art_overlay.set_child(art_container)
 
         if self.show_visualizer:
-            # Background layer
             widget.pop_vis_bg = VisualizerBG()
             widget.pop_vis_bg_revealer = Gtk.Revealer()
             widget.pop_vis_bg_revealer.set_transition_type(
-                Gtk.RevealerTransitionType.CROSSFADE
-            )
+                Gtk.RevealerTransitionType.CROSSFADE)
             widget.pop_vis_bg_revealer.set_transition_duration(500)
             widget.pop_vis_bg_revealer.set_child(widget.pop_vis_bg)
             widget.pop_vis_bg_revealer.set_valign(Gtk.Align.END)
             widget.pop_vis_bg_revealer.set_halign(Gtk.Align.FILL)
             art_overlay.add_overlay(widget.pop_vis_bg_revealer)
 
-            # Visualizer anchored to the bottom of the art overlay
             widget.pop_visualizer = Visualizer(art_size)
             widget.pop_visualizer.set_valign(Gtk.Align.END)
             widget.pop_visualizer.set_halign(Gtk.Align.FILL)
-
-            # Revealer hides/shows visualizer with default slide
             widget.pop_vis_revealer = Gtk.Revealer()
             widget.pop_vis_revealer.set_transition_duration(300)
             widget.pop_vis_revealer.set_child(widget.pop_visualizer)
@@ -587,7 +547,6 @@ class MPRIS(c.BaseModule):
             widget.pop_vis_revealer.set_halign(Gtk.Align.FILL)
             art_overlay.add_overlay(widget.pop_vis_revealer)
 
-            # Sync initial visualizer state with playback status
             is_playing = data.get('status') == 'playing'
             widget.pop_vis_revealer.set_reveal_child(is_playing)
             widget.pop_vis_bg_revealer.set_reveal_child(is_playing)
@@ -596,7 +555,6 @@ class MPRIS(c.BaseModule):
 
         main_box.append(art_overlay)
 
-        # Initial art load
         if art_path and os.path.exists(art_path):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
@@ -609,10 +567,8 @@ class MPRIS(c.BaseModule):
         else:
             widget.pop_art.set_visible(False)
 
-        # Content box for everything under artwork
         content_box = c.box('v', spacing=10, style='music-box')
 
-        # Track info
         widget.pop_song = c.label(
             data.get('song', 'Unknown Song'),
             length=art_size // 15, style='title')
@@ -620,64 +576,63 @@ class MPRIS(c.BaseModule):
             data.get('artist', ''), style='artist',
             length=art_size // 15)
         widget.pop_artist.set_visible(bool(data.get('artist')))
-
         content_box.append(widget.pop_song)
         content_box.append(widget.pop_artist)
 
         seek_box = c.box('v')
-        # Seekbar
-        widget.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
+        widget.pop_seekbar = c.slider(
+            data.get('percent', 0), scrollable=False)
 
         def on_seek(s):
-            if self.active_player_proxy:
-                try:
-                    metadata = unwrap(self.active_player_proxy.Metadata)
-                    if not isinstance(metadata, dict):
-                        metadata = {}
-                    length = metadata.get('mpris:length', 0)
-                    if not isinstance(length, (int, float)):
-                        length = 0
-                    if length > 0:
-                        target = int((s.get_value() / 100) * length)
-                        track_id = metadata.get('mpris:trackid', '')
-                        self.active_player_proxy.SetPosition(track_id, target)
-                except Exception as e:
-                    c.print_debug(f"MPRIS seek error: {e}")
+            if not self._player_proxy:
+                return
+            try:
+                meta = _unpack(
+                    self._player_proxy.get_cached_property('Metadata')) or {}
+                length = meta.get('mpris:length', 0) or 0
+                if length > 0:
+                    target = int((s.get_value() / 100) * length)
+                    track_id = meta.get('mpris:trackid', '')
+                    self._player_proxy.call_sync(
+                        'SetPosition',
+                        GLib.Variant('(ox)', (track_id, target)),
+                        Gio.DBusCallFlags.NONE, -1, None
+                    )
+            except Exception as e:
+                c.print_debug(f"MPRIS seek error: {e}")
 
         widget.pop_seekbar_handler = widget.pop_seekbar.connect(
             'value-changed', on_seek)
         seek_box.append(widget.pop_seekbar)
 
-        # Timestamps
         pos = data.get('position_str', '00:00')
         length = data.get('length_str', '00:00')
         widget.pop_time = c.label(
             f"{pos} / {length}", style='music-time', ha='center', he=True)
-        # seek_box.append(widget.pop_time)
         content_box.append(seek_box)
 
-        # Controls and volume inline
         ctrl_box = Gtk.CenterBox()
         ctrl_box.set_hexpand(True)
 
         def mpris_cmd(_btn, cmd):
-            if self.active_player_proxy:
-                try:
-                    if cmd == 'toggle':
-                        self.active_player_proxy.PlayPause()
-                    elif cmd == 'prev':
-                        self.active_player_proxy.Previous()
-                    elif cmd == 'next':
-                        self.active_player_proxy.Next()
-                except Exception as e:
-                    c.print_debug(f"MPRIS cmd error: {e}")
+            if not self._player_proxy:
+                return
+            try:
+                self._player_proxy.call_sync(
+                    {'toggle': 'PlayPause',
+                     'prev': 'Previous',
+                     'next': 'Next'}[cmd],
+                    None, Gio.DBusCallFlags.NONE, -1, None
+                )
+            except Exception as e:
+                c.print_debug(f"MPRIS cmd error: {e}")
 
         prev_btn = c.button('', style='music-button')
         prev_btn.set_valign(Gtk.Align.FILL)
         prev_btn.connect('clicked', mpris_cmd, 'prev')
 
         widget.pop_play_btn = c.button(
-            '' if data.get('status') == 'playing' else '',
+            '' if data.get('status') == 'playing' else '',
             style='music-button')
         c.add_style(widget.pop_play_btn, 'play-button')
         widget.pop_play_btn.set_valign(Gtk.Align.FILL)
@@ -687,18 +642,26 @@ class MPRIS(c.BaseModule):
         next_btn.set_valign(Gtk.Align.FILL)
         next_btn.connect('clicked', mpris_cmd, 'next')
 
-        # Volume inline
         vol_box = c.box('h', spacing=5)
         vol_box.set_hexpand(True)
         widget.pop_volume = c.slider(
-                data.get('volume', 0), scrollable=True, style='music-volume')
+            data.get('volume', 0), scrollable=True, style='music-volume')
 
         def on_volume(s):
-            if self.active_player_proxy:
-                try:
-                    self.active_player_proxy.Volume = s.get_value() / 100.0
-                except Exception as e:
-                    c.print_debug(f"MPRIS volume error: {e}")
+            if not self._player_proxy:
+                return
+            try:
+                self._player_proxy.call_sync(
+                    'org.freedesktop.DBus.Properties.Set',
+                    GLib.Variant(
+                        '(ssv)',
+                        (PLAYER_IFACE, 'Volume',
+                         GLib.Variant('d', s.get_value() / 100.0))
+                    ),
+                    Gio.DBusCallFlags.NONE, -1, None
+                )
+            except Exception as e:
+                c.print_debug(f"MPRIS volume error: {e}")
 
         widget.pop_volume_handler = widget.pop_volume.connect(
             'value-changed', on_volume)
@@ -716,7 +679,6 @@ class MPRIS(c.BaseModule):
 
         content_box.append(ctrl_box)
         main_box.append(content_box)
-
         return main_box
 
     def create_widget(self, bar):
@@ -728,39 +690,47 @@ class MPRIS(c.BaseModule):
         m.set_visible(False)
         m.popover_built = False
 
-        # Scroll to change volume
         scroll = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL)
 
         def on_scroll(_widget, _dx, dy):
-            if self.active_player_proxy:
-                try:
-                    vol = unwrap(self.active_player_proxy.Volume)
-                    step = 0.05
-                    if dy > 0:
-                        new_vol = max(0.0, vol - step)
-                    else:
-                        new_vol = min(1.0, vol + step)
-                    self.active_player_proxy.Volume = new_vol
-                    self.update_state()
-                except Exception as e:
-                    c.print_debug(f"MPRIS volume scroll error: {e}")
+            if not self._player_proxy:
+                return True
+            try:
+                vol_var = self._player_proxy.get_cached_property('Volume')
+                vol = vol_var.unpack() if vol_var else 0.5
+                new_vol = max(0.0, vol - 0.05) if dy > 0 else min(
+                    1.0, vol + 0.05)
+                self._player_proxy.call_sync(
+                    'org.freedesktop.DBus.Properties.Set',
+                    GLib.Variant(
+                        '(ssv)',
+                        (PLAYER_IFACE, 'Volume',
+                         GLib.Variant('d', new_vol))
+                    ),
+                    Gio.DBusCallFlags.NONE, -1, None
+                )
+                self.update_state()
+            except Exception as e:
+                c.print_debug(f"MPRIS volume scroll error: {e}")
             return True
 
         scroll.connect('scroll', on_scroll)
         m.add_controller(scroll)
 
-        # Right click to toggle play/pause
         click = Gtk.GestureClick()
         click.set_button(3)
 
         def on_right_click(_gesture, _n_press, _x, _y):
-            if self.active_player_proxy:
-                try:
-                    self.active_player_proxy.PlayPause()
-                    self.update_state()
-                except Exception as e:
-                    c.print_debug(f"MPRIS toggle error: {e}")
+            if not self._player_proxy:
+                return
+            try:
+                self._player_proxy.call_sync(
+                    'PlayPause', None,
+                    Gio.DBusCallFlags.NONE, -1, None)
+                self.update_state()
+            except Exception as e:
+                c.print_debug(f"MPRIS toggle error: {e}")
 
         click.connect('released', on_right_click)
         m.add_controller(click)
@@ -782,12 +752,8 @@ class MPRIS(c.BaseModule):
             return
 
         status = data.get('status', 'stopped')
-        if status == 'playing':
-            widget.set_icon('')
-        elif status == 'paused':
-            widget.set_icon('')
-        else:
-            widget.set_icon('')
+        icon = {'playing': '', 'paused': ''}.get(status, '')
+        widget.set_icon(icon)
 
         if self.show_title:
             widget.set_label(data.get('song', 'Stopped'))
@@ -795,7 +761,6 @@ class MPRIS(c.BaseModule):
             widget.set_label('')
         widget.set_visible(True)
 
-        # Update popover content
         if not widget.popover_built:
             widget.set_widget(self.build_popover(widget, data))
             widget.popover_built = True
@@ -803,8 +768,8 @@ class MPRIS(c.BaseModule):
             try:
                 self.update_popover_widgets(widget, data)
             except Exception as e:
-                c.print_debug(f"Failed to update mpris popover: {e}",
-                              color='red')
+                c.print_debug(
+                    f"Failed to update mpris popover: {e}", color='red')
 
 
 module_map = {

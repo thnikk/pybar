@@ -1,48 +1,28 @@
 #!/usr/bin/python3 -u
 """
-Description: UPower module for tracking device battery levels via DBus
+Description: UPower module using Gio.DBusProxy directly (no dasbus)
 Author: thnikk
 """
 import weakref
 import common as c
-from dasbus.connection import SystemMessageBus
-from dasbus.client.proxy import disconnect_proxy
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk  # noqa
+from gi.repository import Gtk, GLib, Gio  # noqa
 
-# UPower device types
+UPOWER_SERVICE = 'org.freedesktop.UPower'
+UPOWER_PATH = '/org/freedesktop/UPower'
+UPOWER_IFACE = 'org.freedesktop.UPower'
+DEVICE_IFACE = 'org.freedesktop.UPower.Device'
+
 TYPE_MAP = {
-    0: "Unknown",
-    1: "Line Power",
-    2: "Battery",
-    3: "UPS",
-    4: "Monitor",
-    5: "Mouse",
-    6: "Touchpad",
-    7: "Keyboard",
-    8: "PDA",
-    9: "Phone",
-    10: "Media Player",
-    11: "Tablet",
-    12: "Computer",
-    13: "Controller",
-    14: "Pen",
-    15: "Touchpad",
-    16: "Modem",
-    17: "Network",
-    18: "Headset",
-    19: "Speakers",
-    20: "Headphones",
-    21: "Video",
-    22: "Audio",
-    23: "Remote",
-    24: "Printer",
-    25: "Scanner",
-    26: "Camera",
-    27: "Wearable",
-    28: "Toy",
-    29: "Bluetooth"
+    0: "Unknown", 1: "Line Power", 2: "Battery", 3: "UPS",
+    4: "Monitor", 5: "Mouse", 6: "Touchpad", 7: "Keyboard",
+    8: "PDA", 9: "Phone", 10: "Media Player", 11: "Tablet",
+    12: "Computer", 13: "Controller", 14: "Pen", 15: "Touchpad",
+    16: "Modem", 17: "Network", 18: "Headset", 19: "Speakers",
+    20: "Headphones", 21: "Video", 22: "Audio", 23: "Remote",
+    24: "Printer", 25: "Scanner", 26: "Camera", 27: "Wearable",
+    28: "Toy", 29: "Bluetooth"
 }
 
 ICON_LOOKUP = {
@@ -67,18 +47,11 @@ BATT_LEVEL_MAP = {
 }
 
 
-def unwrap(val):
-    if hasattr(val, 'unpack'):
-        val = val.unpack()
-    if hasattr(val, 'value'):
-        val = val.value
-    return val
-
-
-def get_prop(proxy, prop, default=None):
-    """ Safely get a DBus property, returning default if unavailable """
+def _get_prop(proxy, prop, default=None):
+    """ Safely get a cached DBus property """
     try:
-        return unwrap(getattr(proxy, prop))
+        var = proxy.get_cached_property(prop)
+        return var.unpack() if var is not None else default
     except Exception:
         return default
 
@@ -95,186 +68,161 @@ class UPower(c.BaseModule):
 
     def __init__(self, name, config):
         super().__init__(name, config)
-        self.bus = SystemMessageBus()
-        self.proxies = {}
-        self.devices_data = {}
         self.ignore = [i.lower() for i in config.get('ignore', [])]
+        # path -> Gio.DBusProxy
+        self._device_proxies = {}
 
     def get_device_data(self, proxy):
         """ Extract relevant data from a device proxy """
         try:
-            # IsPresent is not available on all device types; skip only
-            # if the property exists and explicitly reports not present
-            if get_prop(proxy, 'IsPresent', default=True) is False:
+            if _get_prop(proxy, 'IsPresent', default=True) is False:
                 return None
 
-            dev_type = get_prop(proxy, 'Type', default=0)
-            # Skip unknown and line power (AC adapters)
+            dev_type = _get_prop(proxy, 'Type', default=0)
             if dev_type in (0, 1):
                 return None
 
-            model = get_prop(proxy, 'Model', default='')
-            vendor = get_prop(proxy, 'Vendor', default='')
-
-            # Try to get a decent name
-            name = ""
-            if vendor and vendor != "Unknown":
-                name += vendor + " "
-            if model and model != "Unknown":
+            vendor = _get_prop(proxy, 'Vendor', default='') or ''
+            model = _get_prop(proxy, 'Model', default='') or ''
+            name = ''
+            if vendor and vendor != 'Unknown':
+                name += vendor + ' '
+            if model and model != 'Unknown':
                 name += model
-
-            name = name.strip() or TYPE_MAP.get(dev_type, "Unknown Device")
+            name = name.strip() or TYPE_MAP.get(dev_type, 'Unknown Device')
 
             if any(i in name.lower() for i in self.ignore):
                 return None
 
-            percentage = get_prop(proxy, 'Percentage', default=0)
-            battery_level = get_prop(proxy, 'BatteryLevel', default=0)
+            percentage = _get_prop(proxy, 'Percentage', default=0) or 0
+            battery_level = _get_prop(proxy, 'BatteryLevel', default=0) or 0
 
-            # If percentage is 0 or missing, but we have a battery level enum,
-            # use the enum to estimate a percentage for the bar
-            if (not percentage or percentage <= 0) and \
-                    battery_level in BATT_LEVEL_MAP:
-                # Map 0-4 to 10, 30, 60, 85, 100
+            if (not percentage or percentage <= 0) and (
+                    battery_level in BATT_LEVEL_MAP):
                 est_map = {0: 10, 1: 30, 2: 60, 3: 85, 4: 100}
                 percentage = est_map.get(BATT_LEVEL_MAP[battery_level], 0)
 
-            # Map level to 0-4
             if battery_level in BATT_LEVEL_MAP:
                 level = BATT_LEVEL_MAP[battery_level]
             else:
-                level = int(percentage // 20) - 1
-                level = max(0, min(level, 4))
+                level = max(0, min(int(percentage // 20) - 1, 4))
 
-            icon = ICON_LOOKUP.get(dev_type, "")
-            if "xbox" in name.lower() or "controller" in name.lower():
-                icon = ""
+            icon = ICON_LOOKUP.get(dev_type, '')
+            if 'xbox' in name.lower() or 'controller' in name.lower():
+                icon = ''
 
             return {
-                "name": name,
-                "level": level,
-                "percentage": int(round(percentage)),
-                "icon": icon,
-                "type": dev_type
+                'name': name,
+                'level': level,
+                'percentage': int(round(percentage)),
+                'icon': icon,
+                'type': dev_type
             }
         except Exception as e:
             c.print_debug(f"UPower error getting device data: {e}")
             return None
 
     def update_state(self):
-        """ Collect all device data and update state manager """
+        """ Collect all device data and push to state manager """
         devices = []
         icons = []
-
-        for path, proxy in self.proxies.items():
+        for proxy in self._device_proxies.values():
             data = self.get_device_data(proxy)
             if data:
                 devices.append(data)
                 icons.append(data['icon'])
+        text = '  '.join(sorted(set(icons)))
+        c.state_manager.update(self.name, {'text': text, 'devices': devices})
 
-        # Unique set of icons to show in the bar
-        text = "  ".join(sorted(list(set(icons))))
+    def _on_device_properties_changed(
+            self, _proxy, _changed, _invalidated, _data):
+        """ Handle property changes on a device proxy """
+        self.update_state()
 
-        c.state_manager.update(self.name, {
-            "text": text,
-            "devices": devices
-        })
-
-    def on_properties_changed(self, proxy, interface, changed, invalidated):
-        """ Handle property changes on a device """
-        if interface == 'org.freedesktop.UPower.Device':
-            self.update_state()
-
-    def setup_device(self, path):
-        """ Setup proxy and signals for a device path """
-        if path in self.proxies:
+    def _setup_device(self, path):
+        """ Create a proxy for a device path and connect signals """
+        if path in self._device_proxies:
             return
-
         try:
-            proxy = self.bus.get_proxy('org.freedesktop.UPower', path)
-            # Connect to PropertiesChanged signal
-            # dasbus doesn't directly expose PropertiesChanged for all proxies
-            # in a simple way
-            # We use the underlying DBus.Properties interface
-            props_proxy = self.bus.get_proxy(
-                'org.freedesktop.UPower', path,
-                interface_name='org.freedesktop.DBus.Properties'
+            proxy = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SYSTEM,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                UPOWER_SERVICE, path, DEVICE_IFACE,
+                None
             )
-
-            def cb(interface, changed, invalidated, p=proxy):
-                self.on_properties_changed(p, interface, changed, invalidated)
-
-            props_proxy.PropertiesChanged.connect(cb)
-
-            # Store both to prevent GC and for cleanup
-            self.proxies[path] = proxy
-            self.proxies[f"{path}_props"] = props_proxy
-
-            c.print_debug(f"UPower: Monitoring device {path}", color='green')
+            proxy.connect(
+                'g-properties-changed',
+                self._on_device_properties_changed,
+                None
+            )
+            self._device_proxies[path] = proxy
+            c.print_debug(
+                f"UPower: Monitoring device {path}", color='green')
         except Exception as e:
-            c.print_debug(f"UPower error setting up device {path}: {e}")
+            c.print_debug(
+                f"UPower error setting up device {path}: {e}")
+
+    def _on_upower_signal(
+            self, _proxy, _sender, signal_name, params, *_args):
+        """ Handle DeviceAdded / DeviceRemoved signals """
+        path = params[0] if params else None
+        if not path:
+            return
+        if signal_name == 'DeviceAdded':
+            self._setup_device(path)
+            self.update_state()
+        elif signal_name == 'DeviceRemoved':
+            self._device_proxies.pop(path, None)
+            self.update_state()
 
     def run_worker(self):
-        """ Background worker to monitor UPower """
+        """ Background worker to monitor UPower via Gio """
         try:
-            upower_proxy = self.bus.get_proxy(
-                'org.freedesktop.UPower', '/org/freedesktop/UPower')
-
-            def on_device_added(path):
-                self.setup_device(path)
-                self.update_state()
-
-            def on_device_removed(path):
-                changed = False
-                proxy = self.proxies.pop(path, None)
-                if proxy:
-                    disconnect_proxy(proxy)
-                    changed = True
-                props = self.proxies.pop(f"{path}_props", None)
-                if props:
-                    disconnect_proxy(props)
-                if changed:
-                    self.update_state()
-
-            upower_proxy.DeviceAdded.connect(on_device_added)
-            upower_proxy.DeviceRemoved.connect(on_device_removed)
-
-            # Initial devices
-            for path in upower_proxy.EnumerateDevices():
-                self.setup_device(path)
-
-            self.update_state()
-
+            upower_proxy = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SYSTEM,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                UPOWER_SERVICE, UPOWER_PATH, UPOWER_IFACE,
+                None
+            )
         except Exception as e:
             c.print_debug(f"UPower worker failed: {e}", color='red')
             return
 
-        # Keep alive
+        # g-signal covers DeviceAdded and DeviceRemoved
+        upower_proxy.connect('g-signal', self._on_upower_signal)
+
+        # Enumerate existing devices
+        try:
+            result = upower_proxy.call_sync(
+                'EnumerateDevices', None,
+                Gio.DBusCallFlags.NONE, -1, None
+            )
+            for path in result[0]:
+                self._setup_device(path)
+        except Exception as e:
+            c.print_debug(f"UPower EnumerateDevices error: {e}")
+
+        self.update_state()
+
+        # Keep thread alive; updates arrive via GLib signal dispatch
+        import time
         while True:
-            import time
             time.sleep(60)
-            # Occasionally refresh list in case signals were missed
+            # Periodic refresh in case signals were missed
             try:
-                current_paths = upower_proxy.EnumerateDevices()
-                changed = False
-                for path in current_paths:
-                    if path not in self.proxies:
-                        self.setup_device(path)
-                        changed = True
-
-                # Check for removed
-                to_remove = [p for p in self.proxies if p.startswith(
-                    '/') and p not in current_paths]
-                for p in to_remove:
-                    proxy = self.proxies.pop(p, None)
-                    if proxy:
-                        disconnect_proxy(proxy)
-                    props = self.proxies.pop(f"{p}_props", None)
-                    if props:
-                        disconnect_proxy(props)
-                    changed = True
-
-                if changed:
+                result = upower_proxy.call_sync(
+                    'EnumerateDevices', None,
+                    Gio.DBusCallFlags.NONE, -1, None
+                )
+                current = set(result[0])
+                known = set(self._device_proxies.keys())
+                for path in current - known:
+                    self._setup_device(path)
+                for path in known - current:
+                    self._device_proxies.pop(path, None)
+                if current != known:
                     self.update_state()
             except Exception:
                 pass
@@ -288,17 +236,14 @@ class UPower(c.BaseModule):
             box.append(c.label('No devices found', style='dim-label'))
             return
 
-        for i, dev in enumerate(devices):
+        for dev in devices:
             device_box = c.box('v', spacing=10)
-
-            # Name and icon above the bar box
             name_label = c.label(
-                f"{dev['icon']}  {dev['name']}", ha="start", style='title')
+                f"{dev['icon']}  {dev['name']}", ha='start', style='title')
             device_box.append(name_label)
 
-            # Box containing level bar and percentage
             outer = c.box('v', spacing=10, style='box')
-            row = c.box('h', spacing=10, style="inner-box")
+            row = c.box('h', spacing=10, style='inner-box')
 
             lvl = Gtk.LevelBar.new_for_interval(0, 100)
             lvl.set_min_value(0)
@@ -352,14 +297,11 @@ class UPower(c.BaseModule):
         if not widget.get_active():
             widget.set_widget(self.build_popover(widget, data))
         else:
-            # Live update
             devices = {d['name']: d for d in data.get('devices', [])}
-            # We might need to rebuild if devices changed significantly
             current_names = {w['name'] for w in widget.popover_widgets}
             new_names = set(devices.keys())
 
             if current_names != new_names:
-                # Device list changed, update the EXISTING popover's box
                 if hasattr(widget, 'popover_inner_box'):
                     inner_box = widget.popover_inner_box
                     child = inner_box.get_first_child()
@@ -382,7 +324,7 @@ class UPower(c.BaseModule):
 module_map = {
     'upower': UPower
 }
-# Alias to old power supply module
+
 alias_map = {
     'power_supply': UPower
 }
