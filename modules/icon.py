@@ -15,9 +15,6 @@ from gi.repository import Gtk, Rsvg  # noqa
 # Default icon path relative to the resource root
 _DEFAULT_ICON = 'assets/pybar-icon.svg'
 
-# Bar padding (top + bottom) defined in style.css .bar { padding: 5px }
-_BAR_PADDING = 0
-
 
 class Icon(c.BaseModule):
     DEFAULT_INTERVAL = 0  # Static; no polling needed
@@ -38,10 +35,20 @@ class Icon(c.BaseModule):
             'label': 'Icon Size',
             'description': (
                 'Override icon height in pixels. '
-                'Defaults to bar height minus bar padding.'
+                'Defaults to bar height.'
             ),
             'min': 0,
             'max': 200
+        },
+        'padding': {
+            'type': 'integer',
+            'default': 0,
+            'label': 'Padding',
+            'description': (
+                'Space in pixels around the icon on all sides.'
+            ),
+            'min': 0,
+            'max': 50
         }
     }
 
@@ -67,13 +74,14 @@ class Icon(c.BaseModule):
         config = c.state_manager.get('config') or {}
         bar_height = config.get('bar-height', 28)
 
-        # Use explicit size if set, otherwise fill bar minus its padding
-        size = self.config.get('size', 0)
-        if not size:
-            size = bar_height - _BAR_PADDING
+        size = self.config.get('size', 0) or bar_height
+        padding = self.config.get('padding', 0)
+        # Shrink icon by padding on top/bottom; width gets padding on
+        # left/right too, handled inside IconWidget
+        icon_size = max(1, size - padding * 2)
 
         svg_path = self._resolve_path()
-        return IconWidget(svg_path, size)
+        return IconWidget(svg_path, icon_size, padding)
 
 
 class IconWidget(Gtk.DrawingArea):
@@ -84,7 +92,7 @@ class IconWidget(Gtk.DrawingArea):
     automatically crisp at any scale factor.
     """
 
-    def __init__(self, svg_path, size):
+    def __init__(self, svg_path, size, padding=0):
         super().__init__()
         self._size = size
         self._handle = None
@@ -99,9 +107,9 @@ class IconWidget(Gtk.DrawingArea):
             c.print_debug(f"Failed to load SVG: {e}", color='red')
             return
 
-        # Reserve logical size; GTK handles HiDPI scaling from here
-        self.set_content_width(size)
+        # Height fits the icon; width adds horizontal padding on each side
         self.set_content_height(size)
+        self.set_content_width(size + padding * 2)
         self.set_valign(Gtk.Align.CENTER)
         self.set_draw_func(self._on_draw)
 
@@ -119,7 +127,7 @@ class IconWidget(Gtk.DrawingArea):
         draw_w = svg_w * scale
         draw_h = svg_h * scale
 
-        # Centre within the allocated area
+        # Centre within the full allocated area (including side padding)
         cr.translate((width - draw_w) / 2, (height - draw_h) / 2)
         cr.scale(scale, scale)
 
