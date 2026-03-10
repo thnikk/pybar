@@ -42,7 +42,7 @@ if args.gtk_log_level.upper() == 'DEBUG':
 # down its render pipeline, leaving Vulkan with no valid surface
 # (VK_ERROR_SURFACE_LOST_KHR). The NGL renderer uses EGL and survives
 # display blank/unblank cycles without errors.
-os.environ.setdefault('GSK_RENDERER', 'ngl')
+os.environ.setdefault('GSK_RENDERER', 'gl')
 
 from ctypes import CDLL
 try:
