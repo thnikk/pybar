@@ -201,7 +201,7 @@ class Volume(c.BaseModule):
                            if s.index == index), None)
 
             if dev:
-                pulse.mute(dev, not state)
+                pulse.mute(dev, state)
         return True
 
     def set_dev_volume(self, section, index, value):
@@ -313,6 +313,7 @@ class Volume(c.BaseModule):
             large = len(visible) > 3
             vsgb = c.VScrollGradientBox(
                 devices_box, gradient_size=60,
+                bg_color="1c1f26",
                 max_height=250 if large else None)
             section_box.append(vsgb)
             content_box.append(section_box)
