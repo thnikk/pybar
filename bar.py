@@ -62,6 +62,9 @@ class Display:
         # post-wake redraw so that on_monitors_changed does not race with
         # the dedicated wake handler.
         self._is_waking = False
+        # GLib source ID of any pending _redraw_bars timer so it can be
+        # cancelled when the extended-delay wake path supersedes it.
+        self._redraw_timer_id = None
         self._setup_dbus_sleep_handler()
 
         # Watch for reload signal from settings
@@ -330,8 +333,15 @@ class Display:
             return
         if added > 0:
             # Monitor reconnected; compositor may be rebuilding Wayland
-            # surfaces. Reuse the wake-from-sleep safe-reload path with
-            # the same 3-second delay to avoid surface errors.
+            # surfaces. Cancel any short-delay redraw already scheduled
+            # (e.g. from a preceding removal event in the same DPMS cycle)
+            # then use the extended-delay safe-reload path.
+            if self._redraw_timer_id is not None:
+                GLib.source_remove(self._redraw_timer_id)
+                self._redraw_timer_id = None
+                logging.debug(
+                    "on_monitors_changed: cancelled pending redraw timer"
+                )
             logging.debug(
                 "on_monitors_changed: %d monitor(s) added, "
                 "using extended-delay reload", added
@@ -340,7 +350,9 @@ class Display:
             GLib.timeout_add_seconds(3, self._safe_reload_after_sleep)
         else:
             # Only removals; a quick redraw is safe.
-            GLib.timeout_add(500, self._redraw_bars)
+            self._redraw_timer_id = GLib.timeout_add(
+                500, self._redraw_bars
+            )
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
@@ -396,6 +408,13 @@ class Display:
 
     def _redraw_bars(self):
         """ Redraw all bars (called from idle callback) """
+        self._redraw_timer_id = None
+
+        # Skip if the extended-delay wake path has taken over
+        if self._is_waking:
+            logging.debug("Skipping bar redraw: wake/reconnect in progress")
+            return False
+
         # Skip if system is sleeping
         if self.is_sleeping:
             logging.debug("Skipping bar redraw during sleep")
