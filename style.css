@@ -474,6 +474,16 @@ button.power-item:hover {
 	background: rgba(255, 255, 255, 0.1);
 }
 
+.power-list-icon {
+	font-size: 13px;
+	color: @blue;
+}
+
+.power-list-icon-danger {
+	font-size: 13px;
+	color: @red;
+}
+
 .temp-label {
 	font-size: 80px;
 }
@@ -732,4 +742,133 @@ popover.hover-popover label {
 	background: @gray;
 	margin: 0;
 	padding: 0;
+}
+
+/* ── Power menu: shared ── */
+button.power-item {
+	font-size: 13px;
+	padding: 10px;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+}
+
+button.power-item:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Power menu: grid ── */
+button.power-grid-cell {
+	background: #2b303b;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 10px;
+	padding: 14px 8px 12px;
+	box-shadow: none;
+}
+
+button.power-grid-cell:hover {
+	background: #363c47;
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+button.power-grid-cell:active {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+button.power-grid-cell.power-grid-cell-short {
+	padding: 6px 8px;
+}
+
+
+.power-grid-icon {
+	font-size: 18px;
+	color: @blue;
+}
+
+.power-grid-icon-danger {
+	font-size: 18px;
+	color: @red;
+}
+
+.power-grid-label {
+	font-size: 11px;
+	color: @white;
+	opacity: 0.75;
+}
+
+/* Split reboot/UEFI cell */
+.power-grid-split {
+	background: #2b303b;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 10px;
+}
+
+button.power-split-half {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	padding: 9px 8px 7px;
+}
+
+button.power-split-half:hover {
+	background: #363c47;
+}
+
+button.power-split-half:active {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.power-split-icon-sm {
+	font-size: 10px;
+	color: @blue;
+	opacity: 0.6;
+}
+
+/* ── Power menu: wide rows ── */
+button.power-wide-item {
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	padding: 10px 12px;
+	box-shadow: none;
+}
+
+button.power-wide-item:hover {
+	background: #2b303b;
+	border-color: rgba(255, 255, 255, 0.1);
+}
+
+button.power-wide-item:active {
+	background: #363c47;
+}
+
+.power-wide-tile {
+	background: #2b303b;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	min-width: 34px;
+	min-height: 34px;
+}
+
+.power-wide-icon {
+	font-size: 14px;
+	color: @blue;
+}
+
+.power-wide-icon-danger {
+	font-size: 14px;
+	color: @red;
+}
+
+.power-wide-name {
+	font-size: 13px;
+	color: @white;
+}
+
+.power-wide-desc {
+	font-size: 11px;
+	color: @white;
+	opacity: 0.4;
 }
