@@ -4,6 +4,7 @@ Description: UPower module using Gio.DBusProxy directly (no dasbus)
 Author: thnikk
 """
 import weakref
+import time
 import common as c
 import gi
 gi.require_version('Gtk', '4.0')
@@ -13,6 +14,7 @@ UPOWER_SERVICE = 'org.freedesktop.UPower'
 UPOWER_PATH = '/org/freedesktop/UPower'
 UPOWER_IFACE = 'org.freedesktop.UPower'
 DEVICE_IFACE = 'org.freedesktop.UPower.Device'
+PROPS_IFACE = 'org.freedesktop.DBus.Properties'
 
 TYPE_MAP = {
     0: "Unknown", 1: "Line Power", 2: "Battery", 3: "UPS",
@@ -26,15 +28,15 @@ TYPE_MAP = {
 }
 
 ICON_LOOKUP = {
-    2: "",   # Battery
-    3: "",   # UPS
-    5: "",   # Mouse
-    7: "",   # Keyboard
-    13: "",  # Controller
-    18: "",  # Headset
-    19: "",  # Speakers
-    20: "",  # Headphones
-    29: "",  # Bluetooth
+    2: "\uf240",   # Battery (fa-battery-full)
+    3: "\uf207",   # UPS (fa-plug)
+    5: "\uf8cc",   # Mouse (fa-computer-mouse)
+    7: "\uf11c",   # Keyboard (fa-keyboard)
+    13: "\uf11b",  # Controller (fa-gamepad)
+    18: "\uf58f",  # Headset (fa-headphones-alt)
+    19: "\uf028",  # Speakers (fa-volume-up)
+    20: "\uf58f",  # Headphones (fa-headphones-alt)
+    29: "\uf293",  # Bluetooth (fa-bluetooth)
 }
 
 # UPower BatteryLevel enum mapping to 0-4 (critical to full)
@@ -47,16 +49,9 @@ BATT_LEVEL_MAP = {
 }
 
 
-def _get_prop(proxy, prop, default=None):
-    """ Safely get a cached DBus property """
-    try:
-        var = proxy.get_cached_property(prop)
-        return var.unpack() if var is not None else default
-    except Exception:
-        return default
-
-
 class UPower(c.BaseModule):
+    DEFAULT_INTERVAL = 30
+
     SCHEMA = {
         'ignore': {
             'type': 'list',
@@ -69,163 +64,230 @@ class UPower(c.BaseModule):
     def __init__(self, name, config):
         super().__init__(name, config)
         self.ignore = [i.lower() for i in config.get('ignore', [])]
-        # path -> Gio.DBusProxy
-        self._device_proxies = {}
+        # system bus connection, created once in run_worker
+        self._bus = None
+        # set of known device paths
+        self._device_paths = set()
+        # subscriptions to cancel on cleanup
+        self._signal_subs = []
 
-    def get_device_data(self, proxy):
-        """ Extract relevant data from a device proxy """
+    def _get_all_props(self, path):
+        """
+        Call org.freedesktop.DBus.Properties.GetAll on a device path.
+        Returns a plain dict of property name -> unpacked value, or None.
+        This guarantees we get fresh values rather than relying on the
+        proxy's property cache, which may be empty right after creation.
+        """
         try:
-            if _get_prop(proxy, 'IsPresent', default=True) is False:
-                return None
-
-            dev_type = _get_prop(proxy, 'Type', default=0)
-            if dev_type in (0, 1):
-                return None
-
-            vendor = _get_prop(proxy, 'Vendor', default='') or ''
-            model = _get_prop(proxy, 'Model', default='') or ''
-            name = ''
-            if vendor and vendor != 'Unknown':
-                name += vendor + ' '
-            if model and model != 'Unknown':
-                name += model
-            name = name.strip() or TYPE_MAP.get(dev_type, 'Unknown Device')
-
-            if any(i in name.lower() for i in self.ignore):
-                return None
-
-            percentage = _get_prop(proxy, 'Percentage', default=0) or 0
-            battery_level = _get_prop(proxy, 'BatteryLevel', default=0) or 0
-
-            if (not percentage or percentage <= 0) and (
-                    battery_level in BATT_LEVEL_MAP):
-                est_map = {0: 10, 1: 30, 2: 60, 3: 85, 4: 100}
-                percentage = est_map.get(BATT_LEVEL_MAP[battery_level], 0)
-
-            if battery_level in BATT_LEVEL_MAP:
-                level = BATT_LEVEL_MAP[battery_level]
-            else:
-                level = max(0, min(int(percentage // 20) - 1, 4))
-
-            icon = ICON_LOOKUP.get(dev_type, '')
-            if 'xbox' in name.lower() or 'controller' in name.lower():
-                icon = ''
-
+            result = self._bus.call_sync(
+                UPOWER_SERVICE,
+                path,
+                PROPS_IFACE,
+                'GetAll',
+                GLib.Variant('(s)', (DEVICE_IFACE,)),
+                GLib.VariantType.new('(a{sv})'),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None
+            )
+            # result[0] is a dict of str -> GLib.Variant (or already unpacked)
             return {
-                'name': name,
-                'level': level,
-                'percentage': int(round(percentage)),
-                'icon': icon,
-                'type': dev_type
+                k: v.unpack() if hasattr(v, 'unpack') else v
+                for k, v in result[0].items()
             }
         except Exception as e:
-            c.print_debug(f"UPower error getting device data: {e}")
+            c.print_debug(
+                f"UPower GetAll failed for {path}: {e}", color='red')
             return None
 
-    def update_state(self):
-        """ Collect all device data and push to state manager """
+    def _props_to_device(self, props):
+        """
+        Convert a raw property dict from GetAll into a device data dict.
+        Returns None if the device should be skipped.
+        """
+        if not props:
+            return None
+
+        # Skip absent or line-power devices
+        if props.get('IsPresent', True) is False:
+            return None
+        dev_type = props.get('Type', 0)
+        if dev_type in (0, 1):
+            return None
+
+        vendor = props.get('Vendor', '') or ''
+        model = props.get('Model', '') or ''
+        name = ''
+        if vendor and vendor != 'Unknown':
+            name += vendor + ' '
+        if model and model != 'Unknown':
+            name += model
+        name = name.strip() or TYPE_MAP.get(dev_type, 'Unknown Device')
+
+        if any(i in name.lower() for i in self.ignore):
+            return None
+
+        percentage = props.get('Percentage', 0) or 0
+        battery_level = props.get('BatteryLevel', 0) or 0
+
+        # Fall back to estimated percentage from coarse battery level
+        if (not percentage or percentage <= 0) and (
+                battery_level in BATT_LEVEL_MAP):
+            est_map = {0: 10, 1: 30, 2: 60, 3: 85, 4: 100}
+            percentage = est_map.get(BATT_LEVEL_MAP[battery_level], 0)
+
+        if battery_level in BATT_LEVEL_MAP:
+            level = BATT_LEVEL_MAP[battery_level]
+        else:
+            level = max(0, min(int(percentage // 20) - 1, 4))
+
+        icon = ICON_LOOKUP.get(dev_type, '')
+        if 'xbox' in name.lower() or 'controller' in name.lower():
+            icon = "\uf11b"
+
+        return {
+            'name': name,
+            'level': level,
+            'percentage': int(round(percentage)),
+            'icon': icon,
+            'type': dev_type
+        }
+
+    def fetch_data(self):
+        """
+        Enumerate UPower devices and call GetAll on each one.
+        Returns a state dict ready for the state manager.
+        """
+        if self._bus is None:
+            return None
+        try:
+            result = self._bus.call_sync(
+                UPOWER_SERVICE,
+                UPOWER_PATH,
+                UPOWER_IFACE,
+                'EnumerateDevices',
+                None,
+                GLib.VariantType.new('(ao)'),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None
+            )
+            paths = result[0]
+        except Exception as e:
+            c.print_debug(f"UPower EnumerateDevices error: {e}", color='red')
+            return None
+
+        self._device_paths = set(paths)
         devices = []
         icons = []
-        for proxy in self._device_proxies.values():
-            data = self.get_device_data(proxy)
-            if data:
-                devices.append(data)
-                icons.append(data['icon'])
+        for path in paths:
+            props = self._get_all_props(path)
+            dev = self._props_to_device(props)
+            if dev:
+                devices.append(dev)
+                icons.append(dev['icon'])
+                c.print_debug(
+                    f"UPower: found device '{dev['name']}'", color='green')
+
         text = '  '.join(sorted(set(icons)))
-        c.state_manager.update(self.name, {'text': text, 'devices': devices})
+        return {'text': text, 'devices': devices}
 
-    def _on_device_properties_changed(
-            self, _proxy, _changed, _invalidated, _data):
-        """ Handle property changes on a device proxy """
-        self.update_state()
+    def _wake_worker(self):
+        """ Signal the worker thread to run fetch_data immediately """
+        import module as mod
+        wake = mod._worker_wake_flags.get(self.name)
+        if wake:
+            wake.set()
 
-    def _setup_device(self, path):
-        """ Create a proxy for a device path and connect signals """
-        if path in self._device_proxies:
-            return
-        try:
-            proxy = Gio.DBusProxy.new_for_bus_sync(
-                Gio.BusType.SYSTEM,
-                Gio.DBusProxyFlags.NONE,
-                None,
-                UPOWER_SERVICE, path, DEVICE_IFACE,
-                None
-            )
-            proxy.connect(
-                'g-properties-changed',
-                self._on_device_properties_changed,
-                None
-            )
-            self._device_proxies[path] = proxy
-            c.print_debug(
-                f"UPower: Monitoring device {path}", color='green')
-        except Exception as e:
-            c.print_debug(
-                f"UPower error setting up device {path}: {e}")
+    def _on_device_signal(
+            self, _conn, _sender, _path, _iface, signal_name,
+            _params, _data):
+        """
+        Callback for DeviceAdded / DeviceRemoved on the UPower interface.
+        Wakes the worker so fetch_data runs right away.
+        """
+        c.print_debug(f"UPower: signal {signal_name}, waking worker")
+        self._wake_worker()
 
-    def _on_upower_signal(
-            self, _proxy, _sender, signal_name, params, *_args):
-        """ Handle DeviceAdded / DeviceRemoved signals """
-        path = params[0] if params else None
-        if not path:
-            return
-        if signal_name == 'DeviceAdded':
-            self._setup_device(path)
-            self.update_state()
-        elif signal_name == 'DeviceRemoved':
-            self._device_proxies.pop(path, None)
-            self.update_state()
+    def _on_props_changed(
+            self, _conn, _sender, path, _iface, _signal,
+            _params, _data):
+        """
+        Callback for PropertiesChanged on any monitored device path.
+        Wakes the worker so fetch_data runs right away.
+        """
+        c.print_debug(
+            f"UPower: properties changed on {path}, waking worker")
+        self._wake_worker()
 
     def run_worker(self):
-        """ Background worker to monitor UPower via Gio """
+        """ Background worker: set up DBus subscriptions then run base loop """
+        import module as mod
+
         try:
-            upower_proxy = Gio.DBusProxy.new_for_bus_sync(
-                Gio.BusType.SYSTEM,
-                Gio.DBusProxyFlags.NONE,
-                None,
-                UPOWER_SERVICE, UPOWER_PATH, UPOWER_IFACE,
-                None
-            )
+            self._bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         except Exception as e:
-            c.print_debug(f"UPower worker failed: {e}", color='red')
+            c.print_debug(f"UPower: bus_get_sync failed: {e}", color='red')
             return
 
-        # g-signal covers DeviceAdded and DeviceRemoved
-        upower_proxy.connect('g-signal', self._on_upower_signal)
+        # Subscribe to DeviceAdded / DeviceRemoved on the UPower object
+        sub_id = self._bus.signal_subscribe(
+            UPOWER_SERVICE,
+            UPOWER_IFACE,
+            None,           # any signal name
+            UPOWER_PATH,
+            None,
+            Gio.DBusSignalFlags.NONE,
+            self._on_device_signal,
+            None
+        )
+        self._signal_subs.append(sub_id)
 
-        # Enumerate existing devices
-        try:
-            result = upower_proxy.call_sync(
-                'EnumerateDevices', None,
-                Gio.DBusCallFlags.NONE, -1, None
-            )
-            for path in result[0]:
-                self._setup_device(path)
-        except Exception as e:
-            c.print_debug(f"UPower EnumerateDevices error: {e}")
+        stop_event = mod._worker_stop_flags.get(self.name)
+        wake_event = mod._worker_wake_flags.get(self.name)
 
-        self.update_state()
+        # track which paths we've already subscribed to
+        subscribed_paths = set()
 
-        # Keep thread alive; updates arrive via GLib signal dispatch
-        import time
         while True:
-            time.sleep(60)
-            # Periodic refresh in case signals were missed
+            data = self.fetch_data()
+            if data is not None:
+                # Subscribe to PropertiesChanged for any newly seen paths
+                for path in self._device_paths - subscribed_paths:
+                    self._bus.signal_subscribe(
+                        UPOWER_SERVICE,
+                        PROPS_IFACE,
+                        'PropertiesChanged',
+                        path,
+                        None,
+                        Gio.DBusSignalFlags.NONE,
+                        self._on_props_changed,
+                        None
+                    )
+                    subscribed_paths.add(path)
+                c.state_manager.update(self.name, data)
+
+            if not stop_event:
+                time.sleep(self.interval)
+                continue
+
+            if wake_event:
+                woken = wake_event.wait(timeout=self.interval)
+                if stop_event.is_set():
+                    break
+                if woken:
+                    wake_event.clear()
+            else:
+                if stop_event.wait(timeout=self.interval):
+                    break
+
+        # Clean up subscriptions
+        for sub_id in self._signal_subs:
             try:
-                result = upower_proxy.call_sync(
-                    'EnumerateDevices', None,
-                    Gio.DBusCallFlags.NONE, -1, None
-                )
-                current = set(result[0])
-                known = set(self._device_proxies.keys())
-                for path in current - known:
-                    self._setup_device(path)
-                for path in known - current:
-                    self._device_proxies.pop(path, None)
-                if current != known:
-                    self.update_state()
+                self._bus.signal_unsubscribe(sub_id)
             except Exception:
                 pass
+        self._signal_subs.clear()
 
     def _populate_box(self, widget, data, box):
         widget.popover_widgets = []
