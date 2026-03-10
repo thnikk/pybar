@@ -475,12 +475,12 @@ button.power-item:hover {
 }
 
 .power-list-icon {
-	font-size: 13px;
+	font-size: 14px;
 	color: @blue;
 }
 
 .power-list-icon-danger {
-	font-size: 13px;
+	font-size: 14px;
 	color: @red;
 }
 
@@ -792,7 +792,7 @@ button.power-grid-cell.power-grid-cell-short {
 }
 
 .power-grid-label {
-	font-size: 11px;
+	font-size: 12px;
 	color: @white;
 	opacity: 0.75;
 }
@@ -863,12 +863,12 @@ button.power-wide-item:active {
 }
 
 .power-wide-name {
-	font-size: 13px;
+	font-size: 14px;
 	color: @white;
 }
 
 .power-wide-desc {
-	font-size: 11px;
+	font-size: 12px;
 	color: @white;
 	opacity: 0.4;
 }
