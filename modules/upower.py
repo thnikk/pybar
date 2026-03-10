@@ -70,6 +70,8 @@ class UPower(c.BaseModule):
         self._device_paths = set()
         # subscriptions to cancel on cleanup
         self._signal_subs = []
+        # last known state for change detection
+        self._last_devices = {}
 
     def _get_all_props(self, path):
         """
@@ -186,8 +188,22 @@ class UPower(c.BaseModule):
             if dev:
                 devices.append(dev)
                 icons.append(dev['icon'])
+
+        # Log additions, removals, and percentage changes
+        current = {d['name']: d['percentage'] for d in devices}
+        added = set(current) - set(self._last_devices)
+        removed = set(self._last_devices) - set(current)
+        for name in added:
+            c.print_debug(f"UPower: device added '{name}'", color='green')
+        for name in removed:
+            c.print_debug(f"UPower: device removed '{name}'", color='yellow')
+        for name, pct in current.items():
+            if name in self._last_devices and pct != self._last_devices[name]:
                 c.print_debug(
-                    f"UPower: found device '{dev['name']}'", color='green')
+                    f"UPower: '{name}' battery {self._last_devices[name]}"
+                    f"% -> {pct}%"
+                )
+        self._last_devices = current
 
         text = '  '.join(sorted(set(icons)))
         return {'text': text, 'devices': devices}
@@ -203,21 +219,11 @@ class UPower(c.BaseModule):
             self, _conn, _sender, _path, _iface, signal_name,
             _params, _data):
         """
-        Callback for DeviceAdded / DeviceRemoved on the UPower interface.
+        Callback for DeviceAdded/DeviceRemoved and PropertiesChanged.
         Wakes the worker so fetch_data runs right away.
         """
-        c.print_debug(f"UPower: signal {signal_name}, waking worker")
-        self._wake_worker()
-
-    def _on_props_changed(
-            self, _conn, _sender, path, _iface, _signal,
-            _params, _data):
-        """
-        Callback for PropertiesChanged on any monitored device path.
-        Wakes the worker so fetch_data runs right away.
-        """
-        c.print_debug(
-            f"UPower: properties changed on {path}, waking worker")
+        if signal_name in ('DeviceAdded', 'DeviceRemoved'):
+            c.print_debug(f"UPower: {signal_name}, waking worker")
         self._wake_worker()
 
     def run_worker(self):
@@ -261,7 +267,7 @@ class UPower(c.BaseModule):
                         path,
                         None,
                         Gio.DBusSignalFlags.NONE,
-                        self._on_props_changed,
+                        self._on_device_signal,
                         None
                     )
                     subscribed_paths.add(path)
