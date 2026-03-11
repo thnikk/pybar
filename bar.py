@@ -227,6 +227,10 @@ class Display:
 
     def _safe_reload_after_sleep(self):
         """ Safely reload all bars after sleep """
+        # Clear the waking flag before redrawing so _redraw_bars does not
+        # see it and bail out — the flag was only needed to block racing
+        # monitor-change events during the delay window.
+        self._is_waking = False
         try:
             # Reinitialize display connection if needed
             self.display = Gdk.Display.get_default()
@@ -238,7 +242,7 @@ class Display:
             self.monitors = self.get_monitors()
             self.plugs = self.get_plugs()
 
-            # Redraw all bars safely
+            # Redraw all bars
             self._redraw_bars()
 
             logging.info("Successfully reloaded bars after sleep")
@@ -248,10 +252,6 @@ class Display:
                 f"Error reloading bars after sleep: {e}", exc_info=True
             )
             return False
-        finally:
-            # Always clear the waking flag so future monitor-change events
-            # are handled normally.
-            self._is_waking = False
 
     def get_monitors(self):
         """ Get monitor objects from gdk """
