@@ -129,24 +129,39 @@ class Backlight(c.BaseModule):
 
     def _read_ddc(self):
         """Return a list of DDC source dicts for all detected monitors."""
-        out = self._ddcutil(['detect', '--brief'])
+        out = self._ddcutil(['detect'])
         if not out:
             return []
         monitors = []
         bus = None
+        connector = None
+        name = None
         for line in out.splitlines():
             line = line.strip()
-            if line.startswith('I2C bus:'):
+            # New display block — flush previous entry first
+            if line.startswith('Display '):
+                if bus is not None:
+                    monitors.append((bus, name or 'Monitor', connector))
+                bus = None
+                connector = None
+                name = None
+            elif line.startswith('I2C bus:'):
                 try:
                     bus = int(line.split('/dev/i2c-')[-1])
                 except ValueError:
                     bus = None
-            elif line.startswith('Monitor:') and bus is not None:
-                name = line.split('Monitor:', 1)[-1].strip()
-                monitors.append((bus, name))
-                bus = None
+            elif line.startswith('DRM_connector:') and bus is not None:
+                # Format: "DRM_connector: cardN-OUTPUT" → strip "cardN-"
+                raw = line.split('DRM_connector:', 1)[-1].strip()
+                connector = raw.split('-', 1)[-1] if '-' in raw else raw
+            elif line.startswith('Model:') and bus is not None:
+                # Verbose output: model under "EDID synopsis:"
+                name = line.split('Model:', 1)[-1].strip()
+        # Flush last entry
+        if bus is not None:
+            monitors.append((bus, name or 'Monitor', connector))
         sources = []
-        for bus, name in monitors:
+        for bus, name, connector in monitors:
             out = self._ddcutil(
                 ['getvcp', '10', '--bus', str(bus), '--brief']
             )
@@ -165,6 +180,7 @@ class Backlight(c.BaseModule):
                 'brightness': current,
                 'max_brightness': maximum,
                 'bus': bus,
+                'connector': connector,
             })
         return sources
 
@@ -206,9 +222,11 @@ class Backlight(c.BaseModule):
                 daemon=True
             ).start()
 
-    def _make_slider_handler(self, widget, source):
+    def _make_slider_handler(self, widget, source, pct_label=None):
         """Return a value-changed callback with per-source debounce."""
         key = source['key']
+        max_b = source['max_brightness']
+        connector = getattr(widget, '_connector', None)
 
         def on_value_changed(slider):
             # Cancel any pending write for this source
@@ -217,10 +235,28 @@ class Backlight(c.BaseModule):
                 GLib.source_remove(handle)
 
             value = slider.get_value()
+            pct = round((value / max_b) * 100)
+
+            # Update the inline percentage label in the popover row
+            if pct_label is not None:
+                pct_label.set_text(f'{pct}%')
+
+            # Update the bar module label if this source matches the bar
+            matched = self._find_source_for_connector(
+                [source], connector
+            )
+            if matched or len(
+                getattr(widget, 'source_rows', {})
+            ) == 1:
+                pending = getattr(widget, '_scroll_pending', {})
+                if key not in pending:
+                    widget.set_label(f'{pct}%')
 
             def do_apply():
                 widget._debounce.pop(key, None)
                 self._apply_brightness(source, value)
+                import module as _module
+                _module.force_update(self.name)
                 return GLib.SOURCE_REMOVE
 
             widget._debounce[key] = GLib.timeout_add(300, do_apply)
@@ -236,20 +272,31 @@ class Backlight(c.BaseModule):
         row_box = c.box('v', spacing=8)
         row_box.append(c.label(source['name'], style='title', ha='start'))
 
-        outer = c.box('h', style='box')
+        outer = c.box('h', style='box', spacing=10)
+        c.add_style(outer, 'inner-box-min')
         outer.set_hexpand(True)
-        outer.append(c.label(self.ICON, style='inner-box'))
+        outer.append(c.label(self.ICON))
 
         sl = c.slider(
             source['brightness'], 0, source['max_brightness']
         )
         sl.set_hexpand(True)
-        sl.set_margin_end(10)
+
+        # Percentage label to the right of the slider
+        pct = round(
+            (source['brightness'] / source['max_brightness']) * 100
+        )
+        pct_label = c.label(f'{pct}%')
+        pct_label.set_width_chars(4)
+        pct_label.set_xalign(1.0)
+
         # Connect and store the signal handler ID for block/unblock
         hid = sl.connect(
-            'value-changed', self._make_slider_handler(widget, source)
+            'value-changed',
+            self._make_slider_handler(widget, source, pct_label)
         )
         outer.append(sl)
+        outer.append(pct_label)
         row_box.append(outer)
         return row_box, sl, hid
 
@@ -266,7 +313,11 @@ class Backlight(c.BaseModule):
 
         for source in sources:
             row_box, sl, hid = self._make_row(widget, source)
-            widget.source_rows[source['key']] = (row_box, sl, hid)
+            # Store pct_label via slider's next sibling (appended after sl)
+            pct_label = sl.get_next_sibling()
+            widget.source_rows[source['key']] = (
+                row_box, sl, hid, pct_label
+            )
             sources_box.append(row_box)
 
         main_box.append(sources_box)
@@ -279,7 +330,7 @@ class Backlight(c.BaseModule):
 
         # Remove rows for disconnected sources
         for key in existing_keys - current_keys.keys():
-            row_box, _sl, _hid = widget.source_rows.pop(key)
+            row_box, _sl, _hid, _pct = widget.source_rows.pop(key)
             widget.sources_box.remove(row_box)
             # Cancel any pending debounce for this key
             handle = widget._debounce.pop(key, None)
@@ -290,14 +341,15 @@ class Backlight(c.BaseModule):
         for key in current_keys.keys() - existing_keys:
             source = current_keys[key]
             row_box, sl, hid = self._make_row(widget, source)
-            widget.source_rows[key] = (row_box, sl, hid)
+            pct_label = sl.get_next_sibling()
+            widget.source_rows[key] = (row_box, sl, hid, pct_label)
             widget.sources_box.append(row_box)
 
         # Silently update sliders for existing rows (skip if being dragged)
         for key, source in current_keys.items():
             if key not in widget.source_rows:
                 continue
-            _row_box, sl, hid = widget.source_rows[key]
+            _row_box, sl, hid, pct_label = widget.source_rows[key]
             # Skip update while user is interacting or a write is pending
             if key in widget._debounce:
                 continue
@@ -307,10 +359,23 @@ class Backlight(c.BaseModule):
                 sl.handler_block(hid)
                 sl.set_value(new_val)
                 sl.handler_unblock(hid)
+                max_b = source['max_brightness']
+                pct_label.set_text(
+                    f'{round((new_val / max_b) * 100)}%'
+                )
 
     # ------------------------------------------------------------------
     # Widget creation and UI update
     # ------------------------------------------------------------------
+
+    def _find_source_for_connector(self, sources, connector):
+        """Return the DDC source whose connector matches, or None."""
+        if not connector:
+            return None
+        for s in sources:
+            if s.get('connector') == connector:
+                return s
+        return None
 
     def create_widget(self, bar):
         """Create the brightness bar module."""
@@ -319,6 +384,13 @@ class Backlight(c.BaseModule):
         m.set_icon(self.ICON)
         m.set_label('...')
         m.set_visible(True)
+
+        # Store the connector name for this bar's monitor so scroll and
+        # label can target the right DDC source.
+        try:
+            m._connector = bar.monitor.get_connector()
+        except Exception:
+            m._connector = None
 
         widget_ref = weakref.ref(m)
 
@@ -331,27 +403,59 @@ class Backlight(c.BaseModule):
         m._subscriptions.append(sub_id)
 
         def scroll_action(_controller, _dx, dy):
-            """Scroll adjusts brightness when there is exactly one source."""
+            """Scroll the source that matches this bar's monitor."""
             data = c.state_manager.get(self.name)
             if not data:
                 return
             sources = data.get('sources', [])
-            if len(sources) != 1:
+            if not sources:
                 return
-            source = sources[0]
+            widget = widget_ref()
+            if widget is None:
+                return
+            connector = getattr(widget, '_connector', None)
+            source = self._find_source_for_connector(sources, connector)
+            # Fall back to single-source behaviour when no match
+            if source is None:
+                if len(sources) != 1:
+                    return
+                source = sources[0]
             max_b = source['max_brightness']
-            b = source['brightness']
-            if source['kind'] == 'sysfs':
-                # 1 % of max per tick, matching original behaviour
-                delta = round(max_b * 0.01)
-            else:
-                delta = round(
-                    max_b * (self.config.get('step', 5) / 100)
-                )
-            # dy < 0 → scroll up → brighter
-            new_val = b + (-delta if dy < 0 else delta)
+            key = source['key']
+            # Always step 1% of max regardless of source kind
+            delta = max(1, round(max_b * 0.01))
+            # Use pending value if a debounce is in flight, else state value
+            if not hasattr(widget, '_scroll_pending'):
+                widget._scroll_pending = {}
+            if not hasattr(widget, '_scroll_debounce'):
+                widget._scroll_debounce = {}
+            current = widget._scroll_pending.get(
+                key, source['brightness']
+            )
+            # dy > 0 → scroll down → dimmer; dy < 0 → scroll up → brighter
+            new_val = current + (-delta if dy > 0 else delta)
             new_val = max(0, min(new_val, max_b))
-            self._apply_brightness(source, new_val)
+            widget._scroll_pending[key] = new_val
+            # Update label immediately
+            pct = round((new_val / max_b) * 100)
+            widget.set_label(f'{pct}%')
+            # Cancel any pending write and reschedule
+            handle = widget._scroll_debounce.get(key)
+            if handle is not None:
+                GLib.source_remove(handle)
+
+            def do_scroll_apply():
+                widget._scroll_debounce.pop(key, None)
+                # Keep pending value until next poll confirms the new state
+                self._apply_brightness(source, new_val)
+                # Wake the worker so the widget reflects the new value
+                import module as _module
+                _module.force_update(self.name)
+                return GLib.SOURCE_REMOVE
+
+            widget._scroll_debounce[key] = GLib.timeout_add(
+                300, do_scroll_apply
+            )
 
         scroll_controller = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL
@@ -376,10 +480,30 @@ class Backlight(c.BaseModule):
 
         widget.set_visible(True)
 
-        # Bar label: percentage for one source, icon-only for many
-        if len(sources) == 1:
-            s = sources[0]
-            pct = round((s['brightness'] / s['max_brightness']) * 100)
+        # Prefer the source for this bar's monitor; fall back to
+        # single-source pct or icon-only for multiple sources.
+        connector = getattr(widget, '_connector', None)
+        matched = self._find_source_for_connector(sources, connector)
+        label_source = matched if matched else (
+            sources[0] if len(sources) == 1 else None
+        )
+        if label_source:
+            key = label_source['key']
+            pending = getattr(widget, '_scroll_pending', {})
+            if key in pending:
+                # Clear pending once polled state has caught up
+                if label_source['brightness'] == pending[key]:
+                    pending.pop(key, None)
+                else:
+                    # Write still in flight; keep showing the pending value
+                    pct = round((pending[key] / label_source['max_brightness'])
+                                * 100)
+                    widget.set_label(f'{pct}%')
+                    return
+            pct = round(
+                (label_source['brightness']
+                 / label_source['max_brightness']) * 100
+            )
             widget.set_label(f'{pct}%')
         else:
             widget.set_label('')
