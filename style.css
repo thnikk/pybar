@@ -451,6 +451,51 @@ separator { background: @gray; padding: 0; margin: 0; }
 	min-width: 20px;
 }
 
+/* volume slider rows */
+.volume-row {
+	background-color: transparent;
+	border-radius: 10px;
+	padding: 0;
+}
+
+.volume-progress trough {
+	background-color: #2b303b;
+	border: none;
+	min-height: 50px;
+	border-radius: 10px;
+	border: 1px solid rgba(255,255,255,0.1);
+	transition: background-color 0.15s;
+}
+
+.volume-progress progress {
+	background-color: alpha(@blue, 0.2);
+	border-radius: 10px 0 0 10px;
+	border: none;
+	min-height: 50px;
+}
+
+.volume-progress.muted progress {
+	background-color: alpha(@red, 0.15);
+}
+
+.volume-row-content {
+	padding-left: 10px;
+}
+
+.title-label {
+	font-size: 16px;
+}
+
+.subtitle-label {
+	font-size: 12px;
+	opacity: 0.6;
+}
+
+.default-icon {
+	opacity: 0.6;
+	padding-right: 10px;
+}
+
 .hour-temp { font-size: 24px; }
 
 .today-weather {

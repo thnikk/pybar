@@ -29,6 +29,7 @@ class Volume(c.BaseModule):
             blacklist = {}
         try:
             default_sink = pulse.sink_default_get()
+            default_source = pulse.source_default_get()
             sinks = pulse.sink_list()
             sources = pulse.source_list()
             sink_inputs = pulse.sink_input_list()
@@ -74,6 +75,8 @@ class Volume(c.BaseModule):
             return {
                 'default_sink': serialize_device(default_sink)
                 if default_sink else None,
+                'default_source': serialize_device(default_source)
+                if default_source else None,
                 'outputs': [serialize_device(s) for s in sinks],
                 'inputs': [serialize_device(s) for s in sources],
                 'programs': [serialize_device(s) for s in sink_inputs]
@@ -198,7 +201,7 @@ class Volume(c.BaseModule):
                            if s.index == index), None)
 
             if dev:
-                pulse.mute(dev, not state)
+                pulse.mute(dev, state)
         return True
 
     def set_dev_volume(self, section, index, value):
@@ -230,76 +233,62 @@ class Volume(c.BaseModule):
                 if source:
                     pulse.default_set(source)
 
-    def build_device_row(self, section, device):
-        """ Build a row for a single pulse device """
-        row = c.box('v', spacing=5, style='inner-box')
-        controls = {}
+    def build_device_row(self, section, device, default_name=None):
+        """Build a VolumeSliderRow for a single pulse device."""
+        title = device.get('proplist', {}).get(
+            'application.process.binary',
+            device.get('description', 'Unknown'))
+        subtitle = device.get('name')
+        index = device['index']
+        volume = round(device.get('volume', 0) * 100)
+        is_muted = bool(device.get('mute', False))
+        is_default = (
+            default_name is not None
+            and device.get('name') == default_name
+        )
 
-        top = c.box('h', spacing=10)
+        # Only wire set_default_cb for sinks and sources, not programs
+        if section in ('Outputs', 'Inputs'):
+            def set_default_cb(idx, _sec=section, _name=device['name']):
+                self.set_default(_sec, _name)
+        else:
+            set_default_cb = None
 
-        # Mute switch
-        mute_switch = Gtk.Switch()
-        mute_switch.set_active(not device.get('mute', False))
-        mute_switch.set_valign(Gtk.Align.CENTER)
-        handler_id = mute_switch.connect(
-            'state-set', lambda _s, state: self.toggle_mute(
-                section, device['index'], state))
-        top.append(mute_switch)
-        controls['mute'] = mute_switch
-        controls['mute_handler'] = handler_id
-
-        # Label
-        label_text = device.get('proplist', {}).get(
-            'application.process.binary', device.get('description', 'Unknown'))
-        btn = c.button(label_text, ha='start', style='minimal', length=25)
-        if section != 'Programs':
-            btn.connect(
-                'clicked', lambda _b: self.set_default(
-                    section, device['name']))
-        btn.set_hexpand(True)
-        top.append(btn)
-
-        row.append(top)
-
-        # Volume slider - disable scroll to allow container to scroll
-        slider = c.slider(
-            round(device.get('volume', 0) * 100), scrollable=False)
-        handler_id = slider.connect(
-            'value-changed', lambda s: self.set_dev_volume(
-                section, device['index'], s.get_value()))
-        if device.get('mute'):
-            c.add_style(slider, 'muted')
-        row.append(slider)
-        controls['volume'] = slider
-        controls['volume_handler'] = handler_id
-
-        return row, controls
+        row = c.VolumeSliderRow(
+            title, subtitle, index, volume, is_muted,
+            lambda idx, vol: self.set_dev_volume(section, idx, vol * 100),
+            lambda idx, state: self.toggle_mute(section, idx, state),
+            is_default=is_default,
+            set_default_cb=set_default_cb,
+        )
+        return row
 
     def build_popover_content(self, widget, data):
         """ Build popover for volume """
-        if hasattr(widget, 'popover_widgets'):
-            widget.popover_widgets.clear()
         widget.popover_widgets = {'Outputs': {}, 'Inputs': {}, 'Programs': {}}
+        # Store devices_box refs so update_ui can add/remove rows in place
+        widget.popover_boxes = {'Outputs': None, 'Inputs': None,
+                                'Programs': None}
         main_box = c.box('v', spacing=20, style='small-widget')
         main_box.append(c.label('Volume', style='heading'))
 
         content_box = c.box('v', spacing=20)
 
+        default_sink_name = (
+            data.get('default_sink') or {}
+        ).get('name')
+        default_source_name = (
+            data.get('default_source') or {}
+        ).get('name')
+
         sections = [
-            ('Outputs', data.get('outputs', [])),
-            ('Inputs', data.get('inputs', [])),
-            ('Programs', data.get('programs', []))
+            ('Outputs', data.get('outputs', []), default_sink_name),
+            ('Inputs', data.get('inputs', []), default_source_name),
+            ('Programs', data.get('programs', []), None),
         ]
 
-        for name, devices in sections:
-            if not devices:
-                continue
-
-            section_box = c.box('v', spacing=10)
-            section_box.append(c.label(name, style='title', ha='start'))
-            devices_box = c.box('v')
-
-            # Filter monitors before iterating so separator logic is correct
+        for name, devices, default_name in sections:
+            # Filter monitors from hardware sections
             if name != 'Programs':
                 visible = [
                     d for d in devices
@@ -308,18 +297,24 @@ class Volume(c.BaseModule):
             else:
                 visible = devices
 
-            for i, device in enumerate(visible):
-                dev_row, controls = self.build_device_row(name, device)
-                widget.popover_widgets[name][device['index']] = controls
-                devices_box.append(dev_row)
-                if i != len(visible) - 1:
-                    devices_box.append(c.sep('h'))
+            if not visible:
+                continue
+
+            section_box = c.box('v', spacing=10)
+            section_box.append(c.label(name, style='title', ha='start'))
+            devices_box = c.box('v', spacing=10)
+            widget.popover_boxes[name] = devices_box
+
+            for device in visible:
+                row = self.build_device_row(name, device, default_name)
+                widget.popover_widgets[name][device['index']] = row
+                devices_box.append(row)
 
             large = len(visible) > 3
             vsgb = c.VScrollGradientBox(
                 devices_box, gradient_size=60,
+                bg_color="1c1f26",
                 max_height=250 if large else None)
-            c.add_style(vsgb, 'box')
             section_box.append(vsgb)
             content_box.append(section_box)
 
@@ -394,69 +389,74 @@ class Volume(c.BaseModule):
             if not found:
                 widget.set_icon('')
 
-        # Optimization: Don't update if data hasn't changed
-        compare_data = data.copy()
-        compare_data.pop('timestamp', None)
-
-        if (widget.get_popover() and
-                getattr(widget, 'last_popover_data', None) == compare_data):
+        # Build the popover on first open; never replace it afterwards
+        # to avoid dismissing an open popover
+        if not widget.get_popover() or not hasattr(widget, 'popover_widgets'):
+            widget.set_widget(self.build_popover_content(widget, data))
             return
 
+        # Skip further processing if nothing relevant changed
+        compare_data = data.copy()
+        compare_data.pop('timestamp', None)
+        if getattr(widget, 'last_popover_data', None) == compare_data:
+            return
         widget.last_popover_data = compare_data
 
-        # Check if we need to rebuild
-        needs_rebuild = False
-        if not widget.get_popover() or not hasattr(widget, 'popover_widgets'):
-            needs_rebuild = True
-        else:
-            # Check structure match
-            for section in ['Outputs', 'Inputs', 'Programs']:
-                current_indices = set(widget.popover_widgets[section].keys())
-                new_indices = set()
-                devices = data.get(section.lower(), [])
-                for d in devices:
-                    # Logic to skip monitors matched build logic
-                    if section != 'Programs' and 'Monitor of' in d.get(
-                            'description', ''):
-                        continue
-                    new_indices.add(d['index'])
+        default_sink_name = (data.get('default_sink') or {}).get('name')
+        default_source_name = (
+            data.get('default_source') or {}
+        ).get('name')
+        default_names = {
+            'Outputs': default_sink_name,
+            'Inputs': default_source_name,
+            'Programs': None,
+        }
 
-                if current_indices != new_indices:
-                    needs_rebuild = True
-                    break
+        for section in ('Outputs', 'Inputs', 'Programs'):
+            devices = data.get(section.lower(), [])
+            # Filter monitors consistently with build_popover_content
+            if section != 'Programs':
+                visible = [
+                    d for d in devices
+                    if 'Monitor of' not in d.get('description', '')
+                ]
+            else:
+                visible = devices
 
-        if needs_rebuild:
-            widget.set_widget(self.build_popover_content(widget, data))
-        else:
-            # Update in place
-            for section in ['Outputs', 'Inputs', 'Programs']:
-                devices = data.get(section.lower(), [])
-                for d in devices:
-                    idx = d['index']
-                    if idx in widget.popover_widgets[section]:
-                        ctrls = widget.popover_widgets[section][idx]
+            rows = widget.popover_widgets[section]
+            devices_box = widget.popover_boxes.get(section)
+            new_ids = {d['index'] for d in visible}
+            old_ids = set(rows.keys())
 
-                        # Update mute
-                        if ctrls['mute'].get_active() != (not d['mute']):
-                            ctrls['mute'].handler_block(ctrls['mute_handler'])
-                            ctrls['mute'].set_active(not d['mute'])
-                            ctrls['mute'].handler_unblock(
-                                ctrls['mute_handler'])
+            # Remove rows for devices that have disappeared
+            for idx in old_ids - new_ids:
+                if devices_box is not None:
+                    devices_box.remove(rows[idx])
+                del rows[idx]
 
-                        # Update volume
-                        new_vol = round(d['volume'] * 100)
-                        if abs(ctrls['volume'].get_value() - new_vol) > 1:
-                            ctrls['volume'].handler_block(
-                                ctrls['volume_handler'])
-                            ctrls['volume'].set_value(new_vol)
-                            ctrls['volume'].handler_unblock(
-                                ctrls['volume_handler'])
+            # Add rows for devices that have appeared
+            default_name = default_names[section]
+            for d in visible:
+                if d['index'] not in rows:
+                    row = self.build_device_row(section, d, default_name)
+                    rows[d['index']] = row
+                    if devices_box is not None:
+                        devices_box.append(row)
 
-                        # Update style for muted
-                        if d['mute']:
-                            c.add_style(ctrls['volume'], 'muted')
-                        else:
-                            c.del_style(ctrls['volume'], 'muted')
+            # Update existing rows in place
+            for d in visible:
+                idx = d['index']
+                if idx not in rows:
+                    continue
+                row = rows[idx]
+                new_vol = round(d['volume'] * 100)
+                if abs(row.adjustment.get_value() - new_vol) > 1:
+                    row.set_volume_silent(new_vol)
+                if row.is_muted != bool(d['mute']):
+                    row.set_mute_silent(bool(d['mute']))
+                if section in ('Outputs', 'Inputs'):
+                    row.set_is_default(
+                        d.get('name') == default_names[section])
 
 
 module_map = {
