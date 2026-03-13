@@ -42,11 +42,19 @@ class Backlight(c.BaseModule):
             ),
             'min': 1,
             'max': 20
+        },
+        'show_percent': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Show Percentage',
+            'description': (
+                'Show brightness percentage on the module label '
+                'and enable scroll to adjust'
+            )
         }
     }
 
-    # FA solid sun (f185)
-    ICON = '\uf185'
+    ICON = '\uf0eb'
 
     # ------------------------------------------------------------------
     # sysfs helpers
@@ -242,15 +250,17 @@ class Backlight(c.BaseModule):
                 pct_label.set_text(f'{pct}%')
 
             # Update the bar module label if this source matches the bar
-            matched = self._find_source_for_connector(
-                [source], connector
-            )
-            if matched or len(
-                getattr(widget, 'source_rows', {})
-            ) == 1:
-                pending = getattr(widget, '_scroll_pending', {})
-                if key not in pending:
-                    widget.set_label(f'{pct}%')
+            # and percentage display is enabled
+            if self.config.get('show_percent', True):
+                matched = self._find_source_for_connector(
+                    [source], connector
+                )
+                if matched or len(
+                    getattr(widget, 'source_rows', {})
+                ) == 1:
+                    pending = getattr(widget, '_scroll_pending', {})
+                    if key not in pending:
+                        widget.set_label(f'{pct}%')
 
             def do_apply():
                 widget._debounce.pop(key, None)
@@ -275,7 +285,6 @@ class Backlight(c.BaseModule):
         outer = c.box('h', style='box', spacing=10)
         c.add_style(outer, 'inner-box-min')
         outer.set_hexpand(True)
-        outer.append(c.label(self.ICON))
 
         sl = c.slider(
             source['brightness'], 0, source['max_brightness']
@@ -383,6 +392,7 @@ class Backlight(c.BaseModule):
         m.set_position(bar.position)
         m.set_icon(self.ICON)
         m.set_label('...')
+        m.text.set_width_chars(5)
         m.set_visible(True)
 
         # Store the connector name for this bar's monitor so scroll and
@@ -436,9 +446,10 @@ class Backlight(c.BaseModule):
             new_val = current + (-delta if dy > 0 else delta)
             new_val = max(0, min(new_val, max_b))
             widget._scroll_pending[key] = new_val
-            # Update label immediately
-            pct = round((new_val / max_b) * 100)
-            widget.set_label(f'{pct}%')
+            # Update label immediately (only if percent display is enabled)
+            if self.config.get('show_percent', True):
+                pct = round((new_val / max_b) * 100)
+                widget.set_label(f'{pct}%')
             # Cancel any pending write and reschedule
             handle = widget._scroll_debounce.get(key)
             if handle is not None:
@@ -457,11 +468,12 @@ class Backlight(c.BaseModule):
                 300, do_scroll_apply
             )
 
-        scroll_controller = Gtk.EventControllerScroll.new(
-            Gtk.EventControllerScrollFlags.VERTICAL
-        )
-        scroll_controller.connect('scroll', scroll_action)
-        m.add_controller(scroll_controller)
+        if self.config.get('show_percent', True):
+            scroll_controller = Gtk.EventControllerScroll.new(
+                Gtk.EventControllerScrollFlags.VERTICAL
+            )
+            scroll_controller.connect('scroll', scroll_action)
+            m.add_controller(scroll_controller)
 
         return m
 
@@ -487,7 +499,7 @@ class Backlight(c.BaseModule):
         label_source = matched if matched else (
             sources[0] if len(sources) == 1 else None
         )
-        if label_source:
+        if label_source and self.config.get('show_percent', True):
             key = label_source['key']
             pending = getattr(widget, '_scroll_pending', {})
             if key in pending:
@@ -496,8 +508,9 @@ class Backlight(c.BaseModule):
                     pending.pop(key, None)
                 else:
                     # Write still in flight; keep showing the pending value
-                    pct = round((pending[key] / label_source['max_brightness'])
-                                * 100)
+                    pct = round(
+                        (pending[key] / label_source['max_brightness']) * 100
+                    )
                     widget.set_label(f'{pct}%')
                     return
             pct = round(
