@@ -118,6 +118,7 @@ button.restart-btn.reloading {
 from settings.tabs.general import GeneralTab
 from settings.tabs.modules import ModulesTab
 from settings.tabs.appearance import AppearanceTab
+from settings.tabs.about import AboutTab
 
 
 class SettingsWindow(Adw.ApplicationWindow):
@@ -231,6 +232,24 @@ class SettingsWindow(Adw.ApplicationWindow):
         view_stack.add_titled_with_icon(
             appearance_page, 'appearance', 'Appearance',
             'preferences-color-symbolic'
+        )
+
+        about_page = Gtk.ScrolledWindow()
+        about_page.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        about_page.set_focusable(True)
+
+        about_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        about_box.set_margin_top(24)
+        about_box.set_margin_bottom(24)
+        about_box.set_margin_start(24)
+        about_box.set_margin_end(24)
+        about_box.append(AboutTab())
+        about_page.set_child(about_box)
+        view_stack.add_titled_with_icon(
+            about_page, 'about', 'About',
+            'help-about-symbolic'
         )
 
         view_switcher = Adw.ViewSwitcher()
