@@ -105,26 +105,35 @@ class Display:
     def _generate_dynamic_css(self):
         """Generate CSS from config values"""
         css = []
-        
+
         bar_height = self.config.get('bar-height')
         font_size = self.config.get('font-size')
         floating_mode = self.config.get('floating-mode', False)
         corner_radius = self.config.get('corner-radius', 0)
-        
+        bar_opacity = self.config.get('bar-opacity')
+        popover_opacity = self.config.get('popover-opacity')
+
         # Generate .bar CSS if any bar properties are set
         if (bar_height is not None or font_size is not None or
-                floating_mode or corner_radius > 0):
+                floating_mode or corner_radius > 0 or
+                bar_opacity is not None):
             css.append(".bar {")
             if bar_height is not None:
                 css.append(f"    min-height: {bar_height}px;")
             if font_size is not None:
                 css.append(f"    font-size: {font_size}px;")
-            
+            if bar_opacity is not None:
+                css.append(f"    opacity: {bar_opacity};")
+
             # Apply full border when floating mode is enabled
             if floating_mode:
-                css.append("    border: 1px solid rgba(255, 255, 255, 0.1);")
+                css.append(
+                    "    border: 1px solid rgba(255, 255, 255, 0.1);"
+                )
                 if corner_radius > 0:
-                    css.append(f"    border-radius: {corner_radius}px;")
+                    css.append(
+                        f"    border-radius: {corner_radius}px;"
+                    )
                 else:
                     css.append("    border-radius: 0px;")
             else:
@@ -134,9 +143,15 @@ class Display:
                     "    border-top: 1px solid rgba(255, 255, 255, 0.1);"
                 )
                 css.append("    border-radius: 0px;")
-            
+
             css.append("}")
-            
+
+        # Generate popover contents CSS if opacity is set
+        if popover_opacity is not None:
+            css.append("popover contents {")
+            css.append(f"    opacity: {popover_opacity};")
+            css.append("}")
+
         return "\n".join(css) if css else None
 
     def _add_css_provider(self, data, from_string=False):

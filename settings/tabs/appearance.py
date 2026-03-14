@@ -66,6 +66,40 @@ class AppearanceTab(Gtk.Box):
             else:
                 self.font_size_editor = editor
 
+        # Opacity
+        opacity_group = Adw.PreferencesGroup()
+        opacity_group.set_title('Opacity')
+        self.append(opacity_group)
+
+        self._opacity_editors = {}
+        for key in ['bar-opacity', 'popover-opacity']:
+            schema_field = GLOBAL_SCHEMA[key]
+            value = config.get(key, schema_field['default'])
+
+            row = Adw.ActionRow()
+            row.set_title(schema_field.get('label', key))
+            row.set_subtitle(schema_field.get('description', ''))
+
+            editor = create_editor(
+                key, schema_field, value, self._on_field_change,
+                show_label=False
+            )
+            editor.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(editor)
+
+            reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+            reset_btn.set_valign(Gtk.Align.CENTER)
+            reset_btn.add_css_class('flat')
+            reset_btn.set_tooltip_text('Reset to default')
+            reset_btn.connect(
+                'clicked', lambda _, k=key, e=editor, s=schema_field:
+                e.set_value(s['default'])
+            )
+            row.add_suffix(reset_btn)
+
+            opacity_group.add(row)
+            self._opacity_editors[key] = editor
+
         style_schema = GLOBAL_SCHEMA['style']
         self.style_editor = create_editor(
             'style', style_schema,
@@ -131,12 +165,19 @@ class AppearanceTab(Gtk.Box):
             config.get('bar-height', GLOBAL_SCHEMA['bar-height']['default']))
         self.font_size_editor.set_value(
             config.get('font-size', GLOBAL_SCHEMA['font-size']['default']))
+        for key, editor in self._opacity_editors.items():
+            editor.set_value(
+                config.get(key, GLOBAL_SCHEMA[key]['default'])
+            )
 
     def get_values(self):
         """Get current values"""
-        return {
+        values = {
             'style': self.style_editor.get_value(),
             'outputs': self.outputs_editor.get_value(),
             'bar-height': self.bar_height_editor.get_value(),
             'font-size': self.font_size_editor.get_value()
         }
+        for key, editor in self._opacity_editors.items():
+            values[key] = editor.get_value()
+        return values

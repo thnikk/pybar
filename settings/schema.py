@@ -128,6 +128,24 @@ GLOBAL_SCHEMA = {
         'description': 'List of monitor outputs to display on',
         'unique': True,
         'sortable': False
+    },
+    'bar-opacity': {
+        'type': FieldType.FLOAT,
+        'default': 0.9,
+        'label': 'Bar Opacity',
+        'description': 'Opacity of the bar',
+        'min': 0.0,
+        'max': 1.0,
+        'step': 0.05
+    },
+    'popover-opacity': {
+        'type': FieldType.FLOAT,
+        'default': 0.9,
+        'label': 'Popover Opacity',
+        'description': 'Opacity of popover contents',
+        'min': 0.0,
+        'max': 1.0,
+        'step': 0.05
     }
 }
 
