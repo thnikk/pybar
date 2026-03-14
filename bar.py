@@ -16,6 +16,7 @@ import time
 import common as c
 import module
 import ipc
+import version
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
 from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib  # noqa
@@ -650,6 +651,12 @@ class Bar:
             inspector_btn.connect('clicked', self._open_inspector, popover)
             menu_box.append(inspector_btn)
 
+        # About button
+        about_btn = c.icon_button('\uf05a', 'About')
+        about_btn.get_style_context().add_class('flat')
+        about_btn.connect('clicked', self._open_about, popover)
+        menu_box.append(about_btn)
+
         popover.set_child(menu_box)
 
         # Position the popover at click location
@@ -686,6 +693,43 @@ class Bar:
         """ Open GTK Inspector """
         popover.popdown()
         Gtk.Window.set_interactive_debugging(True)
+
+    def _open_about(self, btn, popover):
+        """ Open about window """
+        gi.require_version('Adw', '1')
+        from gi.repository import Adw
+        popover.popdown()
+
+        # Register the assets directory so the icon theme can find the icon
+        icon_dir = os.path.dirname(
+            c.get_resource_path(os.path.join('assets', 'pybar-icon.svg'))
+        )
+        icon_theme = Gtk.IconTheme.get_for_display(
+            Gdk.Display.get_default()
+        )
+        icon_theme.add_search_path(icon_dir)
+
+        about = Adw.AboutWindow()
+        about.set_application_name('pybar')
+        about.set_version(version.get_version())
+        about.set_developer_name('thnikk')
+        about.set_license_type(Gtk.License.MIT_X11)
+        about.set_website('https://github.com/thnikk/pybar')
+        about.set_issue_url('https://github.com/thnikk/pybar/issues')
+        # Icon file must be named <icon-name>.svg in the search path
+        about.set_application_icon('pybar-icon')
+        about.set_transient_for(self.window)
+        about.set_modal(False)
+
+        # Override the display-level window { background: none; } rule
+        override_css = Gtk.CssProvider()
+        override_css.load_from_data(b"window { background: #1c1f26; }")
+        about.get_style_context().add_provider(
+            override_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_USER + 1
+        )
+
+        about.present()
 
     def modules(self, modules):
         """ Add modules to bar """

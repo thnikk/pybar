@@ -48,6 +48,14 @@ jobs:
           source venv/bin/activate
           pip install pyinstaller
 
+      - name: Write version file
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "${{ github.event.inputs.tag_name }}" > VERSION
+          else
+            echo "${GITHUB_REF#refs/tags/}" > VERSION
+          fi
+
       - name: Build binary
         run: |
           source venv/bin/activate
@@ -91,6 +99,14 @@ jobs:
         run: |
           . venv/bin/activate
           pip install pyinstaller
+
+      - name: Write version file
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "${{ github.event.inputs.tag_name }}" > VERSION
+          else
+            echo "${GITHUB_REF#refs/tags/}" > VERSION
+          fi
 
       - name: Build binary
         run: |

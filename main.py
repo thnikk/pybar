@@ -62,6 +62,10 @@ gi.require_version('Gtk4LayerShell', '1.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Gio, Adw, GLib  # noqa
 
+# Initialise Adwaita so Adw widgets (e.g. AboutWindow) load their
+# bundled resources and icons correctly without requiring Adw.Application.
+Adw.init()
+
 
 class StreamToLogger:
     """ Redirect a stream (stdout/stderr) to a logger """

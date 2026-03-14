@@ -1,5 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 from PyInstaller.utils.hooks import collect_submodules
+
+# Include VERSION file only if it exists (written by CI before build)
+extra_datas = []
+if os.path.exists('VERSION'):
+    extra_datas.append(('VERSION', '.'))
 
 
 a = Analysis(
@@ -11,7 +17,7 @@ a = Analysis(
         ('modules', 'modules'),
         ('fonts', 'fonts'),
         ('assets/pybar-icon.svg', 'assets'),
-    ],
+    ] + extra_datas,
     hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
         'requests',
         'hid',
