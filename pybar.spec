@@ -13,6 +13,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        ('LICENSE', '.'),
         ('style.css', '.'),
         ('modules', 'modules'),
         ('fonts', 'fonts'),
