@@ -310,11 +310,10 @@ class Volume(c.BaseModule):
                 widget.popover_widgets[name][device['index']] = row
                 devices_box.append(row)
 
-            large = len(visible) > 3
             vsgb = c.VScrollGradientBox(
                 devices_box, gradient_size=60,
                 bg_color="1c1f26",
-                max_height=250 if large else None)
+                max_height=180)
             section_box.append(vsgb)
             content_box.append(section_box)
 
