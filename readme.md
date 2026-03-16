@@ -4,15 +4,19 @@
 </p>
 
 <p align="center">
-    A statusbar for Sway with widgets.
+    A statusbar for Sway and Hyprland with widgets.
 </p>
 
-![Screenshot](assets/screenshot-2.png)
+<p align="center">
+    <img src="assets/screenshot-3.png" alt="Screenshot">
+</p>
 
 ### Installation
 Pybar is released as an executable with pyinstaller. If you're on Arch or Ubuntu, you can just download the latest release for your distribution.
 
 [Releases](https://github.com/thnikk/pybar/releases)
+
+Arch users can get it from the AUR: [pybar-bin](https://aur.archlinux.org/packages/pybar-bin)
 
 ### Manual Installation and Development
 1. Clone the repo
