@@ -2,17 +2,21 @@
 Description: GTK helper functions and widget factories
 Author: thnikk
 """
+
 import inspect
 import logging
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Pango', '1.0')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Pango", "1.0")
 from gi.repository import Gtk, Pango, GLib  # noqa
 
 # Alignment mapping for GTK
 align = {
-    "fill": Gtk.Align.FILL, "start": Gtk.Align.START,
-    "end": Gtk.Align.END, "center": Gtk.Align.CENTER
+    "fill": Gtk.Align.FILL,
+    "start": Gtk.Align.START,
+    "end": Gtk.Align.END,
+    "center": Gtk.Align.CENTER,
 }
 align_map = align
 
@@ -20,15 +24,19 @@ align_map = align
 def print_debug(msg, name=None, color=None) -> None:
     """Print debug message using logging."""
     if not name:
+        # Fast path: check if any debug logging is enabled at all
+        # to avoid the very expensive inspect.stack() call
+        if not logging.root.isEnabledFor(logging.DEBUG):
+            return
         frame = inspect.stack()[1]
-        name = frame[0].f_code.co_filename.split('/')[-1].split('.')[0]
+        name = frame[0].f_code.co_filename.split("/")[-1].split(".")[0]
     logger = logging.getLogger(name)
     logger.debug(msg)
 
 
 def add_style(widget, style):
     """Add style class(es) to a widget."""
-    if hasattr(widget, 'add_style'):
+    if hasattr(widget, "add_style"):
         widget.add_style(style)
         return
     if isinstance(style, list):
@@ -40,7 +48,7 @@ def add_style(widget, style):
 
 def del_style(widget, style):
     """Remove style class(es) from a widget."""
-    if hasattr(widget, 'del_style'):
+    if hasattr(widget, "del_style"):
         widget.del_style(style)
         return
     if isinstance(style, list):
@@ -53,9 +61,10 @@ def del_style(widget, style):
 def box(orientation, spacing=0, style=None):
     """Create a Gtk.Box."""
     obox = Gtk.Box(
-        orientation=Gtk.Orientation.VERTICAL if orientation == 'v'
+        orientation=Gtk.Orientation.VERTICAL
+        if orientation == "v"
         else Gtk.Orientation.HORIZONTAL,
-        spacing=spacing
+        spacing=spacing,
     )
     if style:
         obox.get_style_context().add_class(style)
@@ -66,7 +75,8 @@ def sep(orientation, style=None):
     """Create a Gtk.Separator."""
     separator = Gtk.Separator(
         orientation=Gtk.Orientation.VERTICAL
-        if orientation == 'v' else Gtk.Orientation.HORIZONTAL
+        if orientation == "v"
+        else Gtk.Orientation.HORIZONTAL
     )
     if style:
         separator.get_style_context().add_class(style)
@@ -111,7 +121,7 @@ def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     window.set_propagate_natural_height(True)
     window.set_policy(
         Gtk.PolicyType.AUTOMATIC if width else Gtk.PolicyType.NEVER,
-        Gtk.PolicyType.AUTOMATIC if height else Gtk.PolicyType.NEVER
+        Gtk.PolicyType.AUTOMATIC if height else Gtk.PolicyType.NEVER,
     )
     if style:
         window.get_style_context().add_class(style)
@@ -121,10 +131,10 @@ def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
 def _suppress_overshoot(scrolled_window):
     """Remove the built-in overshoot highlight from a ScrolledWindow."""
     provider = Gtk.CssProvider()
-    provider.load_from_data(
-        b"overshoot { background: none; box-shadow: none; }")
+    provider.load_from_data(b"overshoot { background: none; box-shadow: none; }")
     scrolled_window.get_style_context().add_provider(
-        provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
 
 
 def _parse_color(color):
@@ -133,8 +143,8 @@ def _parse_color(color):
     Accepts: float tuple, byte tuple (0-255), or hex string.
     """
     if isinstance(color, str):
-        h = color.lstrip('#')
-        return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+        h = color.lstrip("#")
+        return tuple(int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
     if any(v > 1.0 for v in color):
         return tuple(v / 255.0 for v in color)
     return tuple(color)

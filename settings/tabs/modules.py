@@ -3,9 +3,11 @@
 Description: Modules settings tab with libadwaita styling
 Author: thnikk
 """
+
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 from gi.repository import Gtk, Gdk, GObject, Graphene, Adw
 
 from settings.widgets.editors import create_editor
@@ -23,42 +25,40 @@ class ModuleChip(Gtk.Box):
         self.on_select = on_select
         self.on_remove = on_remove
 
-        self.add_css_class('module-chip')
+        self.add_css_class("module-chip")
         # self.set_margin_top(4)
         # self.set_margin_bottom(4)
         # self.set_margin_start(4)
         # self.set_margin_end(4)
 
-        module_config = (
-            config.get('modules', {}).get(name, {}) if config else {}
-        )
-        module_type = module_config.get('type', name)
+        module_config = config.get("modules", {}).get(name, {}) if config else {}
+        module_type = module_config.get("type", name)
 
         if module_type != name:
             self.set_tooltip_text(f"Type: {module_type}")
 
         label = Gtk.Label(label=name)
-        label.add_css_class('caption')
+        label.add_css_class("caption")
         self.append(label)
 
         remove_btn = Gtk.Button()
-        remove_btn.set_icon_name('window-close-symbolic')
-        remove_btn.add_css_class('flat')
-        remove_btn.add_css_class('circular')
+        remove_btn.set_icon_name("window-close-symbolic")
+        remove_btn.add_css_class("flat")
+        remove_btn.add_css_class("circular")
         remove_btn.set_valign(Gtk.Align.CENTER)
-        remove_btn.connect('clicked', self._on_remove_clicked)
+        remove_btn.connect("clicked", self._on_remove_clicked)
         self.append(remove_btn)
 
         click = Gtk.GestureClick()
         click.set_button(1)
-        click.connect('released', self._on_clicked)
+        click.connect("released", self._on_clicked)
         self.add_controller(click)
 
         drag_source = Gtk.DragSource()
         drag_source.set_actions(Gdk.DragAction.MOVE)
-        drag_source.connect('prepare', self._on_drag_prepare)
-        drag_source.connect('drag-begin', self._on_drag_begin)
-        drag_source.connect('drag-end', self._on_drag_end)
+        drag_source.connect("prepare", self._on_drag_prepare)
+        drag_source.connect("drag-begin", self._on_drag_begin)
+        drag_source.connect("drag-end", self._on_drag_end)
         self.add_controller(drag_source)
 
     def _on_clicked(self, gesture, n_press, x, y):
@@ -82,7 +82,7 @@ class ModuleChip(Gtk.Box):
         box.set_margin_end(10)
         label = Gtk.Label(label=self.name)
         box.append(label)
-        box.add_css_class('card')
+        box.add_css_class("card")
         icon.set_child(box)
         self.set_opacity(0.3)
 
@@ -96,15 +96,14 @@ class DropIndicator(Gtk.Box):
     def __init__(self):
         super().__init__()
         self.set_size_request(3, -1)
-        self.add_css_class('drop-indicator')
+        self.add_css_class("drop-indicator")
 
 
 class SectionRow(Gtk.Box):
     """Box for a bar section with drag-drop support"""
 
     def __init__(
-        self, section_name, modules, on_select, on_change,
-        all_sections, config=None
+        self, section_name, modules, on_select, on_change, all_sections, config=None
     ):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.section_name = section_name
@@ -118,21 +117,21 @@ class SectionRow(Gtk.Box):
         self.set_margin_top(6)
         self.set_margin_bottom(6)
 
-        display_name = section_name.replace('modules-', '').title()
-        
+        display_name = section_name.replace("modules-", "").title()
+
         label = Gtk.Label(label=display_name)
         label.set_halign(Gtk.Align.START)
-        label.add_css_class('heading')
+        label.add_css_class("heading")
         self.append(label)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scroll.set_hexpand(True)
         scroll.set_min_content_height(48)
-        scroll.add_css_class('section-scroll')
+        scroll.add_css_class("section-scroll")
 
         frame = Gtk.Frame()
-        frame.add_css_class('section-frame')
+        frame.add_css_class("section-frame")
         frame.set_hexpand(True)
 
         self.chips_box = Gtk.FlowBox()
@@ -148,8 +147,8 @@ class SectionRow(Gtk.Box):
         self.chips_box.set_margin_start(4)
         self.chips_box.set_margin_end(4)
 
-        self.placeholder = Gtk.Label(label='Drop modules here')
-        self.placeholder.add_css_class('dim-label')
+        self.placeholder = Gtk.Label(label="Drop modules here")
+        self.placeholder.add_css_class("dim-label")
         self.placeholder.set_valign(Gtk.Align.CENTER)
         self.placeholder.set_margin_start(8)
         self.placeholder.set_margin_end(8)
@@ -167,13 +166,11 @@ class SectionRow(Gtk.Box):
 
         self._update_placeholder()
 
-        drop_target = Gtk.DropTarget.new(
-            GObject.TYPE_STRING, Gdk.DragAction.MOVE
-        )
-        drop_target.connect('drop', self._on_drop)
-        drop_target.connect('enter', self._on_enter)
-        drop_target.connect('motion', self._on_motion)
-        drop_target.connect('leave', self._on_leave)
+        drop_target = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.MOVE)
+        drop_target.connect("drop", self._on_drop)
+        drop_target.connect("enter", self._on_enter)
+        drop_target.connect("motion", self._on_motion)
+        drop_target.connect("leave", self._on_leave)
         scroll.add_controller(drop_target)
 
         self._frame = frame
@@ -181,9 +178,7 @@ class SectionRow(Gtk.Box):
         self._scroll = scroll
 
     def _add_chip(self, name, position=-1):
-        chip = ModuleChip(
-            name, self.on_select, self._on_remove, self, self.config
-        )
+        chip = ModuleChip(name, self.on_select, self._on_remove, self, self.config)
         if position < 0 or position >= len(self._get_chips()):
             self.chips_box.append(chip)
         else:
@@ -208,9 +203,7 @@ class SectionRow(Gtk.Box):
                 chip_child = child.get_child()
                 if isinstance(chip_child, ModuleChip):
                     chips.append(chip_child)
-                elif exclude_indicator and isinstance(
-                    chip_child, DropIndicator
-                ):
+                elif exclude_indicator and isinstance(chip_child, DropIndicator):
                     pass
             child = child.get_next_sibling()
         return chips
@@ -224,77 +217,77 @@ class SectionRow(Gtk.Box):
         # First, find which row the cursor is on
         cursor_row_chips = []
         row_tolerance = 10  # pixels
-        
+
         for i, chip in enumerate(chips):
             child = chip.get_parent()
             if not child:
                 continue
-            
+
             success, bounds = child.compute_bounds(self.chips_box)
             if not success:
                 continue
-            
+
             chip_y = bounds.get_y()
             chip_height = bounds.get_height()
-            
+
             # Check if cursor y is within this chip's row
             if chip_y - row_tolerance <= y <= chip_y + chip_height + row_tolerance:
                 cursor_row_chips.append((i, chip, bounds))
-        
+
         # If no chips in cursor row, find closest row
         if not cursor_row_chips:
-            min_row_distance = float('inf')
+            min_row_distance = float("inf")
             target_y = None
-            
+
             for chip in chips:
                 child = chip.get_parent()
                 if not child:
                     continue
-                
+
                 success, bounds = child.compute_bounds(self.chips_box)
                 if not success:
                     continue
-                
+
                 chip_y = bounds.get_y()
                 chip_height = bounds.get_height()
                 chip_center_y = chip_y + chip_height / 2
-                
+
                 row_distance = abs(y - chip_center_y)
                 if row_distance < min_row_distance:
                     min_row_distance = row_distance
                     target_y = chip_y
-            
+
             # Get all chips at the target y position
             for i, chip in enumerate(chips):
                 child = chip.get_parent()
                 if not child:
                     continue
-                
+
                 success, bounds = child.compute_bounds(self.chips_box)
                 if not success:
                     continue
-                
+
                 if abs(bounds.get_y() - target_y) < row_tolerance:
                     cursor_row_chips.append((i, chip, bounds))
-        
+
         if not cursor_row_chips:
             return len(chips)
-        
+
         # Now find the best position within the row
-        min_distance = float('inf')
+        min_distance = float("inf")
         best_index = cursor_row_chips[-1][0] + 1  # Default to end of row
-        
+
         for i, chip, bounds in cursor_row_chips:
             chip_center_x = bounds.get_x() + bounds.get_width() / 2
             distance = abs(x - chip_center_x)
-            
+
             if distance < min_distance:
                 min_distance = distance
                 if x < chip_center_x:
                     best_index = i
                 else:
                     best_index = i + 1
-        
+
         return best_index
 
     def _auto_scroll(self, x):
@@ -310,7 +303,7 @@ class SectionRow(Gtk.Box):
             adj.set_value(adj.get_value() + scroll_speed)
 
     def _on_enter(self, target, x, y):
-        self._frame.add_css_class('drop-target')
+        self._frame.add_css_class("drop-target")
         return Gdk.DragAction.MOVE
 
     def _on_motion(self, target, x, y):
@@ -322,7 +315,7 @@ class SectionRow(Gtk.Box):
         return Gdk.DragAction.MOVE
 
     def _on_leave(self, target):
-        self._frame.remove_css_class('drop-target')
+        self._frame.remove_css_class("drop-target")
         self._remove_drop_indicator()
         self._drop_index = -1
 
@@ -338,14 +331,14 @@ class SectionRow(Gtk.Box):
         # Create drop indicator as overlay if it doesn't exist
         if not self._drop_indicator:
             self._drop_indicator = Gtk.Box()
-            self._drop_indicator.add_css_class('drop-indicator-overlay')
+            self._drop_indicator.add_css_class("drop-indicator-overlay")
             self._drop_indicator.set_size_request(4, -1)
             self._drop_indicator.set_halign(Gtk.Align.START)
             self._drop_indicator.set_valign(Gtk.Align.START)
             self._overlay.add_overlay(self._drop_indicator)
-        
+
         self._drop_indicator.set_visible(True)
-        
+
         # Calculate position based on drop index
         if self._drop_index >= len(chips):
             target_chip = chips[-1]
@@ -353,24 +346,24 @@ class SectionRow(Gtk.Box):
         else:
             target_chip = chips[self._drop_index]
             after_chip = False
-        
+
         target_child = target_chip.get_parent()
         if not target_child:
             return
-        
+
         # Get position of target chip relative to overlay
         success, bounds = target_child.compute_bounds(self._overlay)
         if not success:
             return
-        
+
         if after_chip:
             x = bounds.get_x() + bounds.get_width() + 2
         else:
             x = bounds.get_x() - 5
-        
+
         y = bounds.get_y()
         height = bounds.get_height()
-        
+
         self._drop_indicator.set_size_request(4, int(height))
         self._drop_indicator.set_margin_start(int(x))
         self._drop_indicator.set_margin_top(int(y))
@@ -382,18 +375,18 @@ class SectionRow(Gtk.Box):
 
     def _on_drop(self, target, value, x, y):
         drop_index = self._drop_index
-        self._frame.remove_css_class('drop-target')
+        self._frame.remove_css_class("drop-target")
         self._remove_drop_indicator()
         self._drop_index = -1
 
-        parts = value.split(':', 1)
+        parts = value.split(":", 1)
         if len(parts) != 2:
             module_name = value
             source_section = None
         else:
             source_section, module_name = parts
 
-        if source_section == 'available':
+        if source_section == "available":
             source_section = None
 
         current_index = -1
@@ -406,9 +399,7 @@ class SectionRow(Gtk.Box):
 
         if source_section and source_section != self.section_name:
             if source_section in self.all_sections:
-                self.all_sections[source_section].remove_module_by_name(
-                    module_name
-                )
+                self.all_sections[source_section].remove_module_by_name(module_name)
         elif source_section == self.section_name and current_index >= 0:
             self.remove_module_by_name(module_name, emit=False)
             if current_index < drop_index:
@@ -457,17 +448,13 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
 
     def __init__(self, on_add, sections, config=None):
         super().__init__()
-        self.set_title('Add Module')
+        self.set_title("Add Module")
         self.set_description(
-            'Select a module type and drag it to a section or click the + '
-            'button'
+            "Select a module type and drag it to a section or click the + button"
         )
         self.on_add = on_add
         self.sections = sections
         self.config = config
-
-        mod.discover_modules()
-        all_modules = sorted(mod._module_map.keys())
 
         # Create a horizontal box for the dropdown and button
         controls_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -480,25 +467,21 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
 
         # Create a box with dotted border to indicate draggability
         drag_indicator = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        drag_indicator.add_css_class('drag-indicator')
+        drag_indicator.add_css_class("drag-indicator")
         drag_indicator.set_hexpand(False)
 
         # Create dropdown
         dropdown = Gtk.DropDown()
         string_list = Gtk.StringList()
-        for name in all_modules:
+        for name in mod.get_available_module_names():
             string_list.append(name)
         dropdown.set_model(string_list)
         dropdown.set_size_request(200, -1)
 
         drag_source = Gtk.DragSource()
         drag_source.set_actions(Gdk.DragAction.MOVE)
-        drag_source.connect(
-            'prepare', lambda s, x, y: self._drag_prepare(dropdown)
-        )
-        drag_source.connect(
-            'drag-begin', lambda s, d: self._drag_begin(d, dropdown)
-        )
+        drag_source.connect("prepare", lambda s, x, y: self._drag_prepare(dropdown))
+        drag_source.connect("drag-begin", lambda s, d: self._drag_begin(d, dropdown))
         dropdown.add_controller(drag_source)
 
         drag_indicator.append(dropdown)
@@ -506,9 +489,9 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
 
         # Create add button
         add_btn = Gtk.Button()
-        add_btn.set_icon_name('list-add-symbolic')
-        add_btn.set_tooltip_text('Add module')
-        add_btn.connect('clicked', lambda b: self._on_add_clicked_btn(dropdown))
+        add_btn.set_icon_name("list-add-symbolic")
+        add_btn.set_tooltip_text("Add module")
+        add_btn.connect("clicked", lambda b: self._on_add_clicked_btn(dropdown))
         controls_box.append(add_btn)
 
         self.add(controls_box)
@@ -530,13 +513,13 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
 
         icon = Gtk.DragIcon.get_for_drag(drag)
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        box.add_css_class('module-chip')
+        box.add_css_class("module-chip")
         box.set_margin_top(4)
         box.set_margin_bottom(4)
         box.set_margin_start(4)
         box.set_margin_end(4)
         label = Gtk.Label(label=name)
-        label.add_css_class('caption')
+        label.add_css_class("caption")
         box.append(label)
         icon.set_child(box)
 
@@ -573,7 +556,7 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         content_box.append(name_row)
 
         error_label = Gtk.Label()
-        error_label.add_css_class('error')
+        error_label.add_css_class("error")
         error_label.set_visible(False)
         content_box.append(error_label)
 
@@ -586,7 +569,7 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
             section_map = {
                 "left": "modules-left",
                 "center": "modules-center",
-                "right": "modules-right"
+                "right": "modules-right",
             }
             section_name = section_map.get(response)
             if not section_name:
@@ -597,26 +580,26 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
             if not instance_name:
                 error_label.set_label("Name cannot be empty")
                 error_label.set_visible(True)
-                name_row.add_css_class('error')
+                name_row.add_css_class("error")
                 return
 
             if not self._is_name_globally_unique(instance_name):
                 error_label.set_label(f"'{instance_name}' already exists")
                 error_label.set_visible(True)
-                name_row.add_css_class('error')
+                name_row.add_css_class("error")
                 return
 
             if section_name in self.sections:
                 section = self.sections[section_name]
 
                 if instance_name != module_type and self.config is not None:
-                    modules_config = self.config.setdefault('modules', {})
-                    modules_config[instance_name] = {'type': module_type}
+                    modules_config = self.config.setdefault("modules", {})
+                    modules_config[instance_name] = {"type": module_type}
 
                 section._add_chip(instance_name)
                 section._emit_change()
 
-        dialog.connect('response', on_response)
+        dialog.connect("response", on_response)
         dialog.present()
 
     def _is_name_globally_unique(self, name):
@@ -632,8 +615,8 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
 
     def __init__(self):
         super().__init__()
-        self.set_title('Module Settings')
-        self.set_description('Select a module to configure')
+        self.set_title("Module Settings")
+        self.set_description("Select a module to configure")
         self.selected_module = None
         self.config = None
         self.on_change = None
@@ -641,16 +624,12 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         self._current_rows = []
 
         # Vertical box for settings with spacing
-        self._content_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=20
-        )
+        self._content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.add(self._content_box)
 
         # Initial placeholder
         placeholder_row = Adw.ActionRow()
-        placeholder_label = Gtk.Label(
-            label='Click a module to configure its settings'
-        )
+        placeholder_label = Gtk.Label(label="Click a module to configure its settings")
         placeholder_label.set_opacity(0.5)
         placeholder_label.set_vexpand(True)
         placeholder_label.set_valign(Gtk.Align.CENTER)
@@ -660,9 +639,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         self._content_box.append(placeholder_row)
         self._current_rows.append(placeholder_row)
 
-    def show_module_settings(
-        self, module_name, config, on_change, sections
-    ):
+    def show_module_settings(self, module_name, config, on_change, sections):
         """Show settings for a specific module"""
         self.selected_module = module_name
         self.config = config
@@ -674,18 +651,16 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
             self._content_box.remove(row)
         self._current_rows.clear()
 
-        module_config = config.get('modules', {}).get(module_name, {})
-        module_type = module_config.get('type', module_name)
+        module_config = config.get("modules", {}).get(module_name, {})
+        module_type = module_config.get("type", module_name)
 
-        mod.discover_modules()
-        module_class = mod._module_map.get(module_type) or \
-                       mod._alias_map.get(module_type)
+        module_class = mod.get_module_class(module_type)
 
         if not module_class:
             # Re-add placeholder for no settings
             placeholder_row = Adw.ActionRow()
             placeholder_label = Gtk.Label(
-                label=f'No settings available for {module_name}'
+                label=f"No settings available for {module_name}"
             )
             placeholder_label.set_opacity(0.5)
             placeholder_label.set_vexpand(True)
@@ -701,7 +676,8 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
 
         header_text = (
             f"{module_name} ({module_type})"
-            if module_type != module_name else module_name.title()
+            if module_type != module_name
+            else module_name.title()
         )
 
         name_row = Adw.EntryRow()
@@ -710,9 +686,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         name_row.add_suffix(
             self._create_apply_button(module_name, module_type, name_row)
         )
-        name_row.connect(
-            'changed', lambda r: self._on_name_changed(r, module_name)
-        )
+        name_row.connect("changed", lambda r: self._on_name_changed(r, module_name))
         self._content_box.append(name_row)
         self._current_rows.append(name_row)
         self._name_row = name_row
@@ -720,12 +694,12 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
 
         if schema:
             for key, schema_field in schema.items():
-                value = module_config.get(key, schema_field.get('default'))
+                value = module_config.get(key, schema_field.get("default"))
                 editor = create_editor(
-                    key, schema_field, value,
-                    lambda k, v, m=module_name: self._on_module_field_change(
-                        m, k, v
-                    )
+                    key,
+                    schema_field,
+                    value,
+                    lambda k, v, m=module_name: self._on_module_field_change(m, k, v),
                 )
                 self._content_box.append(editor)
                 self._current_rows.append(editor)
@@ -739,12 +713,11 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
     def _create_apply_button(self, module_name, module_type, entry_row):
         """Create apply button for name changes"""
         btn = Gtk.Button(label="Apply")
-        btn.add_css_class('suggested-action')
+        btn.add_css_class("suggested-action")
         btn.set_sensitive(False)
         btn.set_valign(Gtk.Align.CENTER)
         btn.connect(
-            'clicked',
-            lambda b: self._apply_rename(module_name, module_type, entry_row)
+            "clicked", lambda b: self._apply_rename(module_name, module_type, entry_row)
         )
         return btn
 
@@ -754,20 +727,20 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
 
         if new_name == old_name:
             self._name_apply_btn.set_sensitive(False)
-            entry_row.remove_css_class('error')
+            entry_row.remove_css_class("error")
             return
 
         if not new_name:
-            entry_row.add_css_class('error')
+            entry_row.add_css_class("error")
             self._name_apply_btn.set_sensitive(False)
             return
 
         if not self._is_name_unique(new_name, exclude=old_name):
-            entry_row.add_css_class('error')
+            entry_row.add_css_class("error")
             self._name_apply_btn.set_sensitive(False)
             return
 
-        entry_row.remove_css_class('error')
+        entry_row.remove_css_class("error")
         self._name_apply_btn.set_sensitive(True)
 
     def _apply_rename(self, old_name, module_type, entry_row):
@@ -777,9 +750,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         if new_name == old_name:
             return
 
-        if not new_name or not self._is_name_unique(
-            new_name, exclude=old_name
-        ):
+        if not new_name or not self._is_name_unique(new_name, exclude=old_name):
             return
 
         source_section = None
@@ -805,13 +776,13 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         else:
             source_chip.set_tooltip_text(None)
 
-        modules_config = self.config.setdefault('modules', {})
+        modules_config = self.config.setdefault("modules", {})
         old_config = modules_config.pop(old_name, {})
 
         if module_type != new_name:
-            old_config['type'] = module_type
-        elif 'type' in old_config and old_config['type'] == new_name:
-            del old_config['type']
+            old_config["type"] = module_type
+        elif "type" in old_config and old_config["type"] == new_name:
+            del old_config["type"]
 
         modules_config[new_name] = old_config
 
@@ -822,7 +793,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
                 section_name: section.get_modules()
                 for section_name, section in self.sections.items()
             }
-            self.on_change('__layout__', layout, None)
+            self.on_change("__layout__", layout, None)
 
         self.show_module_settings(new_name, self.config, self.on_change, self.sections)
 
@@ -848,9 +819,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
         self._current_rows.clear()
 
         placeholder_row = Adw.ActionRow()
-        placeholder_label = Gtk.Label(
-            label='Click a module to configure its settings'
-        )
+        placeholder_label = Gtk.Label(label="Click a module to configure its settings")
         placeholder_label.set_opacity(0.5)
         placeholder_label.set_vexpand(True)
         placeholder_label.set_valign(Gtk.Align.CENTER)
@@ -876,9 +845,7 @@ class ModulesTab(Gtk.Box):
         left_box.set_spacing(12)
 
         left_scroll = Gtk.ScrolledWindow()
-        left_scroll.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        left_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         left_scroll.set_vexpand(True)
 
         left_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -889,36 +856,34 @@ class ModulesTab(Gtk.Box):
         left_content.set_spacing(18)
 
         layout_group = Adw.PreferencesGroup()
-        layout_group.set_title('Bar Layout')
+        layout_group.set_title("Bar Layout")
         layout_group.set_description(
-            'Drag modules between sections or click to configure'
+            "Drag modules between sections or click to configure"
         )
 
-        for section_name in [
-            'modules-left', 'modules-center', 'modules-right'
-        ]:
+        for section_name in ["modules-left", "modules-center", "modules-right"]:
             modules = config.get(section_name, [])
             section = SectionRow(
-                section_name, modules, self._on_module_select,
-                self._on_layout_change, self.sections, config
+                section_name,
+                modules,
+                self._on_module_select,
+                self._on_layout_change,
+                self.sections,
+                config,
             )
             self.sections[section_name] = section
             layout_group.add(section)
 
         left_content.append(layout_group)
 
-        available = AvailableModulesGroup(
-            self._on_add_module, self.sections, config
-        )
+        available = AvailableModulesGroup(self._on_add_module, self.sections, config)
         left_content.append(available)
 
         left_scroll.set_child(left_content)
 
         # Right side: Module settings
         right_scroll = Gtk.ScrolledWindow()
-        right_scroll.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        right_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         right_scroll.set_vexpand(True)
 
         right_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -955,10 +920,10 @@ class ModulesTab(Gtk.Box):
 
     def _on_layout_change(self):
         if self.on_change:
-            self.on_change('__layout__', self.get_layout(), None)
+            self.on_change("__layout__", self.get_layout(), None)
 
     def _on_add_module(self, module_name):
-        center = self.sections.get('modules-center')
+        center = self.sections.get("modules-center")
         if center:
             center._add_chip(module_name)
             center._emit_change()

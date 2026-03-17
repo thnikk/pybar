@@ -3,6 +3,7 @@
 Description: Load module and popover widgets
 Author: thnikk
 """
+
 import importlib
 import threading
 from subprocess import run, CalledProcessError
@@ -12,69 +13,80 @@ import time
 from datetime import datetime
 import gi
 import common as c
-gi.require_version('Gtk', '4.0')
+
+gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa
 
 _instances = {}
 _module_map = {}
 _alias_map = {}
 _canonical_map = {}
+_discovered_files = {}
+_discovery_done = False
 _worker_threads = {}
 _worker_stop_flags = {}
 _worker_wake_flags = {}
 
 
 def discover_modules():
-    """Automatically discover modules in the modules/ directory in parallel"""
-    global _module_map, _alias_map, _canonical_map
-    modules_dir = c.get_resource_path('modules')
+    """Discover available module files without importing them"""
+    global _discovered_files, _discovery_done
+    if _discovery_done:
+        return
+
+    modules_dir = c.get_resource_path("modules")
     if not os.path.exists(modules_dir):
         return
 
-    filenames = [f for f in os.listdir(modules_dir)
-                 if f.endswith('.py') and f != '__init__.py']
+    filenames = [
+        f for f in os.listdir(modules_dir) if f.endswith(".py") and f != "__init__.py"
+    ]
 
-    def load_module(filename):
+    for filename in filenames:
         module_name = filename[:-3]
-        try:
-            mod = importlib.import_module(f'modules.{module_name}')
-            return {
-                'module_map': getattr(mod, 'module_map', {}),
-                'alias_map': getattr(mod, 'alias_map', {}),
-                'canonical_base': module_name
-            }
-        except Exception as e:
-            c.print_debug(
-                f"Failed to load module {module_name}: {e}", color='red')
-        return {}
+        _discovered_files[module_name] = filename
 
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor() as executor:
-        results = executor.map(load_module, filenames)
-        for res in results:
-            if not res:
-                continue
-            m_map = res['module_map']
-            a_map = res['alias_map']
-            base = res['canonical_base']
+    _discovery_done = True
 
-            _module_map.update(m_map)
-            _alias_map.update(a_map)
 
-            # Map aliases to their canonical name
-            for alias, cls in a_map.items():
-                canonical = base
-                for k, v in m_map.items():
-                    if v == cls:
-                        canonical = k
-                        break
-                _canonical_map[alias] = canonical
+def _import_module(module_name):
+    """Import a specific module file and update maps"""
+    if module_name not in _discovered_files:
+        return False
+
+    try:
+        mod = importlib.import_module(f"modules.{module_name}")
+        m_map = getattr(mod, "module_map", {})
+        a_map = getattr(mod, "alias_map", {})
+
+        _module_map.update(m_map)
+        _alias_map.update(a_map)
+
+        # Map aliases to their canonical name
+        for alias, cls in a_map.items():
+            canonical = module_name
+            for k, v in m_map.items():
+                if v == cls:
+                    canonical = k
+                    break
+            _canonical_map[alias] = canonical
+        return True
+    except Exception as e:
+        c.print_debug(f"Failed to load module {module_name}: {e}", color="red")
+    return False
 
 
 def resolve_type(module_type):
     """Resolve an alias to its canonical module type"""
-    if not _module_map:
+    if module_type in _canonical_map:
+        return _canonical_map[module_type]
+
+    if not _discovery_done:
         discover_modules()
+
+    if module_type not in _module_map and module_type not in _alias_map:
+        _import_module(module_type)
+
     return _canonical_map.get(module_type, module_type)
 
 
@@ -82,16 +94,19 @@ def get_instance(name, config):
     """Get or create a module instance"""
     # Check if instance already exists
     if name in _instances:
-        c.print_debug(
-            f"Reusing existing instance for {name}",
-            color='yellow'
-        )
+        c.print_debug(f"Reusing existing instance for {name}", color="yellow")
         return _instances[name]
 
-    if not _module_map:
+    if not _discovery_done:
         discover_modules()
 
-    module_type = config.get('type', name)
+    module_type = config.get("type", name)
+
+    if module_type not in _module_map and module_type not in _alias_map:
+        # Try to import the module matching the type/name
+        if not _import_module(module_type) and name != module_type:
+            _import_module(name)
+
     if module_type in _module_map:
         cls = _module_map[module_type]
     elif module_type in _alias_map:
@@ -116,20 +131,15 @@ def start_worker(name, config):
 
     instance = get_instance(name, config)
     if instance:
-        thread = threading.Thread(
-            target=instance.run_worker,
-            daemon=True
-        )
+        thread = threading.Thread(target=instance.run_worker, daemon=True)
         _worker_threads[name] = thread
         thread.start()
         return
 
     # Fallback for waybar-style command modules
-    if 'command' in config:
+    if "command" in config:
         thread = threading.Thread(
-            target=command_worker,
-            args=(name, config),
-            daemon=True
+            target=command_worker, args=(name, config), daemon=True
         )
         _worker_threads[name] = thread
         thread.start()
@@ -138,13 +148,10 @@ def start_worker(name, config):
 def force_update(name):
     """Force a module to update immediately by waking its worker"""
     if name in _worker_wake_flags:
-        c.print_debug(f"Forcing update for {name}", color='green')
+        c.print_debug(f"Forcing update for {name}", color="green")
         _worker_wake_flags[name].set()
         return True
-    c.print_debug(
-        f"Cannot force update for {name}: worker not found",
-        color='yellow'
-    )
+    c.print_debug(f"Cannot force update for {name}: worker not found", color="yellow")
     return False
 
 
@@ -200,20 +207,16 @@ def clear_instances():
 
     instance_count = len(_instances)
     c.print_debug(
-        f"Clearing {instance_count} module instances: "
-        f"{list(_instances.keys())}"
+        f"Clearing {instance_count} module instances: {list(_instances.keys())}"
     )
 
     def cleanup_instance(item):
         name, instance = item
-        if hasattr(instance, 'cleanup'):
+        if hasattr(instance, "cleanup"):
             try:
                 instance.cleanup()
             except Exception as e:
-                c.print_debug(
-                    f"Failed to cleanup {name}: {e}",
-                    color='red'
-                )
+                c.print_debug(f"Failed to cleanup {name}: {e}", color="red")
 
     with ThreadPoolExecutor() as executor:
         executor.map(cleanup_instance, _instances.items())
@@ -224,8 +227,7 @@ def clear_instances():
     # Verify it's empty
     if _instances:
         c.print_debug(
-            f"WARNING: _instances not empty after clear: {_instances}",
-            color='red'
+            f"WARNING: _instances not empty after clear: {_instances}", color="red"
         )
 
     # Clear module map to force re-discovery on next use
@@ -235,15 +237,15 @@ def clear_instances():
 
     # Remove all dynamically loaded modules from sys.modules
     modules_to_remove = [
-        key for key in sys.modules.keys()
-        if key.startswith('modules.') and key != 'modules'
+        key
+        for key in sys.modules.keys()
+        if key.startswith("modules.") and key != "modules"
     ]
     for key in modules_to_remove:
         del sys.modules[key]
 
     c.print_debug(
-        f"Cleared {instance_count} instances, "
-        f"{len(modules_to_remove)} module imports"
+        f"Cleared {instance_count} instances, {len(modules_to_remove)} module imports"
     )
 
 
@@ -251,11 +253,13 @@ def command_worker(name, config):
     """Worker for waybar-style command modules"""
     stop_event = _worker_stop_flags.get(name)
     wake_event = _worker_wake_flags.get(name)
-    interval = config.get('interval', 60)
-    module_type = resolve_type(config.get('type', name))
-    is_hass = module_type.startswith('hass') or \
-              module_type.startswith('homeassistant') or \
-              name.startswith('hass')
+    interval = config.get("interval", 60)
+    module_type = resolve_type(config.get("type", name))
+    is_hass = (
+        module_type.startswith("hass")
+        or module_type.startswith("homeassistant")
+        or name.startswith("hass")
+    )
     cache_path = os.path.expanduser(f"~/.cache/pybar/{name}.json")
 
     last_data = None
@@ -265,21 +269,20 @@ def command_worker(name, config):
 
         if first_run and not is_hass and os.path.exists(cache_path):
             try:
-                with open(cache_path, 'r') as f:
+                with open(cache_path, "r") as f:
                     cached = json.load(f)
                 if cached:
                     last_data = cached
                     stale_init = cached.copy()
-                    stale_init['stale'] = True
-                    stale_init['timestamp'] = datetime.now().timestamp()
+                    stale_init["stale"] = True
+                    stale_init["timestamp"] = datetime.now().timestamp()
                     c.state_manager.update(name, stale_init)
             except Exception:
                 pass
 
-        command = [os.path.expanduser(arg) for arg in config['command']]
+        command = [os.path.expanduser(arg) for arg in config["command"]]
         try:
-            output = run(command, check=True,
-                         capture_output=True).stdout.decode()
+            output = run(command, check=True, capture_output=True).stdout.decode()
             new_data = json.loads(output)
             if new_data:
                 data = new_data
@@ -287,22 +290,22 @@ def command_worker(name, config):
                 if not is_hass:
                     try:
                         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-                        with open(cache_path, 'w') as f:
+                        with open(cache_path, "w") as f:
                             json.dump(data, f)
                     except Exception:
                         pass
             else:
                 if last_data:
                     data = last_data.copy()
-                    data['stale'] = True
+                    data["stale"] = True
         except Exception:
             if last_data:
                 data = last_data.copy()
-                data['stale'] = True
+                data["stale"] = True
 
         if data:
             if isinstance(data, dict):
-                data['timestamp'] = datetime.now().timestamp()
+                data["timestamp"] = datetime.now().timestamp()
             c.state_manager.update(name, data)
 
         first_run = False
@@ -322,41 +325,59 @@ def command_worker(name, config):
             time.sleep(interval)
 
 
+def get_available_module_names():
+    """Get a list of all available module names (including not yet loaded)"""
+    if not _discovery_done:
+        discover_modules()
+    return sorted(set(list(_module_map.keys()) + list(_discovered_files.keys())))
+
+
+def get_module_class(module_type):
+    """Get the class for a module type, loading it if necessary"""
+    if not _discovery_done:
+        discover_modules()
+
+    if module_type not in _module_map and module_type not in _alias_map:
+        _import_module(module_type)
+
+    return _module_map.get(module_type) or _alias_map.get(module_type)
+
+
 def module(bar, name, config):
     """Factory to create a module widget"""
-    module_config = config['modules'].get(name, {})
+    module_config = config["modules"].get(name, {})
     instance = get_instance(name, module_config)
 
     if instance:
         return instance.create_widget(bar)
 
     # Waybar-style command fallback
-    if 'command' in module_config:
+    if "command" in module_config:
         import weakref
-        
+
         m = c.Module()
         m.set_position(bar.position)
 
         # Use weak reference to widget to break circular reference
         widget_ref = weakref.ref(m)
-        
+
         def generic_update(data):
             widget = widget_ref()
             if widget is None or not data:
                 return
-            if 'text' in data:
-                widget.set_label(data['text'])
-                widget.set_visible(bool(data['text']))
-            if 'icon' in data:
-                widget.set_icon(data['icon'])
-            if 'tooltip' in data:
-                widget.set_tooltip_text(str(data['tooltip']))
+            if "text" in data:
+                widget.set_label(data["text"])
+                widget.set_visible(bool(data["text"]))
+            if "icon" in data:
+                widget.set_icon(data["icon"])
+            if "tooltip" in data:
+                widget.set_tooltip_text(str(data["tooltip"]))
             widget.reset_style()
-            if 'class' in data:
-                c.add_style(widget, data['class'])
-            if data.get('stale'):
-                c.add_style(widget, 'stale')
-        
+            if "class" in data:
+                c.add_style(widget, data["class"])
+            if data.get("stale"):
+                c.add_style(widget, "stale")
+
         sub_id = c.state_manager.subscribe(name, generic_update)
         m._subscriptions.append(sub_id)
         m._update_callback = generic_update
