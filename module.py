@@ -22,6 +22,7 @@ _module_map = {}
 _alias_map = {}
 _canonical_map = {}
 _discovered_files = {}
+_imported_modules = set()
 _discovery_done = False
 _worker_threads = {}
 _worker_stop_flags = {}
@@ -51,8 +52,8 @@ def discover_modules():
 
 def _import_module(module_name):
     """Import a specific module file and update maps"""
-    if module_name not in _discovered_files:
-        return False
+    if module_name not in _discovered_files or module_name in _imported_modules:
+        return module_name in _imported_modules
 
     try:
         mod = importlib.import_module(f"modules.{module_name}")
@@ -70,6 +71,8 @@ def _import_module(module_name):
                     canonical = k
                     break
             _canonical_map[alias] = canonical
+
+        _imported_modules.add(module_name)
         return True
     except Exception as e:
         c.print_debug(f"Failed to load module {module_name}: {e}", color="red")
@@ -84,8 +87,18 @@ def resolve_type(module_type):
     if not _discovery_done:
         discover_modules()
 
-    if module_type not in _module_map and module_type not in _alias_map:
+    # If not found in maps, try importing by name first
+    if module_type in _discovered_files:
         _import_module(module_type)
+        if module_type in _canonical_map:
+            return _canonical_map[module_type]
+
+    # If still not found, it might be an alias in an unimported file
+    for mod_name in list(_discovered_files.keys()):
+        if mod_name not in _imported_modules:
+            _import_module(mod_name)
+            if module_type in _canonical_map:
+                return _canonical_map[module_type]
 
     return _canonical_map.get(module_type, module_type)
 
@@ -102,22 +115,63 @@ def get_instance(name, config):
 
     module_type = config.get("type", name)
 
-    if module_type not in _module_map and module_type not in _alias_map:
-        # Try to import the module matching the type/name
-        if not _import_module(module_type) and name != module_type:
-            _import_module(name)
+    # Try to get class from already loaded maps
+    cls = _module_map.get(module_type) or _alias_map.get(module_type)
 
-    if module_type in _module_map:
-        cls = _module_map[module_type]
-    elif module_type in _alias_map:
-        cls = _alias_map[module_type]
-    else:
+    # If not found, try importing by name
+    if not cls and module_type in _discovered_files:
+        if _import_module(module_type):
+            cls = _module_map.get(module_type) or _alias_map.get(module_type)
+
+    # If still not found, it might be an alias in an unimported file
+    if not cls:
+        for mod_name in list(_discovered_files.keys()):
+            if mod_name not in _imported_modules:
+                _import_module(mod_name)
+                cls = _module_map.get(module_type) or _alias_map.get(module_type)
+                if cls:
+                    break
+
+    if not cls:
         return None
 
     instance = cls(name, config)
     _instances[name] = instance
     c.print_debug(f"Created new instance for {name}")
     return instance
+
+
+def get_available_module_names():
+    """Get a list of all available module names (including not yet loaded)"""
+    if not _discovery_done:
+        discover_modules()
+    return sorted(set(list(_module_map.keys()) + list(_discovered_files.keys())))
+
+
+def get_module_class(module_type):
+    """Get the class for a module type, loading it if necessary"""
+    if not _discovery_done:
+        discover_modules()
+
+    cls = _module_map.get(module_type) or _alias_map.get(module_type)
+    if cls:
+        return cls
+
+    if module_type in _discovered_files:
+        _import_module(module_type)
+        cls = _module_map.get(module_type) or _alias_map.get(module_type)
+        if cls:
+            return cls
+
+    # Try all modules for alias
+    for mod_name in list(_discovered_files.keys()):
+        if mod_name not in _imported_modules:
+            _import_module(mod_name)
+            cls = _module_map.get(module_type) or _alias_map.get(module_type)
+            if cls:
+                return cls
+
+    return None
 
 
 def start_worker(name, config):
@@ -201,7 +255,13 @@ def stop_all_workers():
 
 def clear_instances():
     """Clear all module instances for reload in parallel"""
-    global _instances, _module_map, _alias_map, _canonical_map
+    global \
+        _instances, \
+        _module_map, \
+        _alias_map, \
+        _canonical_map, \
+        _imported_modules, \
+        _discovery_done
     import sys
     from concurrent.futures import ThreadPoolExecutor
 
@@ -234,6 +294,8 @@ def clear_instances():
     _module_map = {}
     _alias_map = {}
     _canonical_map = {}
+    _imported_modules = set()
+    _discovery_done = False
 
     # Remove all dynamically loaded modules from sys.modules
     modules_to_remove = [
@@ -323,24 +385,6 @@ def command_worker(name, config):
                     break
         else:
             time.sleep(interval)
-
-
-def get_available_module_names():
-    """Get a list of all available module names (including not yet loaded)"""
-    if not _discovery_done:
-        discover_modules()
-    return sorted(set(list(_module_map.keys()) + list(_discovered_files.keys())))
-
-
-def get_module_class(module_type):
-    """Get the class for a module type, loading it if necessary"""
-    if not _discovery_done:
-        discover_modules()
-
-    if module_type not in _module_map and module_type not in _alias_map:
-        _import_module(module_type)
-
-    return _module_map.get(module_type) or _alias_map.get(module_type)
 
 
 def module(bar, name, config):
