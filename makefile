@@ -13,7 +13,7 @@ APP_NAME := pybar
 help:
 	@echo "Available targets:"
 	@echo "  install      - Symlink binary to ~/.local/bin/"
-	@echo "  dev-install  - Install development dependencies"
+	@echo "  setup	      - Set up venv and install dependencies"
 	@echo "  build        - Build executable with PyInstaller"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  test         - Run tests"
@@ -26,9 +26,10 @@ install: build
 	ln -sf $(CURDIR)/$(DIST_DIR)/$(APP_NAME)/$(APP_NAME) $(INSTALL_DIR)/$(APP_NAME)
 	@echo "Linked $(APP_NAME) to $(INSTALL_DIR)"
 
-dev-install:
+setup:
+	python -m venv $(VENV)
 	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
+	$(PIP) install pyinstaller
 
 build:
 	$(VENV)/bin/pyinstaller $(SPEC_FILE) --noconfirm
