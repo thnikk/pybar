@@ -3,17 +3,17 @@
 Description: Settings window - runs as separate GTK application
 Author: thnikk
 """
+
 import sys
 import os
 import copy
 
-sys.path.insert(
-    0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 from gi.repository import Gtk, Gdk, Gio, Adw, GLib
 
 import config as Config
@@ -125,7 +125,7 @@ class SettingsWindow(Adw.ApplicationWindow):
     """Main settings window with libadwaita"""
 
     def __init__(self, app, config, config_path):
-        super().__init__(application=app, title='Pybar Settings')
+        super().__init__(application=app, title="Pybar Settings")
         self.set_default_size(800, 600)
         self.config = copy.deepcopy(config)
         self.original_config = copy.deepcopy(config)
@@ -137,37 +137,33 @@ class SettingsWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
 
         inspector_btn = Gtk.Button()
-        inspector_icon = Gtk.Image.new_from_icon_name(
-            'system-search-symbolic'
-        )
+        inspector_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
         inspector_btn.set_child(inspector_icon)
-        inspector_btn.add_css_class('flat')
-        inspector_btn.add_css_class('inspector-btn')
-        inspector_btn.set_tooltip_text('Open GTK Inspector')
-        inspector_btn.connect('clicked', self._open_inspector)
+        inspector_btn.add_css_class("flat")
+        inspector_btn.add_css_class("inspector-btn")
+        inspector_btn.set_tooltip_text("Open GTK Inspector")
+        inspector_btn.connect("clicked", self._open_inspector)
         header.pack_start(inspector_btn)
 
-        self.restart_btn = Gtk.Button(label='Restart')
-        restart_icon = Gtk.Image.new_from_icon_name(
-            'view-refresh-symbolic'
-        )
+        self.restart_btn = Gtk.Button(label="Restart")
+        restart_icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
         self.restart_btn.set_child(restart_icon)
-        self.restart_btn.add_css_class('restart-btn')
-        self.restart_btn.set_tooltip_text('Reload pybar')
-        self.restart_btn.connect('clicked', self._on_restart)
+        self.restart_btn.add_css_class("restart-btn")
+        self.restart_btn.set_tooltip_text("Reload pybar")
+        self.restart_btn.connect("clicked", self._on_restart)
         header.pack_end(self.restart_btn)
 
-        self.save_btn = Gtk.Button(label='Save')
-        self.save_btn.add_css_class('suggested-action')
-        self.save_btn.connect('clicked', self._on_save)
+        self.save_btn = Gtk.Button(label="Save")
+        self.save_btn.add_css_class("suggested-action")
+        self.save_btn.connect("clicked", self._on_save)
         self.save_btn.set_sensitive(False)
         header.pack_end(self.save_btn)
 
         self.restore_btn = Gtk.Button()
-        restore_icon = Gtk.Image.new_from_icon_name('edit-undo-symbolic')
+        restore_icon = Gtk.Image.new_from_icon_name("edit-undo-symbolic")
         self.restore_btn.set_child(restore_icon)
-        self.restore_btn.set_tooltip_text('Restore original settings')
-        self.restore_btn.connect('clicked', self._on_restore)
+        self.restore_btn.set_tooltip_text("Restore original settings")
+        self.restore_btn.connect("clicked", self._on_restore)
         self.restore_btn.set_sensitive(False)
         header.pack_end(self.restore_btn)
 
@@ -175,12 +171,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar_view.add_top_bar(header)
 
         view_stack = Adw.ViewStack()
-        view_stack.connect('notify::visible-child', self._on_tab_changed)
+        view_stack.connect("notify::visible-child", self._on_tab_changed)
 
         general_page = Gtk.ScrolledWindow()
-        general_page.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        general_page.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         general_page.set_focusable(True)
 
         general_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -192,14 +186,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         general_box.append(self.general_tab)
         general_page.set_child(general_box)
         view_stack.add_titled_with_icon(
-            general_page, 'general', 'General',
-            'preferences-system-symbolic'
+            general_page, "general", "General", "preferences-system-symbolic"
         )
 
         modules_page = Gtk.ScrolledWindow()
-        modules_page.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        modules_page.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         modules_page.set_focusable(True)
 
         modules_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -211,14 +202,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         modules_box.append(self.modules_tab)
         modules_page.set_child(modules_box)
         view_stack.add_titled_with_icon(
-            modules_page, 'modules', 'Modules',
-            'application-x-addon-symbolic'
+            modules_page, "modules", "Modules", "application-x-addon-symbolic"
         )
 
         appearance_page = Gtk.ScrolledWindow()
-        appearance_page.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        appearance_page.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         appearance_page.set_focusable(True)
 
         appearance_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -230,14 +218,11 @@ class SettingsWindow(Adw.ApplicationWindow):
         appearance_box.append(self.appearance_tab)
         appearance_page.set_child(appearance_box)
         view_stack.add_titled_with_icon(
-            appearance_page, 'appearance', 'Appearance',
-            'preferences-color-symbolic'
+            appearance_page, "appearance", "Appearance", "preferences-color-symbolic"
         )
 
         about_page = Gtk.ScrolledWindow()
-        about_page.set_policy(
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
-        )
+        about_page.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         about_page.set_focusable(True)
 
         about_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -248,8 +233,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         about_box.append(AboutTab())
         about_page.set_child(about_box)
         view_stack.add_titled_with_icon(
-            about_page, 'about', 'About',
-            'help-about-symbolic'
+            about_page, "about", "About", "help-about-symbolic"
         )
 
         view_switcher = Adw.ViewSwitcher()
@@ -263,7 +247,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         toolbar_view.set_content(self.toast_overlay)
         self.set_content(toolbar_view)
 
-        self.connect('close-request', self._on_close_request)
+        self.connect("close-request", self._on_close_request)
 
     def _on_tab_changed(self, stack, pspec):
         """Ensure the tab itself gets focus instead of an entry field"""
@@ -276,7 +260,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         if self._loading:
             return
 
-        if key == '__layout__':
+        if key == "__layout__":
             for section, modules in value.items():
                 orig_modules = self.original_config.get(section)
                 if modules == orig_modules:
@@ -287,40 +271,40 @@ class SettingsWindow(Adw.ApplicationWindow):
                 else:
                     self.config[section] = modules
         elif module_name:
-            if 'modules' not in self.config:
-                self.config['modules'] = {}
-            if module_name not in self.config['modules']:
-                self.config['modules'][module_name] = {}
+            if "modules" not in self.config:
+                self.config["modules"] = {}
+            if module_name not in self.config["modules"]:
+                self.config["modules"][module_name] = {}
 
             # Check against original module config
-            orig_modules = self.original_config.get('modules', {})
+            orig_modules = self.original_config.get("modules", {})
             orig_module_conf = orig_modules.get(module_name, {})
-            
+
             if value == orig_module_conf.get(key):
                 if key in orig_module_conf:
-                    self.config['modules'][module_name][key] = value
+                    self.config["modules"][module_name][key] = value
                 else:
-                    self.config['modules'][module_name].pop(key, None)
+                    self.config["modules"][module_name].pop(key, None)
             else:
                 if value is None:
-                    self.config['modules'][module_name].pop(key, None)
+                    self.config["modules"][module_name].pop(key, None)
                 else:
-                    self.config['modules'][module_name][key] = value
+                    self.config["modules"][module_name][key] = value
 
             # Cleanup module entry if it matches original state or is empty
-            if not self.config['modules'][module_name]:
+            if not self.config["modules"][module_name]:
                 if module_name not in orig_modules:
-                    del self.config['modules'][module_name]
+                    del self.config["modules"][module_name]
         else:
             # Global setting
             schema_field = GLOBAL_SCHEMA.get(key, {})
-            default = schema_field.get('default')
+            default = schema_field.get("default")
             orig_val = self.original_config.get(key, default)
-            
+
             # Ensure we compare as strings if they look like strings
             val_comp = str(value) if value is not None else None
             orig_comp = str(orig_val) if orig_val is not None else None
-            
+
             if val_comp == orig_comp:
                 if key in self.original_config:
                     self.config[key] = value
@@ -333,31 +317,33 @@ class SettingsWindow(Adw.ApplicationWindow):
                     self.config[key] = value
 
         # Final cleanup for empty 'modules' dict
-        if 'modules' in self.config:
+        if "modules" in self.config:
             # Ensure any completely unused modules are removed
             used_modules = set()
-            for s in ['modules-left', 'modules-center', 'modules-right']:
+            for s in ["modules-left", "modules-center", "modules-right"]:
                 used_modules.update(self.config.get(s, []))
 
-            for m in list(self.config['modules'].keys()):
+            for m in list(self.config["modules"].keys()):
                 if m not in used_modules:
-                    orig_modules = self.original_config.get('modules', {})
+                    orig_modules = self.original_config.get("modules", {})
                     if m not in orig_modules:
-                        del self.config['modules'][m]
+                        del self.config["modules"][m]
 
             # If modules dict is now empty and wasn't there originally, remove it
-            if not self.config['modules'] and 'modules' not in self.original_config:
-                del self.config['modules']
+            if not self.config["modules"] and "modules" not in self.original_config:
+                del self.config["modules"]
 
         self._update_button_sensitivity()
 
     def _update_button_sensitivity(self):
         """Update sensitivity of Save and Restore buttons"""
+
         # Create clean copies for comparison (ignore None and ensure same types)
         def clean(d):
-            if not isinstance(d, dict): return d
+            if not isinstance(d, dict):
+                return d
             return {k: clean(v) for k, v in d.items() if v is not None}
-            
+
         changed = clean(self.config) != clean(self.original_config)
         self.save_btn.set_sensitive(changed)
         self.restore_btn.set_sensitive(changed)
@@ -373,9 +359,9 @@ class SettingsWindow(Adw.ApplicationWindow):
             Config.save(self.config_path, self.config)
             self.original_config = copy.deepcopy(self.config)
             self._update_button_sensitivity()
-            self._show_toast('Saved - restart pybar to apply changes')
+            self._show_toast("Saved - restart pybar to apply changes")
         except Exception as e:
-            self._show_toast(f'Save failed: {e}')
+            self._show_toast(f"Save failed: {e}")
         finally:
             self._loading = False
 
@@ -388,15 +374,15 @@ class SettingsWindow(Adw.ApplicationWindow):
             self.modules_tab.refresh(self.config)
             self.appearance_tab.refresh(self.config)
             self._update_button_sensitivity()
-            self._show_toast('Settings restored')
+            self._show_toast("Settings restored")
         finally:
             self._loading = False
 
     def _on_restart(self, _):
         """Signal pybar to reload configuration"""
         # Create a reload signal file that the bar will watch
-        reload_file = os.path.expanduser('~/.cache/pybar/.reload')
-        reload_done_file = os.path.expanduser('~/.cache/pybar/.reload_done')
+        reload_file = os.path.expanduser("~/.cache/pybar/.reload")
+        reload_done_file = os.path.expanduser("~/.cache/pybar/.reload_done")
 
         # Clean up any old done signal
         if os.path.exists(reload_done_file):
@@ -407,12 +393,12 @@ class SettingsWindow(Adw.ApplicationWindow):
 
         try:
             os.makedirs(os.path.dirname(reload_file), exist_ok=True)
-            with open(reload_file, 'w') as f:
+            with open(reload_file, "w") as f:
                 f.write(str(os.getpid()))
 
             # Show feedback
             self.restart_btn.set_sensitive(False)
-            self.restart_btn.add_css_class('reloading')
+            self.restart_btn.add_css_class("reloading")
 
             spinner = Gtk.Spinner()
             spinner.start()
@@ -422,9 +408,9 @@ class SettingsWindow(Adw.ApplicationWindow):
             # Start checking for completion
             GLib.timeout_add(100, self._check_reload_done, reload_done_file)
 
-            self._show_toast('Pybar will reload configuration...')
+            self._show_toast("Pybar will reload configuration...")
         except Exception as e:
-            self._show_toast(f'Failed to signal reload: {e}')
+            self._show_toast(f"Failed to signal reload: {e}")
 
     def _check_reload_done(self, done_file):
         """Check if pybar has finished reloading"""
@@ -436,10 +422,10 @@ class SettingsWindow(Adw.ApplicationWindow):
 
             # Revert feedback
             self.restart_btn.set_sensitive(True)
-            self.restart_btn.remove_css_class('reloading')
+            self.restart_btn.remove_css_class("reloading")
             self.restart_btn.set_child(self._restart_btn_original_child)
 
-            self._show_toast('Reload complete')
+            self._show_toast("Reload complete")
             return False  # Stop timeout
         return True  # Continue checking
 
@@ -455,8 +441,7 @@ class SettingsWindow(Adw.ApplicationWindow):
             dialog = Adw.MessageDialog.new(self)
             dialog.set_heading("Unsaved Changes")
             dialog.set_body(
-                "You have unsaved changes. "
-                "Do you want to save before closing?"
+                "You have unsaved changes. Do you want to save before closing?"
             )
             dialog.add_response("cancel", "Cancel")
             dialog.add_response("discard", "Discard")
@@ -464,9 +449,7 @@ class SettingsWindow(Adw.ApplicationWindow):
             dialog.set_response_appearance(
                 "discard", Adw.ResponseAppearance.DESTRUCTIVE
             )
-            dialog.set_response_appearance(
-                "save", Adw.ResponseAppearance.SUGGESTED
-            )
+            dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
             dialog.set_default_response("save")
             dialog.set_close_response("cancel")
 
@@ -477,7 +460,7 @@ class SettingsWindow(Adw.ApplicationWindow):
                 elif response == "discard":
                     self.destroy()
 
-            dialog.connect('response', on_response)
+            dialog.connect("response", on_response)
             dialog.present()
             return True
         return False
@@ -497,8 +480,8 @@ class SettingsApplication(Adw.Application):
 
     def __init__(self, config_path):
         super().__init__(
-            application_id='org.thnikk.pybar.settings',
-            flags=Gio.ApplicationFlags.FLAGS_NONE
+            application_id="org.thnikk.pybar.settings",
+            flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self.config_path = config_path
 
@@ -518,5 +501,5 @@ def main():
     app.run([])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

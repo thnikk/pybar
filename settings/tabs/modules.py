@@ -39,6 +39,8 @@ class ModuleChip(Gtk.Box):
 
         label = Gtk.Label(label=name)
         label.add_css_class("caption")
+        label.set_hexpand(True)
+        label.set_halign(Gtk.Align.START)
         self.append(label)
 
         remove_btn = Gtk.Button()
@@ -103,13 +105,21 @@ class SectionRow(Gtk.Box):
     """Box for a bar section with drag-drop support"""
 
     def __init__(
-        self, section_name, modules, on_select, on_change, all_sections, config=None
+        self,
+        section_name,
+        modules,
+        on_select,
+        on_change,
+        all_sections,
+        size_group,
+        config=None,
     ):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.section_name = section_name
         self.on_select = on_select
         self.on_change = on_change
         self.all_sections = all_sections
+        self.size_group = size_group
         self.config = config
         self._drop_index = -1
         self._drop_indicator = None
@@ -179,6 +189,7 @@ class SectionRow(Gtk.Box):
 
     def _add_chip(self, name, position=-1):
         chip = ModuleChip(name, self.on_select, self._on_remove, self, self.config)
+        self.size_group.add_widget(chip)
         if position < 0 or position >= len(self._get_chips()):
             self.chips_box.append(chip)
         else:
@@ -186,6 +197,7 @@ class SectionRow(Gtk.Box):
         self._update_placeholder()
 
     def _on_remove(self, chip):
+        self.size_group.remove_widget(chip)
         self.chips_box.remove(chip)
         self._emit_change()
         self._update_placeholder()
@@ -418,6 +430,7 @@ class SectionRow(Gtk.Box):
     def remove_module_by_name(self, module_name, emit=True):
         for chip in self._get_chips():
             if chip.name == module_name:
+                self.size_group.remove_widget(chip)
                 self.chips_box.remove(chip)
                 if emit:
                     self._emit_change()
@@ -430,6 +443,10 @@ class SectionRow(Gtk.Box):
         if config:
             self.config = config
         while child := self.chips_box.get_first_child():
+            if isinstance(child, Gtk.FlowBoxChild):
+                chip_child = child.get_child()
+                if isinstance(chip_child, ModuleChip):
+                    self.size_group.remove_widget(chip_child)
             self.chips_box.remove(child)
         for name in modules:
             self._add_chip(name)
@@ -446,7 +463,7 @@ class SectionRow(Gtk.Box):
 class AvailableModulesGroup(Adw.PreferencesGroup):
     """Adwaita preference group for available modules"""
 
-    def __init__(self, on_add, sections, config=None):
+    def __init__(self, on_add, sections, size_group, config=None):
         super().__init__()
         self.set_title("Add Module")
         self.set_description(
@@ -454,6 +471,7 @@ class AvailableModulesGroup(Adw.PreferencesGroup):
         )
         self.on_add = on_add
         self.sections = sections
+        self.size_group = size_group
         self.config = config
 
         # Create a horizontal box for the dropdown and button
@@ -839,6 +857,7 @@ class ModulesTab(Gtk.Box):
         self.config = config
         self.on_change = on_change
         self.sections = {}
+        self.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
 
         # Left side: Layout and available modules
         left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -869,6 +888,7 @@ class ModulesTab(Gtk.Box):
                 self._on_module_select,
                 self._on_layout_change,
                 self.sections,
+                self.size_group,
                 config,
             )
             self.sections[section_name] = section
@@ -876,7 +896,9 @@ class ModulesTab(Gtk.Box):
 
         left_content.append(layout_group)
 
-        available = AvailableModulesGroup(self._on_add_module, self.sections, config)
+        available = AvailableModulesGroup(
+            self._on_add_module, self.sections, self.size_group, config
+        )
         left_content.append(available)
 
         left_scroll.set_child(left_content)
