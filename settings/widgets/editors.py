@@ -3,9 +3,11 @@
 Description: Field editor widgets for settings UI
 Author: thnikk
 """
+
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw  # noqa
 
 from settings.schema import FieldType
@@ -14,23 +16,38 @@ from settings.schema import FieldType
 class FieldEditor(Gtk.Box):
     """Base class for field editors"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.key = key
         self.schema_field = schema_field
         self.on_change = on_change
+        self.size_group = size_group
+        self.halign_value = halign
         if show_label:
             self._build_label()
+
+    def _add_to_size_group(self, widget):
+        if self.size_group:
+            self.size_group.add_widget(widget)
 
     def _build_label(self):
         """Build the label and description"""
         label_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        label = Gtk.Label(label=self.schema_field.get('label', self.key))
+        label = Gtk.Label(label=self.schema_field.get("label", self.key))
         label.set_halign(Gtk.Align.START)
         label_box.append(label)
         self.append(label_box)
 
-        description = self.schema_field.get('description')
+        description = self.schema_field.get("description")
         if description:
             desc_label = Gtk.Label(label=description)
             desc_label.set_halign(Gtk.Align.START)
@@ -56,12 +73,25 @@ class FieldEditor(Gtk.Box):
 class StringEditor(FieldEditor):
     """Editor for string fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
         self.entry = Gtk.Entry()
-        self.entry.set_text(str(value) if value is not None else '')
+        self.entry.set_text(str(value) if value is not None else "")
         self.entry.set_hexpand(True)
-        self.entry.connect('changed', lambda _: self._emit_change())
+        self.entry.set_halign(self.halign_value)
+        self._add_to_size_group(self.entry)
+        self.entry.connect("changed", lambda _: self._emit_change())
         self.append(self.entry)
 
     def get_value(self):
@@ -69,20 +99,31 @@ class StringEditor(FieldEditor):
         return text if text else None
 
     def set_value(self, value):
-        self.entry.set_text(str(value) if value is not None else '')
+        self.entry.set_text(str(value) if value is not None else "")
 
 
 class IntegerEditor(FieldEditor):
     """Editor for integer fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
 
-        min_val = schema_field.get('min', -999999)
-        max_val = schema_field.get('max', 999999)
+        min_val = schema_field.get("min", -999999)
+        max_val = schema_field.get("max", 999999)
 
         # Use a box with entry and spin buttons
-        default_value = schema_field.get('default')
+        default_value = schema_field.get("default")
         if default_value is None:
             default_value = 0
         self.adjustment = Gtk.Adjustment(
@@ -90,25 +131,27 @@ class IntegerEditor(FieldEditor):
             lower=min_val,
             upper=max_val,
             step_increment=1,
-            page_increment=10
+            page_increment=10,
         )
         self.spin = Gtk.SpinButton(adjustment=self.adjustment)
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
-        self.spin.connect('value-changed', lambda _: self._emit_change())
-        
+        self.spin.set_halign(self.halign_value)
+        self._add_to_size_group(self.spin)
+        self.spin.connect("value-changed", lambda _: self._emit_change())
+
         # Disable scroll events on the spin button
         scroll_controller = Gtk.EventControllerScroll()
         scroll_controller.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
-        scroll_controller.connect('scroll', lambda *args: True)
+        scroll_controller.connect("scroll", lambda *args: True)
         self.spin.add_controller(scroll_controller)
 
         # Add a "clear" option for nullable fields
-        if schema_field.get('default') is None:
+        if schema_field.get("default") is None:
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
             self.nullable = True
-            self.clear_btn = Gtk.Button(label='Clear')
-            self.clear_btn.connect('clicked', self._on_clear)
+            self.clear_btn = Gtk.Button(label="Clear")
+            self.clear_btn.connect("clicked", self._on_clear)
             box.append(self.spin)
             box.append(self.clear_btn)
             self.append(box)
@@ -123,38 +166,51 @@ class IntegerEditor(FieldEditor):
     def _on_clear(self, _):
         self._is_null = not self._is_null
         self.spin.set_sensitive(not self._is_null)
-        self.clear_btn.set_label('Set' if self._is_null else 'Clear')
+        self.clear_btn.set_label("Set" if self._is_null else "Clear")
         self._emit_change()
 
     def get_value(self):
-        if hasattr(self, 'nullable') and self.nullable and self._is_null:
+        if hasattr(self, "nullable") and self.nullable and self._is_null:
             return None
         return int(self.spin.get_value())
 
     def set_value(self, value):
-        if hasattr(self, 'nullable') and self.nullable:
+        if hasattr(self, "nullable") and self.nullable:
             self._is_null = value is None
             self.spin.set_sensitive(not self._is_null)
-            self.clear_btn.set_label('Set' if self._is_null else 'Clear')
+            self.clear_btn.set_label("Set" if self._is_null else "Clear")
 
         if value is not None:
             self.spin.set_value(float(value))
         else:
-            default_value = self.schema_field.get('default', 0)
-            self.spin.set_value(float(default_value if default_value is not None else 0))
+            default_value = self.schema_field.get("default", 0)
+            self.spin.set_value(
+                float(default_value if default_value is not None else 0)
+            )
 
 
 class FloatEditor(FieldEditor):
     """Editor for float fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
 
-        min_val = schema_field.get('min', -999999.0)
-        max_val = schema_field.get('max', 999999.0)
-        step = schema_field.get('step', 0.1)
+        min_val = schema_field.get("min", -999999.0)
+        max_val = schema_field.get("max", 999999.0)
+        step = schema_field.get("step", 0.1)
 
-        default_value = schema_field.get('default')
+        default_value = schema_field.get("default")
         if default_value is None:
             default_value = 0.0
         self.adjustment = Gtk.Adjustment(
@@ -162,20 +218,22 @@ class FloatEditor(FieldEditor):
             lower=min_val,
             upper=max_val,
             step_increment=step,
-            page_increment=step * 10
+            page_increment=step * 10,
         )
         self.spin = Gtk.SpinButton(adjustment=self.adjustment)
         self.spin.set_digits(2)
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
-        self.spin.connect('value-changed', lambda _: self._emit_change())
-        
+        self.spin.set_halign(self.halign_value)
+        self._add_to_size_group(self.spin)
+        self.spin.connect("value-changed", lambda _: self._emit_change())
+
         # Disable scroll events on the spin button
         scroll_controller = Gtk.EventControllerScroll()
         scroll_controller.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
-        scroll_controller.connect('scroll', lambda *args: True)
+        scroll_controller.connect("scroll", lambda *args: True)
         self.spin.add_controller(scroll_controller)
-        
+
         self.append(self.spin)
 
     def get_value(self):
@@ -185,19 +243,36 @@ class FloatEditor(FieldEditor):
         if value is not None:
             self.spin.set_value(float(value))
         else:
-            default_value = self.schema_field.get('default', 0.0)
-            self.spin.set_value(float(default_value if default_value is not None else 0.0))
+            default_value = self.schema_field.get("default", 0.0)
+            self.spin.set_value(
+                float(default_value if default_value is not None else 0.0)
+            )
 
 
 class BooleanEditor(FieldEditor):
     """Editor for boolean fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
         self.switch = Gtk.Switch()
         self.switch.set_active(bool(value) if value is not None else False)
-        self.switch.set_halign(Gtk.Align.START)
-        self.switch.connect('state-set', lambda _, state: self._emit_change())
+        # Don't use FILL for switches as it stretches them
+        switch_align = self.halign_value
+        if switch_align == Gtk.Align.FILL:
+            switch_align = Gtk.Align.START
+        self.switch.set_halign(switch_align)
+        self.switch.connect("state-set", lambda _, state: self._emit_change())
         self.append(self.switch)
 
     def get_value(self):
@@ -210,10 +285,21 @@ class BooleanEditor(FieldEditor):
 class ChoiceEditor(FieldEditor):
     """Editor for choice/dropdown fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
 
-        choices = schema_field.get('choices', [])
+        choices = schema_field.get("choices", [])
         self.choices = choices
 
         # Create string list for dropdown
@@ -223,6 +309,8 @@ class ChoiceEditor(FieldEditor):
 
         self.dropdown = Gtk.DropDown(model=string_list)
         self.dropdown.set_hexpand(True)
+        self.dropdown.set_halign(self.halign_value)
+        self._add_to_size_group(self.dropdown)
 
         # Set initial selection
         if value in choices:
@@ -230,8 +318,7 @@ class ChoiceEditor(FieldEditor):
         elif choices:
             self.dropdown.set_selected(0)
 
-        self.dropdown.connect(
-            'notify::selected', lambda *_: self._emit_change())
+        self.dropdown.connect("notify::selected", lambda *_: self._emit_change())
         self.append(self.dropdown)
 
     def get_value(self):
@@ -250,17 +337,29 @@ class ChoiceEditor(FieldEditor):
 class FileEditor(FieldEditor):
     """Editor for file path fields"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         self.entry = Gtk.Entry()
-        self.entry.set_text(str(value) if value else '')
+        self.entry.set_text(str(value) if value else "")
         self.entry.set_hexpand(True)
-        self.entry.connect('changed', lambda _: self._emit_change())
+        self.entry.set_halign(Gtk.Align.FILL)
+        self.entry.connect("changed", lambda _: self._emit_change())
 
-        browse_btn = Gtk.Button(label='Browse...')
-        browse_btn.connect('clicked', self._on_browse)
+        browse_btn = Gtk.Button(label="Browse...")
+        browse_btn.connect("clicked", self._on_browse)
 
         box.append(self.entry)
         box.append(browse_btn)
@@ -268,10 +367,9 @@ class FileEditor(FieldEditor):
 
     def _on_browse(self, _):
         dialog = Gtk.FileChooserNative(
-            title='Select File',
-            action=Gtk.FileChooserAction.OPEN
+            title="Select File", action=Gtk.FileChooserAction.OPEN
         )
-        dialog.connect('response', self._on_file_response)
+        dialog.connect("response", self._on_file_response)
         dialog.show()
 
     def _on_file_response(self, dialog, response):
@@ -286,18 +384,29 @@ class FileEditor(FieldEditor):
         return text if text else None
 
     def set_value(self, value):
-        self.entry.set_text(str(value) if value else '')
+        self.entry.set_text(str(value) if value else "")
 
 
 class DictEditor(FieldEditor):
     """Editor for dict fields with dynamic key-value pairs"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label=True)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
         self.rows = []
-        self.key_type = schema_field.get('key_type', FieldType.STRING)
-        self.value_type = schema_field.get('value_type', FieldType.STRING)
-        self.nested_schema = schema_field.get('schema')
+        self.key_type = schema_field.get("key_type", FieldType.STRING)
+        self.value_type = schema_field.get("value_type", FieldType.STRING)
+        self.nested_schema = schema_field.get("schema")
         self.has_nested = self.nested_schema is not None
 
         # scroll = Gtk.ScrolledWindow()
@@ -305,47 +414,48 @@ class DictEditor(FieldEditor):
         # scroll.set_min_content_height(150)
         # scroll.set_vexpand(True)
 
-        self.rows_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        self.rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
         self.append(self.rows_box)
         # scroll.set_child(self.rows_box)
         # self.append(scroll)
 
-        add_btn = Gtk.Button(label='+ Add Entry')
-        add_btn.get_style_context().add_class('flat')
-        add_btn.connect('clicked', self._on_add_row)
+        add_btn = Gtk.Button(label="+ Add Entry")
+        add_btn.get_style_context().add_class("flat")
+        add_btn.connect("clicked", self._on_add_row)
         self.append(add_btn)
 
         if value and isinstance(value, dict):
             for k, v in value.items():
                 self._add_row(k, v)
 
-    def _add_row(self, key='', value=''):
+    def _add_row(self, key="", value=""):
         if self.has_nested:
             self._add_nested_row(key, value)
         else:
             self._add_simple_row(key, value)
 
-    def _add_nested_row(self, key='', value=''):
+    def _add_nested_row(self, key="", value=""):
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
 
         key_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        key_schema = {'type': self.key_type}
+        key_schema = {"type": self.key_type}
         key_row.key_editor = create_editor(
-            f'{self.key}_key_{len(self.rows)}',
+            f"{self.key}_key_{len(self.rows)}",
             key_schema,
             key,
             lambda k, v: self._emit_change(),
-            show_label=False
+            show_label=False,
+            size_group=self.size_group,
+            halign=self.halign_value,
         )
-        if hasattr(key_row.key_editor, 'entry'):
+        if hasattr(key_row.key_editor, "entry"):
             key_row.key_editor.entry.set_width_chars(15)
-        elif hasattr(key_row.key_editor, 'spin'):
+        elif hasattr(key_row.key_editor, "spin"):
             key_row.key_editor.spin.set_width_chars(10)
 
-        delete_btn = Gtk.Button(label='-')
-        delete_btn.get_style_context().add_class('flat')
-        delete_btn.connect('clicked', lambda _: self._remove_row(container))
+        delete_btn = Gtk.Button(label="-")
+        delete_btn.get_style_context().add_class("flat")
+        delete_btn.connect("clicked", lambda _: self._remove_row(container))
 
         key_row.append(key_row.key_editor)
         key_row.append(delete_btn)
@@ -358,16 +468,17 @@ class DictEditor(FieldEditor):
         nested_box.set_margin_bottom(10)
         nested_box.set_margin_end(10)
         nested_frame = Gtk.Frame()
-        nested_frame.get_style_context().add_class('view')
+        nested_frame.get_style_context().add_class("view")
         nested_frame.set_child(nested_box)
 
         container.nested_editors = []
 
-        add_nested_btn = Gtk.Button(label='+ Add Entry')
-        add_nested_btn.get_style_context().add_class('flat')
+        add_nested_btn = Gtk.Button(label="+ Add Entry")
+        add_nested_btn.get_style_context().add_class("flat")
         add_nested_btn.connect(
-            'clicked', lambda _, nb=nested_box, c=container:
-            self._add_nested_entry(nb, '', '', c))
+            "clicked",
+            lambda _, nb=nested_box, c=container: self._add_nested_entry(nb, "", "", c),
+        )
         nested_box.append(add_nested_btn)
         container.add_nested_btn = add_nested_btn
 
@@ -379,36 +490,42 @@ class DictEditor(FieldEditor):
         self.rows_box.append(container)
         self.rows.append(container)
 
-    def _add_nested_entry(self, parent_box, key='', value='', container=None):
+    def _add_nested_entry(self, parent_box, key="", value="", container=None):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
 
-        key_schema = {'type': self.nested_schema.get('key_type', FieldType.STRING)}
+        key_schema = {"type": self.nested_schema.get("key_type", FieldType.STRING)}
         row.key_editor = create_editor(
-            f'nested_key_{len(container.nested_editors)}',
+            f"nested_key_{len(container.nested_editors)}",
             key_schema,
             key,
             lambda k, v: self._emit_change(),
-            show_label=False
+            show_label=False,
+            size_group=self.size_group,
+            halign=self.halign_value,
         )
-        if hasattr(row.key_editor, 'entry'):
+        if hasattr(row.key_editor, "entry"):
             row.key_editor.entry.set_width_chars(15)
-        elif hasattr(row.key_editor, 'spin'):
+        elif hasattr(row.key_editor, "spin"):
             row.key_editor.spin.set_width_chars(10)
 
-        nested_value_type = self.nested_schema.get('value_type', FieldType.STRING)
-        value_schema = {'type': nested_value_type}
+        nested_value_type = self.nested_schema.get("value_type", FieldType.STRING)
+        value_schema = {"type": nested_value_type}
         row.value_editor = create_editor(
-            f'nested_value_{len(container.nested_editors)}',
+            f"nested_value_{len(container.nested_editors)}",
             value_schema,
             value,
             lambda k, v: self._emit_change(),
-            show_label=False
+            show_label=False,
+            size_group=self.size_group,
+            halign=self.halign_value,
         )
         row.value_editor.set_hexpand(True)
 
-        delete_btn = Gtk.Button(label='-')
-        delete_btn.get_style_context().add_class('flat')
-        delete_btn.connect('clicked', lambda _: self._remove_nested_entry(row, parent_box))
+        delete_btn = Gtk.Button(label="-")
+        delete_btn.get_style_context().add_class("flat")
+        delete_btn.connect(
+            "clicked", lambda _: self._remove_nested_entry(row, parent_box)
+        )
 
         row.append(row.key_editor)
         row.append(row.value_editor)
@@ -420,41 +537,45 @@ class DictEditor(FieldEditor):
     def _remove_nested_entry(self, row, parent_box):
         if parent_box:
             parent_box.remove(row)
-        if hasattr(parent_box, 'get_parent'):
+        if hasattr(parent_box, "get_parent"):
             container = parent_box.get_parent()
-            if hasattr(container, 'nested_editors') and row in container.nested_editors:
+            if hasattr(container, "nested_editors") and row in container.nested_editors:
                 container.nested_editors.remove(row)
         self._emit_change()
 
-    def _add_simple_row(self, key='', value=''):
+    def _add_simple_row(self, key="", value=""):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
 
-        key_schema = {'type': self.key_type}
+        key_schema = {"type": self.key_type}
         row.key_editor = create_editor(
-            f'{self.key}_key_{len(self.rows)}',
+            f"{self.key}_key_{len(self.rows)}",
             key_schema,
             key,
             lambda k, v: self._emit_change(),
-            show_label=False
+            show_label=False,
+            size_group=self.size_group,
+            halign=self.halign_value,
         )
-        if hasattr(row.key_editor, 'entry'):
+        if hasattr(row.key_editor, "entry"):
             row.key_editor.entry.set_width_chars(15)
-        elif hasattr(row.key_editor, 'spin'):
+        elif hasattr(row.key_editor, "spin"):
             row.key_editor.spin.set_width_chars(10)
 
-        value_schema = {'type': self.value_type}
+        value_schema = {"type": self.value_type}
         row.value_editor = create_editor(
-            f'{self.key}_value_{len(self.rows)}',
+            f"{self.key}_value_{len(self.rows)}",
             value_schema,
             value,
             lambda k, v: self._emit_change(),
-            show_label=False
+            show_label=False,
+            size_group=self.size_group,
+            halign=self.halign_value,
         )
         row.value_editor.set_hexpand(True)
 
-        delete_btn = Gtk.Button(label='-')
-        delete_btn.get_style_context().add_class('flat')
-        delete_btn.connect('clicked', lambda _: self._remove_row(row))
+        delete_btn = Gtk.Button(label="-")
+        delete_btn.get_style_context().add_class("flat")
+        delete_btn.connect("clicked", lambda _: self._remove_row(row))
 
         row.append(row.key_editor)
         row.append(row.value_editor)
@@ -470,7 +591,7 @@ class DictEditor(FieldEditor):
             self._emit_change()
 
     def _on_add_row(self, _):
-        self._add_row('', '')
+        self._add_row("", "")
         self._emit_change()
 
     def get_value(self):
@@ -482,10 +603,12 @@ class DictEditor(FieldEditor):
                 if key is None or (isinstance(key, str) and not key.strip()):
                     continue
                 nested_value = {}
-                if hasattr(container, 'nested_editors'):
+                if hasattr(container, "nested_editors"):
                     for nested_row in container.nested_editors:
                         n_key = nested_row.key_editor.get_value()
-                        if n_key is None or (isinstance(n_key, str) and not n_key.strip()):
+                        if n_key is None or (
+                            isinstance(n_key, str) and not n_key.strip()
+                        ):
                             continue
                         nested_value[n_key] = nested_row.value_editor.get_value()
                 result[key] = nested_value if nested_value else {}
@@ -511,17 +634,28 @@ class DictEditor(FieldEditor):
 class ListEditor(FieldEditor):
     """Editor for list fields with dynamic items"""
 
-    def __init__(self, key, schema_field, value, on_change, show_label=True):
-        super().__init__(key, schema_field, value, on_change, show_label)
-        self.item_type = schema_field.get('item_type', FieldType.STRING)
-        self.choices = schema_field.get('choices', [])
-        self.unique = schema_field.get('unique', False)
-        self.sortable = schema_field.get('sortable', True)
+    def __init__(
+        self,
+        key,
+        schema_field,
+        value,
+        on_change,
+        show_label=True,
+        size_group=None,
+        halign=Gtk.Align.END,
+    ):
+        super().__init__(
+            key, schema_field, value, on_change, show_label, size_group, halign
+        )
+        self.item_type = schema_field.get("item_type", FieldType.STRING)
+        self.choices = schema_field.get("choices", [])
+        self.unique = schema_field.get("unique", False)
+        self.sortable = schema_field.get("sortable", True)
 
         self.values = list(value) if isinstance(value, list) else []
 
         self.list_box = Gtk.ListBox()
-        self.list_box.add_css_class('boxed-list')
+        self.list_box.add_css_class("boxed-list")
         self.list_box.set_selection_mode(Gtk.SelectionMode.NONE)
         self.append(self.list_box)
 
@@ -530,20 +664,20 @@ class ListEditor(FieldEditor):
         add_box.set_margin_top(6)
 
         if self.choices:
-            label = schema_field.get('choices_label', 'Add...')
+            label = schema_field.get("choices_label", "Add...")
             strings = [label] + [str(c) for c in self.choices]
             self.dropdown = Gtk.DropDown.new_from_strings(strings)
-            self.dropdown.connect('notify::selected', self._on_choice_selected)
+            self.dropdown.connect("notify::selected", self._on_choice_selected)
             add_box.append(self.dropdown)
 
         self.entry = Gtk.Entry(placeholder_text="Enter value...")
         self.entry.set_hexpand(True)
-        self.entry.connect('activate', lambda _: self._on_manual_add())
+        self.entry.connect("activate", lambda _: self._on_manual_add())
         add_box.append(self.entry)
 
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.add_css_class("flat")
-        add_btn.connect('clicked', lambda _: self._on_manual_add())
+        add_btn.connect("clicked", lambda _: self._on_manual_add())
         add_box.append(add_btn)
 
         self.append(add_box)
@@ -560,11 +694,13 @@ class ListEditor(FieldEditor):
                 row.set_title(str(val))
             else:
                 item_editor = create_editor(
-                    f'{self.key}_item_{i}',
-                    {'type': self.item_type},
+                    f"{self.key}_item_{i}",
+                    {"type": self.item_type},
                     val,
                     lambda k, v, idx=i: self._on_item_change(idx, v),
-                    show_label=False
+                    show_label=False,
+                    size_group=self.size_group,
+                    halign=self.halign_value,
                 )
                 row.set_child(item_editor)
 
@@ -573,17 +709,17 @@ class ListEditor(FieldEditor):
             if self.sortable:
                 up_btn = Gtk.Button(icon_name="go-up-symbolic")
                 up_btn.add_css_class("flat")
-                up_btn.connect('clicked', lambda _, idx=i: self._move_item(idx, -1))
+                up_btn.connect("clicked", lambda _, idx=i: self._move_item(idx, -1))
                 suffix_box.append(up_btn)
 
                 down_btn = Gtk.Button(icon_name="go-down-symbolic")
                 down_btn.add_css_class("flat")
-                down_btn.connect('clicked', lambda _, idx=i: self._move_item(idx, 1))
+                down_btn.connect("clicked", lambda _, idx=i: self._move_item(idx, 1))
                 suffix_box.append(down_btn)
 
             delete_btn = Gtk.Button(icon_name="list-remove-symbolic")
             delete_btn.add_css_class("flat")
-            delete_btn.connect('clicked', lambda _, idx=i: self._remove_item(idx))
+            delete_btn.connect("clicked", lambda _, idx=i: self._remove_item(idx))
             suffix_box.append(delete_btn)
 
             row.add_suffix(suffix_box)
@@ -608,12 +744,16 @@ class ListEditor(FieldEditor):
         if val:
             # Type conversion if needed
             if self.item_type == FieldType.INTEGER:
-                try: val = int(val)
-                except ValueError: return
+                try:
+                    val = int(val)
+                except ValueError:
+                    return
             elif self.item_type == FieldType.FLOAT:
-                try: val = float(val)
-                except ValueError: return
-                
+                try:
+                    val = float(val)
+                except ValueError:
+                    return
+
             if self._add_value(val):
                 self.entry.set_text("")
 
@@ -634,8 +774,10 @@ class ListEditor(FieldEditor):
     def _move_item(self, index, delta):
         new_idx = index + delta
         if 0 <= new_idx < len(self.values):
-            self.values[index], self.values[new_idx] = \
-                self.values[new_idx], self.values[index]
+            self.values[index], self.values[new_idx] = (
+                self.values[new_idx],
+                self.values[index],
+            )
             self._refresh_list()
             self._emit_change()
 
@@ -647,10 +789,17 @@ class ListEditor(FieldEditor):
         self._refresh_list()
 
 
-
-def create_editor(key, schema_field, value, on_change, show_label=True):
+def create_editor(
+    key,
+    schema_field,
+    value,
+    on_change,
+    show_label=True,
+    size_group=None,
+    halign=Gtk.Align.END,
+):
     """Factory function to create appropriate editor for field type"""
-    field_type = schema_field.get('type', FieldType.STRING)
+    field_type = schema_field.get("type", FieldType.STRING)
 
     editors = {
         FieldType.STRING: StringEditor,
@@ -664,4 +813,6 @@ def create_editor(key, schema_field, value, on_change, show_label=True):
     }
 
     editor_class = editors.get(field_type, StringEditor)
-    return editor_class(key, schema_field, value, on_change, show_label)
+    return editor_class(
+        key, schema_field, value, on_change, show_label, size_group, halign
+    )

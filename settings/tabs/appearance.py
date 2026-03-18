@@ -17,105 +17,118 @@ class AppearanceTab(Gtk.Box):
     def __init__(self, config, on_change):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.set_focusable(True)
-        self.connect('map', lambda _: self.grab_focus())
+        self.connect("map", lambda _: self.grab_focus())
 
         self.config = config
         self.on_change = on_change
+        self.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
 
         header = Adw.PreferencesGroup()
-        header.set_title('Appearance')
-        header.set_description('Customize the look and feel of the bar')
+        header.set_title("Appearance")
+        header.set_description("Customize the look and feel of the bar")
         header.set_focusable(True)
         self.append(header)
 
         # Bar Dimensions
         dimensions_group = Adw.PreferencesGroup()
-        dimensions_group.set_title('Dimensions &amp; Typography')
+        dimensions_group.set_title("Dimensions &amp; Typography")
         self.append(dimensions_group)
 
-        for key in ['bar-height', 'font-size']:
+        for key in ["bar-height", "font-size"]:
             schema_field = GLOBAL_SCHEMA[key]
-            value = config.get(key, schema_field['default'])
+            value = config.get(key, schema_field["default"])
 
             row = Adw.ActionRow()
-            row.set_title(schema_field.get('label', key))
-            row.set_subtitle(schema_field.get('description', ''))
+            row.set_title(schema_field.get("label", key))
+            row.set_subtitle(schema_field.get("description", ""))
 
             editor = create_editor(
-                key, schema_field, value, self._on_field_change,
-                show_label=False
+                key,
+                schema_field,
+                value,
+                self._on_field_change,
+                show_label=False,
+                size_group=self.size_group,
             )
             editor.set_valign(Gtk.Align.CENTER)
             row.add_suffix(editor)
 
             # Add reset button
-            reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+            reset_btn = Gtk.Button.new_from_icon_name("edit-undo-symbolic")
             reset_btn.set_valign(Gtk.Align.CENTER)
-            reset_btn.add_css_class('flat')
-            reset_btn.set_tooltip_text('Reset to default')
+            reset_btn.add_css_class("flat")
+            reset_btn.set_tooltip_text("Reset to default")
             reset_btn.connect(
-                'clicked', lambda _, k=key, e=editor, s=schema_field:
-                e.set_value(s['default'])
+                "clicked",
+                lambda _, k=key, e=editor, s=schema_field: e.set_value(s["default"]),
             )
             row.add_suffix(reset_btn)
 
             dimensions_group.add(row)
 
-            if key == 'bar-height':
+            if key == "bar-height":
                 self.bar_height_editor = editor
             else:
                 self.font_size_editor = editor
 
         # Opacity
         opacity_group = Adw.PreferencesGroup()
-        opacity_group.set_title('Opacity')
+        opacity_group.set_title("Opacity")
         self.append(opacity_group)
 
         self._opacity_editors = {}
-        for key in ['bar-opacity', 'popover-opacity']:
+        for key in ["bar-opacity", "popover-opacity"]:
             schema_field = GLOBAL_SCHEMA[key]
-            value = config.get(key, schema_field['default'])
+            value = config.get(key, schema_field["default"])
 
             row = Adw.ActionRow()
-            row.set_title(schema_field.get('label', key))
-            row.set_subtitle(schema_field.get('description', ''))
+            row.set_title(schema_field.get("label", key))
+            row.set_subtitle(schema_field.get("description", ""))
 
             editor = create_editor(
-                key, schema_field, value, self._on_field_change,
-                show_label=False
+                key,
+                schema_field,
+                value,
+                self._on_field_change,
+                show_label=False,
+                size_group=self.size_group,
             )
             editor.set_valign(Gtk.Align.CENTER)
             row.add_suffix(editor)
 
-            reset_btn = Gtk.Button.new_from_icon_name('edit-undo-symbolic')
+            reset_btn = Gtk.Button.new_from_icon_name("edit-undo-symbolic")
             reset_btn.set_valign(Gtk.Align.CENTER)
-            reset_btn.add_css_class('flat')
-            reset_btn.set_tooltip_text('Reset to default')
+            reset_btn.add_css_class("flat")
+            reset_btn.set_tooltip_text("Reset to default")
             reset_btn.connect(
-                'clicked', lambda _, k=key, e=editor, s=schema_field:
-                e.set_value(s['default'])
+                "clicked",
+                lambda _, k=key, e=editor, s=schema_field: e.set_value(s["default"]),
             )
             row.add_suffix(reset_btn)
 
             opacity_group.add(row)
             self._opacity_editors[key] = editor
 
-        style_schema = GLOBAL_SCHEMA['style']
+        style_schema = GLOBAL_SCHEMA["style"]
         self.style_editor = create_editor(
-            'style', style_schema,
-            config.get('style', style_schema['default']),
-            self._on_field_change
+            "style",
+            style_schema,
+            config.get("style", style_schema["default"]),
+            self._on_field_change,
+            size_group=self.size_group,
         )
         self.append(self.style_editor)
 
-        outputs_schema = GLOBAL_SCHEMA['outputs']
-        outputs_schema['choices'] = self._get_monitors()
-        outputs_schema['choices_label'] = 'Add monitor...'
+        outputs_schema = GLOBAL_SCHEMA["outputs"]
+        outputs_schema["choices"] = self._get_monitors()
+        outputs_schema["choices_label"] = "Add monitor..."
 
         self.outputs_editor = create_editor(
-            'outputs', outputs_schema,
-            config.get('outputs', outputs_schema['default']),
-            self._on_field_change
+            "outputs",
+            outputs_schema,
+            config.get("outputs", outputs_schema["default"]),
+            self._on_field_change,
+            size_group=self.size_group,
         )
         self.append(self.outputs_editor)
 
@@ -159,24 +172,24 @@ class AppearanceTab(Gtk.Box):
     def refresh(self, config):
         """Update editors with new config values"""
         self.config = config
-        self.style_editor.set_value(config.get('style', ''))
-        self.outputs_editor.set_value(config.get('outputs', []))
+        self.style_editor.set_value(config.get("style", ""))
+        self.outputs_editor.set_value(config.get("outputs", []))
         self.bar_height_editor.set_value(
-            config.get('bar-height', GLOBAL_SCHEMA['bar-height']['default']))
+            config.get("bar-height", GLOBAL_SCHEMA["bar-height"]["default"])
+        )
         self.font_size_editor.set_value(
-            config.get('font-size', GLOBAL_SCHEMA['font-size']['default']))
+            config.get("font-size", GLOBAL_SCHEMA["font-size"]["default"])
+        )
         for key, editor in self._opacity_editors.items():
-            editor.set_value(
-                config.get(key, GLOBAL_SCHEMA[key]['default'])
-            )
+            editor.set_value(config.get(key, GLOBAL_SCHEMA[key]["default"]))
 
     def get_values(self):
         """Get current values"""
         values = {
-            'style': self.style_editor.get_value(),
-            'outputs': self.outputs_editor.get_value(),
-            'bar-height': self.bar_height_editor.get_value(),
-            'font-size': self.font_size_editor.get_value()
+            "style": self.style_editor.get_value(),
+            "outputs": self.outputs_editor.get_value(),
+            "bar-height": self.bar_height_editor.get_value(),
+            "font-size": self.font_size_editor.get_value(),
         }
         for key, editor in self._opacity_editors.items():
             values[key] = editor.get_value()

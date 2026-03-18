@@ -718,6 +718,7 @@ class ModuleSettingsGroup(Adw.PreferencesGroup):
                     schema_field,
                     value,
                     lambda k, v, m=module_name: self._on_module_field_change(m, k, v),
+                    halign=Gtk.Align.FILL,
                 )
                 self._content_box.append(editor)
                 self._current_rows.append(editor)
