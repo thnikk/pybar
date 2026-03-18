@@ -859,6 +859,10 @@ class ModulesTab(Gtk.Box):
         self.on_change = on_change
         self.sections = {}
         self.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        # Add dummy widget to set min width for the size group
+        dummy = Gtk.Box()
+        dummy.set_size_request(150, -1)
+        self.size_group.add_widget(dummy)
 
         # Left side: Layout and available modules
         left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)

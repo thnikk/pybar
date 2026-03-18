@@ -3,12 +3,14 @@
 Description: Appearance settings tab
 Author: thnikk
 """
+
 from settings.widgets.editors import create_editor
 from settings.schema import FieldType, GLOBAL_SCHEMA
 from gi.repository import Gtk, Adw, Gdk
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 
 
 class AppearanceTab(Gtk.Box):
@@ -22,6 +24,10 @@ class AppearanceTab(Gtk.Box):
         self.config = config
         self.on_change = on_change
         self.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        # Add dummy widget to set min width for the size group
+        dummy = Gtk.Box()
+        dummy.set_size_request(300, -1)
+        self.size_group.add_widget(dummy)
 
         header = Adw.PreferencesGroup()
         header.set_title("Appearance")

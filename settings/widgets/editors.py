@@ -137,6 +137,7 @@ class IntegerEditor(FieldEditor):
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
         self.spin.set_halign(self.halign_value)
+        self.spin.set_width_chars(10)
         self._add_to_size_group(self.spin)
         self.spin.connect("value-changed", lambda _: self._emit_change())
 
@@ -225,6 +226,7 @@ class FloatEditor(FieldEditor):
         self.spin.set_numeric(True)
         self.spin.set_hexpand(True)
         self.spin.set_halign(self.halign_value)
+        self.spin.set_width_chars(10)
         self._add_to_size_group(self.spin)
         self.spin.connect("value-changed", lambda _: self._emit_change())
 

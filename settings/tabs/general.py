@@ -26,6 +26,10 @@ class GeneralTab(Gtk.Box):
         self.on_change = on_change
         self.editors = {}
         self.size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        # Add dummy widget to set min width for the size group
+        dummy = Gtk.Box()
+        dummy.set_size_request(300, -1)
+        self.size_group.add_widget(dummy)
 
         # General Group
         self.general_group = Adw.PreferencesGroup()
