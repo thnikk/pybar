@@ -314,6 +314,7 @@ class Volume(c.BaseModule):
                 devices_box, gradient_size=60,
                 bg_color="1c1f26",
                 max_height=180)
+            c.add_style(vsgb, "scroll")
             section_box.append(vsgb)
             content_box.append(section_box)
 

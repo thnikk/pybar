@@ -179,11 +179,13 @@ class HASSLovelace(c.BaseModule):
         config = data.get("config", {})
         states = data.get("states", {})
 
-        main_box = c.box("v", spacing=15)
+        container = c.box("v", spacing=15)
 
         # Dashboard Title (Main Widget Heading)
         title = config.get("title", "Home Assistant")
-        main_box.append(c.label(title, style="heading"))
+        container.append(c.label(title, style="heading"))
+
+        main_box = c.box("v", spacing=15)
 
         views = config.get("views", [])
         if not views:
@@ -217,14 +219,11 @@ class HASSLovelace(c.BaseModule):
                 if view_box.get_first_child():
                     main_box.append(view_box)
 
-        scrolled = Gtk.ScrolledWindow(hexpand=True, vexpand=False)
-        scrolled.set_overflow(Gtk.Overflow.HIDDEN)
-        scrolled.set_max_content_height(600)
-        scrolled.set_propagate_natural_width(True)
-        scrolled.set_propagate_natural_height(True)
-        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_child(main_box)
-        return scrolled
+        res = c.VScrollGradientBox(
+            main_box, max_height=500, bg_color="#1c1f26")
+        c.add_style(res, "scroll")
+        container.append(res)
+        return container
 
     def _extract_entities(self, card):
         entities = []

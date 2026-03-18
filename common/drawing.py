@@ -2,14 +2,16 @@
 Description: Cairo drawing widgets (Graph, PillBar, scroll gradient boxes)
 Author: thnikk
 """
+
 import math
 import cairo
 import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Pango', '1.0')
-gi.require_version('PangoCairo', '1.0')
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Pango", "1.0")
+gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gtk, Gdk, Pango, PangoCairo, GLib  # noqa
-from common.helpers import _suppress_overshoot, _parse_color
+from common.helpers import _suppress_overshoot, _parse_color, add_style
 from common.widgets import HoverPopover
 
 
@@ -17,11 +19,24 @@ class Graph(Gtk.DrawingArea):
     """Smooth history graph with optional hover labels and icon overlays."""
 
     def __init__(
-            self, data, state=None, unit=None, min_config=None,
-            max_config=None, height=120, width=300, smooth=False,
-            time_markers=None, time_labels=None, hover_labels=None,
-            colors=None, secondary_data=None, icon_data=None,
-            pin_first_to_edge=False, center_in_bins=False):
+        self,
+        data,
+        state=None,
+        unit=None,
+        min_config=None,
+        max_config=None,
+        height=120,
+        width=300,
+        smooth=False,
+        time_markers=None,
+        time_labels=None,
+        hover_labels=None,
+        colors=None,
+        secondary_data=None,
+        icon_data=None,
+        pin_first_to_edge=False,
+        center_in_bins=False,
+    ):
         super().__init__()
         self.set_content_height(height)
         self.set_content_width(width)
@@ -58,8 +73,7 @@ class Graph(Gtk.DrawingArea):
         if width <= 0:
             return
 
-        series = (
-            self.data[0] if isinstance(self.data[0], list) else self.data)
+        series = self.data[0] if isinstance(self.data[0], list) else self.data
         num_points = len(series)
 
         if self.center_in_bins and num_points > 0:
@@ -90,10 +104,11 @@ class Graph(Gtk.DrawingArea):
 
     def _catmull_rom_point(self, p0, p1, p2, p3, t, alpha=0.5):
         """Calculate a Catmull-Rom spline point at parameter t."""
+
         def tj(ti, pi, pj):
             xi, yi = pi
             xj, yj = pj
-            return ((xj - xi)**2 + (yj - yi)**2)**0.5**alpha + ti
+            return ((xj - xi) ** 2 + (yj - yi) ** 2) ** 0.5**alpha + ti
 
         t0, t1 = 0, tj(0, p0, p1)
         t2 = tj(t1, p1, p2)
@@ -111,20 +126,38 @@ class Graph(Gtk.DrawingArea):
         def safe_div(num, denom):
             return num / denom if abs(denom) > 1e-6 else 0
 
-        A1 = [safe_div(t1 - t_norm, t1 - t0) * p0[i] +
-              safe_div(t_norm - t0, t1 - t0) * p1[i] for i in (0, 1)]
-        A2 = [safe_div(t2 - t_norm, t2 - t1) * p1[i] +
-              safe_div(t_norm - t1, t2 - t1) * p2[i] for i in (0, 1)]
-        A3 = [safe_div(t3 - t_norm, t3 - t2) * p2[i] +
-              safe_div(t_norm - t2, t3 - t2) * p3[i] for i in (0, 1)]
+        A1 = [
+            safe_div(t1 - t_norm, t1 - t0) * p0[i]
+            + safe_div(t_norm - t0, t1 - t0) * p1[i]
+            for i in (0, 1)
+        ]
+        A2 = [
+            safe_div(t2 - t_norm, t2 - t1) * p1[i]
+            + safe_div(t_norm - t1, t2 - t1) * p2[i]
+            for i in (0, 1)
+        ]
+        A3 = [
+            safe_div(t3 - t_norm, t3 - t2) * p2[i]
+            + safe_div(t_norm - t2, t3 - t2) * p3[i]
+            for i in (0, 1)
+        ]
 
-        B1 = [safe_div(t2 - t_norm, t2 - t0) * A1[i] +
-              safe_div(t_norm - t0, t2 - t0) * A2[i] for i in (0, 1)]
-        B2 = [safe_div(t3 - t_norm, t3 - t1) * A2[i] +
-              safe_div(t_norm - t1, t3 - t1) * A3[i] for i in (0, 1)]
+        B1 = [
+            safe_div(t2 - t_norm, t2 - t0) * A1[i]
+            + safe_div(t_norm - t0, t2 - t0) * A2[i]
+            for i in (0, 1)
+        ]
+        B2 = [
+            safe_div(t3 - t_norm, t3 - t1) * A2[i]
+            + safe_div(t_norm - t1, t3 - t1) * A3[i]
+            for i in (0, 1)
+        ]
 
-        C = [safe_div(t2 - t_norm, t2 - t1) * B1[i] +
-             safe_div(t_norm - t1, t2 - t1) * B2[i] for i in (0, 1)]
+        C = [
+            safe_div(t2 - t_norm, t2 - t1) * B1[i]
+            + safe_div(t_norm - t1, t2 - t1) * B2[i]
+            for i in (0, 1)
+        ]
 
         return tuple(C)
 
@@ -139,12 +172,12 @@ class Graph(Gtk.DrawingArea):
             return
 
         if len(points) >= 3:
-            p0 = (2 * points[0][0] - points[1][0],
-                  2 * points[0][1] - points[1][1])
-            p_last = (2 * points[-1][0] - points[-2][0],
-                      2 * points[-1][1] - points[-2][1])
-            extended_points = [
-                p0, points[0], *points[1:-1], points[-1], p_last]
+            p0 = (2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1])
+            p_last = (
+                2 * points[-1][0] - points[-2][0],
+                2 * points[-1][1] - points[-2][1],
+            )
+            extended_points = [p0, points[0], *points[1:-1], points[-1], p_last]
         else:
             dx = points[1][0] - points[0][0]
             dy = points[1][1] - points[0][1]
@@ -155,13 +188,14 @@ class Graph(Gtk.DrawingArea):
         first_segment = True
         for i in range(len(extended_points) - 3):
             p0, p1, p2, p3 = (
-                extended_points[i], extended_points[i+1],
-                extended_points[i+2], extended_points[i+3])
+                extended_points[i],
+                extended_points[i + 1],
+                extended_points[i + 2],
+                extended_points[i + 3],
+            )
             for j in range(n_points_per_segment):
-                t = (j / (n_points_per_segment - 1)
-                     if n_points_per_segment > 1 else 0)
-                point = self._catmull_rom_point(
-                    p0, p1, p2, p3, t, alpha=0.5)
+                t = j / (n_points_per_segment - 1) if n_points_per_segment > 1 else 0
+                point = self._catmull_rom_point(p0, p1, p2, p3, t, alpha=0.5)
                 if first_segment and j == 0:
                     cr.move_to(point[0], point[1])
                     first_segment = False
@@ -192,10 +226,8 @@ class Graph(Gtk.DrawingArea):
         for s in series_list:
             all_vals.extend(s)
 
-        min_val = (self.min_config if self.min_config is not None
-                   else min(all_vals))
-        max_val = (self.max_config if self.max_config is not None
-                   else max(all_vals))
+        min_val = self.min_config if self.min_config is not None else min(all_vals)
+        max_val = self.max_config if self.max_config is not None else max(all_vals)
         range_val = max_val - min_val if max_val != min_val else 1
 
         def get_coords(i, series):
@@ -212,7 +244,7 @@ class Graph(Gtk.DrawingArea):
         target_lines = 5
         grid_step = 10
         if range_val > 0:
-            mag = 10**math.floor(math.log10(range_val / target_lines))
+            mag = 10 ** math.floor(math.log10(range_val / target_lines))
             ratio = (range_val / target_lines) / mag
             if ratio < 1.5:
                 multiplier = 1
@@ -225,10 +257,8 @@ class Graph(Gtk.DrawingArea):
             grid_step = max(mag * multiplier, 1)
 
         start_line = math.ceil(min_val / grid_step) * grid_step
-        for val in range(
-                int(start_line), int(max_val) + 1, int(grid_step)):
-            y = 10 + (h - 20) - (
-                (val - min_val) / range_val) * (h - 20)
+        for val in range(int(start_line), int(max_val) + 1, int(grid_step)):
+            y = 10 + (h - 20) - ((val - min_val) / range_val) * (h - 20)
             cr.move_to(0, y)
             cr.line_to(w, y)
             cr.stroke()
@@ -241,20 +271,16 @@ class Graph(Gtk.DrawingArea):
 
             cr.new_path()
             if self.smooth:
-                points = (
-                    [(0, first_y)]
-                    + [get_coords(i, series) for i in range(len(series))]
-                )
-                self._draw_catmull_rom_spline(
-                    cr, points, n_points_per_segment=25)
+                points = [(0, first_y)] + [
+                    get_coords(i, series) for i in range(len(series))
+                ]
+                self._draw_catmull_rom_spline(cr, points, n_points_per_segment=25)
             else:
                 cr.move_to(0, first_y)
                 for i in range(len(series) - 1):
                     x1, y1 = get_coords(i, series)
                     x2, y2 = get_coords(i + 1, series)
-                    cr.curve_to(
-                        x1 + (x2 - x1) / 2, y1,
-                        x1 + (x2 - x1) / 2, y2, x2, y2)
+                    cr.curve_to(x1 + (x2 - x1) / 2, y1, x1 + (x2 - x1) / 2, y2, x2, y2)
 
             cr.line_to(w, last_y)
             cr.set_line_width(2)
@@ -269,8 +295,7 @@ class Graph(Gtk.DrawingArea):
             cr.close_path()
 
             linpat = cairo.LinearGradient(0, 0, 0, h)
-            linpat.add_color_stop_rgba(
-                0, color[0], color[1], color[2], fill_opacity)
+            linpat.add_color_stop_rgba(0, color[0], color[1], color[2], fill_opacity)
             linpat.add_color_stop_rgba(1, color[0], color[1], color[2], 0)
             cr.set_source(linpat)
             cr.fill()
@@ -279,8 +304,7 @@ class Graph(Gtk.DrawingArea):
         if self.secondary_data:
             s_series = self.secondary_data
             n = len(s_series)
-            s_color = (
-                self.colors[1] if len(self.colors) > 1 else (0.2, 0.5, 0.8))
+            s_color = self.colors[1] if len(self.colors) > 1 else (0.2, 0.5, 0.8)
 
             bar_w = 6
             radius = bar_w / 2
@@ -291,17 +315,12 @@ class Graph(Gtk.DrawingArea):
                 x0 = bx - bar_w / 2
                 y0 = h / 2 - bar_h / 2
                 cr.new_sub_path()
-                cr.arc(x0 + radius, y0 + radius,
-                       radius, math.pi, 3 * math.pi / 2)
-                cr.arc(x0 + bar_w - radius, y0 + radius,
-                       radius, 3 * math.pi / 2, 0)
-                cr.arc(x0 + bar_w - radius, y0 + bar_h - radius,
-                       radius, 0, math.pi / 2)
-                cr.arc(x0 + radius, y0 + bar_h - radius,
-                       radius, math.pi / 2, math.pi)
+                cr.arc(x0 + radius, y0 + radius, radius, math.pi, 3 * math.pi / 2)
+                cr.arc(x0 + bar_w - radius, y0 + radius, radius, 3 * math.pi / 2, 0)
+                cr.arc(x0 + bar_w - radius, y0 + bar_h - radius, radius, 0, math.pi / 2)
+                cr.arc(x0 + radius, y0 + bar_h - radius, radius, math.pi / 2, math.pi)
                 cr.close_path()
-            cr.set_source_rgba(
-                s_color[0], s_color[1], s_color[2], 0.15)
+            cr.set_source_rgba(s_color[0], s_color[1], s_color[2], 0.15)
             cr.fill()
 
         # Time marker lines and labels
@@ -310,8 +329,7 @@ class Graph(Gtk.DrawingArea):
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.6)
             cr.set_dash([2, 2])
             num_points = len(series_list[0])
-            for marker_pos, lbl in zip(
-                    self.time_markers, self.time_labels):
+            for marker_pos, lbl in zip(self.time_markers, self.time_labels):
                 if 0 <= marker_pos <= num_points - 1:
                     x = self._point_x(marker_pos, num_points, w)
                     cr.move_to(x, 0)
@@ -320,8 +338,8 @@ class Graph(Gtk.DrawingArea):
                     cr.set_dash([])
                     cr.set_source_rgba(0.5, 0.5, 0.5, 0.8)
                     cr.select_font_face(
-                        "Nunito", cairo.FONT_SLANT_NORMAL,
-                        cairo.FONT_WEIGHT_NORMAL)
+                        "Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL
+                    )
                     cr.set_font_size(9)
                     text_extents = cr.text_extents(lbl)
                     cr.move_to(x - text_extents.width / 2, h / 2)
@@ -355,8 +373,7 @@ class Graph(Gtk.DrawingArea):
                 top_margin = 10
                 _, curve_y = get_coords(i, series_list[0])
                 ty_above = curve_y - gap - (lext.y + lext.height)
-                ty = ty_above if ty_above >= top_margin else (
-                    curve_y + gap - lext.y)
+                ty = ty_above if ty_above >= top_margin else (curve_y + gap - lext.y)
 
                 cr.set_source_rgba(1, 1, 1, 0.75)
                 cr.move_to(tx, ty)
@@ -364,10 +381,8 @@ class Graph(Gtk.DrawingArea):
 
         # Min/Max legend
         legend_color = (0.56, 0.63, 0.75)
-        cr.set_source_rgba(
-            legend_color[0], legend_color[1], legend_color[2], 0.5)
-        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL,
-                            cairo.FONT_WEIGHT_NORMAL)
+        cr.set_source_rgba(legend_color[0], legend_color[1], legend_color[2], 0.5)
+        cr.select_font_face("Nunito", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(10)
         cr.move_to(5, 15)
         cr.show_text(f"{max_val:.1f}")
@@ -389,14 +404,16 @@ class Graph(Gtk.DrawingArea):
             bg_h = extents.height + padding * 2
             cr.set_source_rgba(0, 0, 0, 0.4)
             cr.new_sub_path()
-            cr.arc(bg_x + radius, bg_y + radius,
-                   radius, math.pi, 3 * math.pi / 2)
-            cr.arc(bg_x + bg_w - radius, bg_y + radius,
-                   radius, 3 * math.pi / 2, 2 * math.pi)
-            cr.arc(bg_x + bg_w - radius, bg_y + bg_h - radius,
-                   radius, 0, math.pi / 2)
-            cr.arc(bg_x + radius, bg_y + bg_h - radius,
-                   radius, math.pi / 2, math.pi)
+            cr.arc(bg_x + radius, bg_y + radius, radius, math.pi, 3 * math.pi / 2)
+            cr.arc(
+                bg_x + bg_w - radius,
+                bg_y + radius,
+                radius,
+                3 * math.pi / 2,
+                2 * math.pi,
+            )
+            cr.arc(bg_x + bg_w - radius, bg_y + bg_h - radius, radius, 0, math.pi / 2)
+            cr.arc(bg_x + radius, bg_y + bg_h - radius, radius, math.pi / 2, math.pi)
             cr.close_path()
             cr.fill()
             cr.set_source_rgb(1, 1, 1)
@@ -408,8 +425,7 @@ class Graph(Gtk.DrawingArea):
             num_points = len(series_list[0])
             x = self._point_x(self.hover_index, num_points, w)
             hover_color = (0.56, 0.63, 0.75)
-            cr.set_source_rgba(
-                hover_color[0], hover_color[1], hover_color[2], 0.8)
+            cr.set_source_rgba(hover_color[0], hover_color[1], hover_color[2], 0.8)
             cr.set_line_width(1)
             cr.move_to(x, 0)
             cr.line_to(x, h)
@@ -417,7 +433,7 @@ class Graph(Gtk.DrawingArea):
 
             if self.hover_index < len(self.hover_labels):
                 label_text = str(self.hover_labels[self.hover_index])
-                lines = label_text.split('\n')
+                lines = label_text.split("\n")
                 cr.set_font_size(11)
 
                 max_w = 0
@@ -441,14 +457,10 @@ class Graph(Gtk.DrawingArea):
                 bh = total_h + pad * 2
 
                 cr.new_sub_path()
-                cr.arc(bx + radius, by + radius,
-                       radius, math.pi, 3 * math.pi / 2)
-                cr.arc(bx + bw - radius, by + radius,
-                       radius, 3 * math.pi / 2, 0)
-                cr.arc(bx + bw - radius, by + bh - radius,
-                       radius, 0, math.pi / 2)
-                cr.arc(bx + radius, by + bh - radius,
-                       radius, math.pi / 2, math.pi)
+                cr.arc(bx + radius, by + radius, radius, math.pi, 3 * math.pi / 2)
+                cr.arc(bx + bw - radius, by + radius, radius, 3 * math.pi / 2, 0)
+                cr.arc(bx + bw - radius, by + bh - radius, radius, 0, math.pi / 2)
+                cr.arc(bx + radius, by + bh - radius, radius, math.pi / 2, math.pi)
                 cr.close_path()
                 cr.set_source_rgba(0, 0, 0, 0.55)
                 cr.fill()
@@ -456,12 +468,10 @@ class Graph(Gtk.DrawingArea):
                 cr.set_source_rgb(1, 1, 1)
                 current_y = ly - total_h + line_extents[0].height
                 for i, line in enumerate(lines):
-                    cr.move_to(
-                        lx + (max_w - line_extents[i].width) / 2,
-                        current_y)
+                    cr.move_to(lx + (max_w - line_extents[i].width) / 2, current_y)
                     cr.show_text(line)
                     if i < len(lines) - 1:
-                        current_y += line_extents[i+1].height + 4
+                        current_y += line_extents[i + 1].height + 4
 
 
 class PillBar(Gtk.DrawingArea):
@@ -489,12 +499,12 @@ class PillBar(Gtk.DrawingArea):
         width = self.get_width()
         current_x = 0
         for s in self.segments:
-            w = (s['percent'] / 100) * width
+            w = (s["percent"] / 100) * width
             if current_x <= x <= current_x + w:
-                if s.get('tooltip'):
+                if s.get("tooltip"):
                     self.hover_popover.show_text(
-                        s['tooltip'], x, y,
-                        offset=y, delay=self.hover_delay)
+                        s["tooltip"], x, y, offset=y, delay=self.hover_delay
+                    )
                     return
             current_x += w
         self.hover_popover.popdown()
@@ -512,10 +522,10 @@ class PillBar(Gtk.DrawingArea):
         width = self.get_width()
         current_x = 0
         for s in self.segments:
-            w = (s['percent'] / 100) * width
+            w = (s["percent"] / 100) * width
             if current_x <= x <= current_x + w:
-                if s.get('tooltip'):
-                    tooltip.set_text(s['tooltip'])
+                if s.get("tooltip"):
+                    tooltip.set_text(s["tooltip"])
                     return True
             current_x += w
         return False
@@ -537,11 +547,11 @@ class PillBar(Gtk.DrawingArea):
 
         current_x = 0
         for s in self.segments:
-            w = (s['percent'] / 100) * width
+            w = (s["percent"] / 100) * width
             if w < 0.5:
                 current_x += w
                 continue
-            cr.set_source_rgb(*s['color'])
+            cr.set_source_rgb(*s["color"])
             cr.rectangle(current_x, 0, w, height)
             cr.fill()
             current_x += w
@@ -552,25 +562,33 @@ class _ScrollGradientBase(Gtk.Overlay):
     """Shared base for horizontal and vertical scroll gradient overlays."""
 
     GRADIENT_SIZE = 30
-    BG = (0.169, 0.188, 0.231)   # #2b303b as floats
-    FLASH = (0.3, 0.36, 0.47)    # Light default flash colour
+    BG = (0.169, 0.188, 0.231)  # #2b303b as floats
+    FLASH = (0.3, 0.36, 0.47)  # Light default flash colour
+    RADIUS = 10
 
     def __init__(
-            self, child, gradient_size=None,
-            bg_color=None, flash_color=None):
+        self, child, gradient_size=None, bg_color=None, flash_color=None, radius=None
+    ):
         super().__init__()
+        self.set_overflow(Gtk.Overflow.HIDDEN)
         self._gradient_size = (
-            gradient_size if gradient_size is not None
-            else self.GRADIENT_SIZE
+            gradient_size if gradient_size is not None else self.GRADIENT_SIZE
         )
+
         self._bg_color = _parse_color(bg_color) if bg_color else self.BG
-        self._flash_color = (
-            _parse_color(flash_color) if flash_color else self.FLASH
-        )
+        self._flash_color = _parse_color(flash_color) if flash_color else self.FLASH
+        self._radius = radius if radius is not None else self.RADIUS
+        if radius is not None:
+            add_style(self, f"radius-{int(self._radius)}")
+            provider = Gtk.CssProvider()
+            css = f"* {{ border-radius: {int(self._radius)}px; }}"
+            provider.load_from_data(css.encode())
+            self.get_style_context().add_provider(
+                provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
         self._flash_opacity = 0.0
         self._flash_dir = 0
         self._anim_id = None
-        self.set_overflow(Gtk.Overflow.HIDDEN)
 
         self._scroll = self._make_scroll()
         self._scroll.set_child(child)
@@ -586,12 +604,13 @@ class _ScrollGradientBase(Gtk.Overlay):
         adj.connect("changed", lambda *_: self._canvas.queue_draw())
 
         self._scroll_controller = Gtk.EventControllerScroll.new(
-            Gtk.EventControllerScrollFlags.BOTH_AXES)
+            Gtk.EventControllerScrollFlags.BOTH_AXES
+        )
         self._scroll_controller.connect("scroll", self._on_scroll_event)
         self._scroll.add_controller(self._scroll_controller)
 
     def _on_scroll_event(self, _controller, dx, dy):
-        delta = dy if hasattr(self, '_sw_height') else dx
+        delta = dy if hasattr(self, "_sw_height") else dx
         if delta == 0:
             return False
 
@@ -669,13 +688,25 @@ class HScrollGradientBox(_ScrollGradientBase):
     """
 
     def __init__(
-            self, child, max_width=None, height=0,
-            gradient_size=None, bg_color=None, flash_color=None):
+        self,
+        child,
+        height=0,
+        max_width=None,
+        gradient_size=None,
+        bg_color=None,
+        flash_color=None,
+        radius=None,
+    ):
+
         self._max_width = max_width
         self._sw_height = height
         super().__init__(
-            child, gradient_size=gradient_size,
-            bg_color=bg_color, flash_color=flash_color)
+            child,
+            gradient_size=gradient_size,
+            bg_color=bg_color,
+            flash_color=flash_color,
+            radius=radius,
+        )
 
     def _make_scroll(self):
         sw = Gtk.ScrolledWindow(hexpand=True)
@@ -704,13 +735,12 @@ class HScrollGradientBox(_ScrollGradientBase):
         fade_px = 40.0
         r, g, b = self._bg_color
         fr, fg, fb = self._flash_color
-        radius = 10
 
         left_op = min(val / fade_px, 1.0)
         right_op = min((upper - page - val) / fade_px, 1.0)
 
         cr.save()
-        self._rounded_rect(cr, 0, 0, width, height, radius)
+        self._rounded_rect(cr, 0, 0, width, height, self._radius)
         cr.clip()
 
         if left_op > 0:
@@ -731,8 +761,7 @@ class HScrollGradientBox(_ScrollGradientBase):
         if self._flash_opacity > 0:
             if self._flash_dir == -1:
                 pat = cairo.LinearGradient(0, 0, gs, 0)
-                pat.add_color_stop_rgba(
-                    0, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
                 pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
                 cr.rectangle(0, 0, gs, height)
                 cr.set_source(pat)
@@ -740,8 +769,7 @@ class HScrollGradientBox(_ScrollGradientBase):
             elif self._flash_dir == 1:
                 pat = cairo.LinearGradient(width - gs, 0, width, 0)
                 pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
-                pat.add_color_stop_rgba(
-                    1, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
                 cr.rectangle(width - gs, 0, gs, height)
                 cr.set_source(pat)
                 cr.fill()
@@ -756,14 +784,26 @@ class VScrollGradientBox(_ScrollGradientBase):
     """
 
     def __init__(
-            self, child, height=0, max_height=None, width=0,
-            gradient_size=None, bg_color=None, flash_color=None):
+        self,
+        child,
+        height=0,
+        max_height=None,
+        width=0,
+        gradient_size=None,
+        bg_color=None,
+        flash_color=None,
+        radius=None,
+    ):
         self._sw_height = height
         self._max_height = max_height
         self._sw_width = width
         super().__init__(
-            child, gradient_size=gradient_size,
-            bg_color=bg_color, flash_color=flash_color)
+            child,
+            gradient_size=gradient_size,
+            bg_color=bg_color,
+            flash_color=flash_color,
+            radius=radius,
+        )
 
     def _make_scroll(self):
         sw = Gtk.ScrolledWindow(hexpand=True)
@@ -797,13 +837,12 @@ class VScrollGradientBox(_ScrollGradientBase):
         fade_px = 40.0
         r, g, b = self._bg_color
         fr, fg, fb = self._flash_color
-        radius = 10
 
         top_op = min(val / fade_px, 1.0)
         bottom_op = min((upper - page - val) / fade_px, 1.0)
 
         cr.save()
-        self._rounded_rect(cr, 0, 0, width, height, radius)
+        self._rounded_rect(cr, 0, 0, width, height, self._radius)
         cr.clip()
 
         if top_op > 0:
@@ -824,8 +863,7 @@ class VScrollGradientBox(_ScrollGradientBase):
         if self._flash_opacity > 0:
             if self._flash_dir == -1:
                 pat = cairo.LinearGradient(0, 0, 0, gs)
-                pat.add_color_stop_rgba(
-                    0, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(0, fr, fg, fb, self._flash_opacity)
                 pat.add_color_stop_rgba(1, fr, fg, fb, 0.0)
                 cr.rectangle(0, 0, width, gs)
                 cr.set_source(pat)
@@ -833,11 +871,9 @@ class VScrollGradientBox(_ScrollGradientBase):
             elif self._flash_dir == 1:
                 pat = cairo.LinearGradient(0, height - gs, 0, height)
                 pat.add_color_stop_rgba(0, fr, fg, fb, 0.0)
-                pat.add_color_stop_rgba(
-                    1, fr, fg, fb, self._flash_opacity)
+                pat.add_color_stop_rgba(1, fr, fg, fb, self._flash_opacity)
                 cr.rectangle(0, height - gs, width, gs)
                 cr.set_source(pat)
                 cr.fill()
 
         cr.restore()
-
