@@ -21,6 +21,7 @@ a = Analysis(
     ] + extra_datas,
     hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
         'requests',
+        'aiohttp',
         'hid',
         'pulsectl',
         'psutil',
