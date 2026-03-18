@@ -10,6 +10,9 @@ import common as c
 import gi
 import asyncio
 import aiohttp
+import logging
+
+logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa
@@ -21,8 +24,7 @@ class HASSLovelace(c.BaseModule):
             "type": "string",
             "default": "",
             "label": "Server",
-            "description": "Home Assistant server address "
-            "(e.g. 10.0.0.3:8123)",
+            "description": "Home Assistant server address (e.g. 10.0.0.3:8123)",
         },
         "bearer_token": {
             "type": "string",
@@ -78,8 +80,7 @@ class HASSLovelace(c.BaseModule):
                     msg = await ws.receive_json()
                     if msg.get("type") != "auth_ok":
                         c.print_debug(
-                            f"HASS Lovelace: WS Auth failed: {msg}",
-                            color="red"
+                            f"HASS Lovelace: WS Auth failed: {msg}", color="red"
                         )
                         return None
 
@@ -98,8 +99,7 @@ class HASSLovelace(c.BaseModule):
                         return msg.get("result")
                     else:
                         c.print_debug(
-                            f"HASS Lovelace: WS Config fetch failed: {msg}",
-                            color="red"
+                            f"HASS Lovelace: WS Config fetch failed: {msg}", color="red"
                         )
                         return None
         except Exception as e:
@@ -119,10 +119,8 @@ class HASSLovelace(c.BaseModule):
         else:
             base_url = f"http://{server}"
 
-        bearer_token = f"Bearer {token}" if not token.startswith(
-            "Bearer ") else token
-        headers = {"Authorization": bearer_token,
-                   "content-type": "application/json"}
+        bearer_token = f"Bearer {token}" if not token.startswith("Bearer ") else token
+        headers = {"Authorization": bearer_token, "content-type": "application/json"}
 
         config = None
         try:
@@ -133,8 +131,7 @@ class HASSLovelace(c.BaseModule):
             )
             loop.close()
         except Exception as e:
-            c.print_debug(
-                f"HASS Lovelace: Failed to fetch via WS: {e}", color="yellow")
+            c.print_debug(f"HASS Lovelace: Failed to fetch via WS: {e}", color="yellow")
 
         if config is None:
             url_config = f"{base_url}/api/config/lovelace/config"
@@ -173,8 +170,7 @@ class HASSLovelace(c.BaseModule):
                 "token": bearer_token,
             }
         except Exception as e:
-            c.print_debug(
-                f"HASS Lovelace: Error fetching states: {e}", color="red")
+            c.print_debug(f"HASS Lovelace: Error fetching states: {e}", color="red")
             return None
 
     def build_popover(self, data):
@@ -262,8 +258,7 @@ class HASSLovelace(c.BaseModule):
         try:
             with self._get_session().post(
                 f"{server}/api/services/homeassistant/{service}",
-                headers={"Authorization": token,
-                         "content-type": "application/json"},
+                headers={"Authorization": token, "content-type": "application/json"},
                 json={"entity_id": eids},
                 timeout=3,
             ):
@@ -282,8 +277,7 @@ class HASSLovelace(c.BaseModule):
             domain = eid.split(".")[0]
             with self._get_session().post(
                 f"{server}/api/services/{domain}/toggle",
-                headers={"Authorization": token,
-                         "content-type": "application/json"},
+                headers={"Authorization": token, "content-type": "application/json"},
                 json={"entity_id": eid},
                 timeout=3,
             ):
@@ -306,8 +300,7 @@ class HASSLovelace(c.BaseModule):
             # 'state-set' is specifically for user interaction usually.
             group_sw.set_active(any_on)
 
-    def _render_cards_with_headings(
-            self, cards, states, server, token, parent):
+    def _render_cards_with_headings(self, cards, states, server, token, parent):
         """Render a list of cards into parent, grouping by heading cards."""
         groups = []
         current_group = {"heading": None, "cards": []}
@@ -350,8 +343,7 @@ class HASSLovelace(c.BaseModule):
             # Render heading if present (create group_sw if needed)
             if group["heading"]:
                 card = group["heading"]
-                heading = card.get("heading") or card.get(
-                    "text") or card.get("title")
+                heading = card.get("heading") or card.get("text") or card.get("title")
                 if heading:
                     header_box = c.box("h", spacing=10)
                     header_box.append(
@@ -360,8 +352,7 @@ class HASSLovelace(c.BaseModule):
 
                     if toggleable_eids:
                         any_on = any(
-                            states[eid].get("state") == "on"
-                            for eid in toggleable_eids
+                            states[eid].get("state") == "on" for eid in toggleable_eids
                         )
                         group_sw = Gtk.Switch.new()
                         group_sw.set_active(any_on)
@@ -374,8 +365,7 @@ class HASSLovelace(c.BaseModule):
                     header_box = c.box("h", spacing=10)
                     header_box.append(c.label("", ha="start", he=True))
                     any_on = any(
-                        states[eid].get("state") == "on"
-                        for eid in toggleable_eids
+                        states[eid].get("state") == "on" for eid in toggleable_eids
                     )
                     group_sw = Gtk.Switch.new()
                     group_sw.set_active(any_on)
@@ -449,8 +439,7 @@ class HASSLovelace(c.BaseModule):
             if current_section.get_first_child():
                 parent.append(current_section)
 
-    def build_card_rows(
-            self, card, states, server, token, container, switch_dict=None):
+    def build_card_rows(self, card, states, server, token, container, switch_dict=None):
         ctype = card.get("type")
         if ctype in ["grid", "horizontal-stack", "vertical-stack"]:
             cards = card.get("cards", [])
@@ -463,15 +452,13 @@ class HASSLovelace(c.BaseModule):
         if ctype in ["entities", "glance"]:
             entities = card.get("entities", [])
             for ent in entities:
-                row = self._create_entity_row(
-                    ent, states, server, token, switch_dict)
+                row = self._create_entity_row(ent, states, server, token, switch_dict)
                 if row:
                     if container.get_first_child():
                         container.append(c.sep("h"))
                     container.append(row)
         elif ctype in ["button", "sensor"]:
-            row = self._create_entity_row(
-                card, states, server, token, switch_dict)
+            row = self._create_entity_row(card, states, server, token, switch_dict)
             if row:
                 if container.get_first_child():
                     container.append(c.sep("h"))
@@ -488,9 +475,7 @@ class HASSLovelace(c.BaseModule):
             return None
 
         state_data = states[eid]
-        name = (
-            ent.get("name") if isinstance(ent, dict) else None
-        ) or state_data.get(
+        name = (ent.get("name") if isinstance(ent, dict) else None) or state_data.get(
             "attributes", {}
         ).get("friendly_name")
 
@@ -507,16 +492,13 @@ class HASSLovelace(c.BaseModule):
                 val = f"{float(val):.1f}"
             except (ValueError, TypeError):
                 pass
-            unit = state_data.get("attributes", {}).get(
-                "unit_of_measurement", "")
+            unit = state_data.get("attributes", {}).get("unit_of_measurement", "")
             row.append(c.label(f"{val}{unit}", ha="end"))
-        elif domain in [
-                "switch", "light", "input_boolean", "automation", "script"]:
+        elif domain in ["switch", "light", "input_boolean", "automation", "script"]:
             sw = Gtk.Switch.new()
             sw.set_active(state_data.get("state") == "on")
             sw.set_valign(Gtk.Align.CENTER)
-            sw.connect(
-                "state-set", self._make_toggle_handler(server, token, eid))
+            sw.connect("state-set", self._make_toggle_handler(server, token, eid))
             if switch_dict is not None:
                 switch_dict[eid] = sw
             row.append(sw)
