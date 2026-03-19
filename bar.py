@@ -573,14 +573,22 @@ class Bar:
 
     def populate(self):
         """ Populate bar with modules """
-        for section_name, section in {
+        # Map config section keys to short names used by zone-snap.
+        section_names = {
+            "modules-left": "left",
+            "modules-center": "center",
+            "modules-right": "right",
+        }
+        for section_key, section in {
             "modules-left": self.left,
             "modules-center": self.center,
             "modules-right": self.right,
         }.items():
-            for name in self.config[section_name]:
+            for name in self.config[section_key]:
                 loaded_module = module.module(self, name, self.config)
                 if loaded_module:
+                    # Store section membership so popovers can zone-snap.
+                    loaded_module.section = section_names[section_key]
                     section.append(loaded_module)
                     # Track widget by name for IPC lookups
                     self.module_widgets[name] = loaded_module

@@ -108,6 +108,16 @@ GLOBAL_SCHEMA = {
             'on is no longer visible on any monitor'
         )
     },
+    'popover-zone-snap': {
+        'type': FieldType.BOOLEAN,
+        'default': False,
+        'label': 'Popover Zone Snap',
+        'description': (
+            'Pin popovers to a screen-edge zone based on their section: '
+            'left modules snap to the left edge, right modules snap to '
+            'the right edge, center modules spawn centered'
+        )
+    },
     'namespace': {
         'type': FieldType.STRING,
         'default': 'pybar',

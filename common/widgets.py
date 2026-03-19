@@ -10,6 +10,61 @@ from common.state import state_manager
 from common.helpers import print_debug, add_style, align
 
 
+def apply_zone_snap(popover):
+    """
+    Override popover pointing rect to pin it to the screen zone
+    matching the section its parent module lives in.
+
+    Left section  → popover left edge aligns with screen left edge.
+    Center section → popover is centered on the screen.
+    Right section  → popover right edge aligns with screen right edge.
+
+    The rect x is expressed in the parent widget's local coordinate
+    space; we translate screen positions back through the hierarchy.
+    """
+    parent = popover.get_parent()
+    if not parent:
+        return
+
+    section = getattr(parent, 'section', None)
+    if not section:
+        return
+
+    toplevel = parent.get_native()
+    if not toplevel:
+        return
+
+    win_width = toplevel.get_width()
+    # Translate the module's origin into window coordinates.
+    point = parent.translate_coordinates(toplevel, 0, 0)
+    if not point:
+        return
+    mod_x, _ = point
+    mod_w = parent.get_width()
+
+    rect = Gdk.Rectangle()
+    rect.width = parent.get_width()
+    rect.height = parent.get_height()
+    # y=0 anchors to the top of the module button in local space,
+    # matching GTK's default popover origin and avoiding overlap.
+    rect.y = 0
+
+    if section == 'left':
+        # Pin popover left edge to screen left: rect.x in local space
+        # equals the negative of the module's screen x offset so that
+        # the popover's own left edge lands at screen x=0.
+        rect.x = -mod_x
+    elif section == 'right':
+        # Pin popover right edge to screen right: shift rect.x so the
+        # popover's right edge lands at win_width.
+        rect.x = win_width - mod_x - mod_w
+    else:
+        # Center: place rect at the screen's horizontal midpoint.
+        rect.x = int(win_width / 2 - mod_x - mod_w / 2)
+
+    popover.set_pointing_to(rect)
+
+
 def handle_popover_edge(popover):
     """Check if a popover is near the screen edge and flatten corners."""
     parent = popover.get_parent()
@@ -373,6 +428,10 @@ class Widget(Gtk.Popover):
         config = state_manager.get('config') or {}
         if config.get('popover-arrow', False):
             handle_popover_edge(self)
+        # Zone-snap overrides the pointing rect before the popover
+        # renders so it appears in the correct screen region.
+        if config.get('popover-zone-snap', False):
+            apply_zone_snap(self)
 
         parent = self.get_parent()
         if parent:
