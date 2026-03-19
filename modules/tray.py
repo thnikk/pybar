@@ -1090,6 +1090,24 @@ class TrayModuleWidget(Gtk.Box):
         else:
             # Keep collapsed class when no icons
             self.get_style_context().add_class("collapsed")
+    def _sort_key(self, icon):
+        """Return lowercase sort key: Id > Title > service_name."""
+        props = icon.item.properties
+        return (
+            props.get("Id") or
+            props.get("Title") or
+            icon.item.service_name or
+            ""
+        ).lower()
+
+    def _sort_icons(self):
+        """Re-order icons_box children alphabetically by sort key."""
+        icons = sorted(self.icons.values(), key=self._sort_key)
+        for icon in icons:
+            self.icons_box.remove(icon)
+        for icon in icons:
+            self.icons_box.append(icon)
+
     def add_item(self, item):
         full_name = f"{item.service_name}{item.object_path}"
 
@@ -1140,6 +1158,7 @@ class TrayModuleWidget(Gtk.Box):
             icon = TrayIcon(item, self.icon_size, self)
             self.icons[full_name] = icon
             self.icons_box.append(icon)
+            self._sort_icons()
             self._update_ui_state()
 
     def update_item(self, item, changed):
