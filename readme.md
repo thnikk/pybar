@@ -1,6 +1,6 @@
 <p align="center">
-    <img width="300" src="assets/pybar-logo-new-light.svg#gh-light-mode-only" alt="Pybar">
-    <img width="300" src="assets/pybar-logo-new-dark.svg#gh-dark-mode-only" alt="Pybar">
+    <img width="300" src="assets/pybar-logo-light.svg#gh-light-mode-only" alt="Pybar">
+    <img width="300" src="assets/pybar-logo-dark.svg#gh-dark-mode-only" alt="Pybar">
 </p>
 
 <p align="center">
@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    <img src="assets/screenshot-3.png" alt="Screenshot">
+    <img src="assets/screenshot.png" alt="Screenshot">
 </p>
 
 ### Installation

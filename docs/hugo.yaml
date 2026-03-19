@@ -8,7 +8,7 @@ params:
     displayTitle: true
     displayLogo: true
     logo:
-      dark: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon.svg
+      dark: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon-dark.svg
       path: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon-light.svg
 
   sidebar:

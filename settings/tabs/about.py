@@ -25,13 +25,13 @@ class AboutTab(Gtk.Box):
         # Register assets dir so the icon theme can find pybar-icon.svg
         icon_dir = os.path.dirname(
             c.get_resource_path(
-                os.path.join("assets", "pybar-logo-new-dark.svg"))
+                os.path.join("assets", "pybar-logo-dark.svg"))
         )
         icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
         icon_theme.add_search_path(icon_dir)
 
         # App icon
-        icon = Gtk.Image.new_from_icon_name("pybar-logo-new-dark")
+        icon = Gtk.Image.new_from_icon_name("pybar-logo-dark")
         icon.set_pixel_size(200)
         icon.set_margin_top(8)
         self.append(icon)

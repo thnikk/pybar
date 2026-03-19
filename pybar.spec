@@ -17,7 +17,7 @@ a = Analysis(
         ('style.css', '.'),
         ('modules', 'modules'),
         ('fonts', 'fonts'),
-        ('assets/pybar-icon.svg', 'assets'),
+        ('assets', 'assets'),
     ] + extra_datas,
     hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
         'requests',
