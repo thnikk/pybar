@@ -1,6 +1,8 @@
 ---
-title: "Pybar Documentation"
+title: "Pybar"
 type: "docs"
 ---
 
-This is a test.
+A statusbar for Sway and Hyprland with widgets.
+
+![Screenshot](https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/screenshot-3.png)

@@ -7,6 +7,8 @@ params:
   navbar:
     displayTitle: true
     displayLogo: true
+    logo:
+      path: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon.svg
 
   sidebar:
     open: false
