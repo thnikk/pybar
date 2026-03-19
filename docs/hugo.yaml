@@ -1,4 +1,4 @@
-baseURL: 'https://github.com/thnikk/pybar'
+baseURL: 'https://thnikk.github.io/pybar'
 languageCode: 'en-us'
 title: 'Pybar'
 theme: ["github.com/imfing/hextra"]
