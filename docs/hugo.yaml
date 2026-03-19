@@ -10,12 +10,16 @@ params:
     logo:
       dark: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon-dark.svg
       path: https://raw.githubusercontent.com/thnikk/pybar/refs/heads/master/assets/pybar-icon-light.svg
+    width: wide
 
   sidebar:
     open: false
 
   search:
     type: "flexsearch"
+
+  page:
+    width: wide
 
 menu:
   main:
