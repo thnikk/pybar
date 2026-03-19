@@ -1,0 +1,27 @@
+baseURL: 'https://github.com/thnikk/pybar'
+languageCode: 'en-us'
+title: 'Pybar'
+theme: ["github.com/imfing/hextra"]
+
+params:
+  navbar:
+    displayTitle: true
+    displayLogo: true
+
+  sidebar:
+    open: false
+
+  search:
+    type: "flexsearch"
+
+menu:
+  main:
+    - name: Search
+      weight: 1
+      params:
+        type: search
+    - name: Github
+      weight: 2
+      url: "https://github.com/thnikk/pybar"
+      params:
+        icon: github
