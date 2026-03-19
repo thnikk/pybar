@@ -39,17 +39,25 @@ class Weather(c.BaseModule):
             'min': 60,
             'max': 3600
         },
+        'auto_range': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Auto Range',
+            'description': (
+                'Automatically scale graph to the min/max of the data'
+            )
+        },
         'min': {
             'type': 'integer',
-            'default': None,
+            'default': 0,
             'label': 'Graph Min Temp',
-            'description': 'Minimum temperature on graph (auto if empty)'
+            'description': 'Minimum temperature on graph'
         },
         'max': {
             'type': 'integer',
-            'default': None,
+            'default': 100,
             'label': 'Graph Max Temp',
-            'description': 'Maximum temperature on graph (auto if empty)'
+            'description': 'Maximum temperature on graph'
         }
     }
 
@@ -250,8 +258,9 @@ class Weather(c.BaseModule):
                             w['hourly']['relativehumidity_2m'][now.hour + h])
                         for h in range(hours_to_show + 1)],
                     "hours": hours_to_show,
-                    "min": self.config.get('min'),
-                    "max": self.config.get('max')
+                    "min": self.config.get('min', 0),
+                    "max": self.config.get('max', 100),
+                    "auto_range": self.config.get('auto_range', False)
                 },
                 "Daily": {"info": daily_info},
                 "icon": today_data['icon'],
@@ -400,8 +409,15 @@ class Weather(c.BaseModule):
             graph = c.Graph(
                 graph_temps,
                 height=120,
-                min_config=data['Hourly'].get('min'),
-                max_config=data['Hourly'].get('max'),
+                # Pass None to auto-range, or the config value to fix range
+                min_config=(
+                    None if data['Hourly'].get('auto_range')
+                    else data['Hourly'].get('min')
+                ),
+                max_config=(
+                    None if data['Hourly'].get('auto_range')
+                    else data['Hourly'].get('max')
+                ),
                 time_markers=time_markers,
                 time_labels=time_labels,
                 hover_labels=hover_labels,

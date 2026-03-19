@@ -57,17 +57,25 @@ class HASS(c.BaseModule):
             'min': 10,
             'max': 500
         },
+        'auto_range': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Auto Range',
+            'description': (
+                'Automatically scale graph to the min/max of the data'
+            )
+        },
         'min': {
             'type': 'float',
-            'default': None,
+            'default': 0.0,
             'label': 'Graph Minimum',
-            'description': 'Minimum value for graph scale (optional)'
+            'description': 'Minimum value for graph scale'
         },
         'max': {
             'type': 'float',
-            'default': None,
+            'default': 100.0,
             'label': 'Graph Maximum',
-            'description': 'Maximum value for graph scale (optional)'
+            'description': 'Maximum value for graph scale'
         },
         'interval': {
             'type': 'integer',
@@ -142,8 +150,9 @@ class HASS(c.BaseModule):
             "unit": data['attributes'].get('unit_of_measurement', ''),
             "history": [i['val'] for i in history_data],
             "duration": duration,
-            "min": self.config.get('min'),
-            "max": self.config.get('max')
+            "auto_range": self.config.get('auto_range', False),
+            "min": self.config.get('min', 0.0),
+            "max": self.config.get('max', 100.0)
         }
 
     def build_popover(self, widget, data):
@@ -162,8 +171,15 @@ class HASS(c.BaseModule):
                 data['history'],
                 state=data['state'],
                 unit=data['unit'],
-                min_config=data.get('min'),
-                max_config=data.get('max'),
+                # Pass None to auto-range, or the config value to fix range
+                min_config=(
+                    None if data.get('auto_range')
+                    else data.get('min')
+                ),
+                max_config=(
+                    None if data.get('auto_range')
+                    else data.get('max')
+                ),
                 smooth=False
             )
             graph_box.append(widget.graph)

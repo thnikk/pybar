@@ -34,6 +34,14 @@ class XDrip(c.BaseModule):
             'label': 'API Secret',
             'description': 'XDrip+ API secret'
         },
+        'auto_range': {
+            'type': 'boolean',
+            'default': False,
+            'label': 'Auto Range',
+            'description': (
+                'Automatically scale graph to the min/max of the data'
+            )
+        },
         'min': {
             'type': 'integer',
             'default': 40,
@@ -118,8 +126,9 @@ class XDrip(c.BaseModule):
                 "class": cls,
                 "history": history,
                 "history_labels": history_labels,
-                "min": self.config.get('min'),
-                "max": self.config.get('max')
+                "min": self.config.get('min', 40),
+                "max": self.config.get('max', 200),
+                "auto_range": self.config.get('auto_range', False)
             }
         except Exception as e:
             c.print_debug(f"XDrip fetch failed: {e}", color='red')
@@ -147,15 +156,13 @@ class XDrip(c.BaseModule):
             graph_box = c.box('v', style='box')
             graph_box.set_overflow(Gtk.Overflow.HIDDEN)
 
-            # Use values from config or intelligent defaults
-            min_val = data.get('min', 40)
-            max_val = data.get('max', max(max(data['history']), 200))
-
+            # Pass None to auto-range, or the config value to fix range
+            auto_range = data.get('auto_range', False)
             graph_box.append(c.Graph(
                 data['history'],
                 height=100,
-                min_config=min_val,
-                max_config=max_val,
+                min_config=None if auto_range else data.get('min', 40),
+                max_config=None if auto_range else data.get('max', 200),
                 hover_labels=data.get('history_labels'),
                 smooth=True
             ))
