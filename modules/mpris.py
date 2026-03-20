@@ -627,6 +627,7 @@ class MPRIS(c.BaseModule):
         seek_box = c.box('v')
         # Seekbar
         widget.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
+        widget.pop_seekbar.get_style_context().add_class('mpris-slider')
 
         def on_seek(s):
             if self.active_player_proxy:
@@ -692,6 +693,7 @@ class MPRIS(c.BaseModule):
         vol_box.set_hexpand(True)
         widget.pop_volume = c.slider(
                 data.get('volume', 0), scrollable=True, style='music-volume')
+        widget.pop_volume.get_style_context().add_class('mpris-slider')
 
         def on_volume(s):
             if self.active_player_proxy:

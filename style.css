@@ -207,6 +207,22 @@ scale trough slider {
 	border: 1px solid @gray;
 }
 
+/* Hide mpris slider handles until hovered or dragged */
+.mpris-slider trough slider {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	transition: none;
+}
+
+.mpris-slider trough:hover slider,
+.mpris-slider trough slider:hover,
+.mpris-slider trough slider:active {
+	background: #4b505b;
+	border-color: @gray;
+	transition: none;
+}
+
 switch {
 	border: none;
 	background: @white;
