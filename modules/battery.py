@@ -258,7 +258,6 @@ class Battery(c.BaseModule):
     def create_widget(self, bar):
         """ Battery module widget """
         m = super().create_widget(bar)
-        c.add_style(m, 'module-fixed')
         m.set_icon('')
         return m
 
@@ -270,6 +269,7 @@ class Battery(c.BaseModule):
         # Always update the bar label and icon
         percentage = data.get('percentage', 0)
         widget.set_label(f'{percentage}%')
+        widget.text.set_width_chars(5)
 
         if data.get('ac_online'):
             widget.set_icon('')
