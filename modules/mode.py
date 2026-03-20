@@ -90,6 +90,10 @@ class Mode(c.BaseModule):
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
                     s.connect(socket_path)
+                    # Sync current submap state on connect so the widget
+                    # reflects reality immediately rather than waiting
+                    # for the next event (e.g. after wake from sleep).
+                    self._sync_hyprland_submap(socket_path)
                     while True:
                         data = s.recv(4096).decode('utf-8')
                         if not data:
@@ -106,6 +110,35 @@ class Mode(c.BaseModule):
                     f"Hyprland mode listener error: {e}", color='red')
                 import time
                 time.sleep(5)
+
+    def _sync_hyprland_submap(self, socket2_path):
+        """ Query the active submap via socket1 and apply it. """
+        # Derive socket1 path from socket2 path
+        socket1_path = socket2_path.replace(
+            '.socket2.sock', '.socket.sock')
+        try:
+            with socket.socket(
+                    socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.connect(socket1_path)
+                # Hyprland socket1 protocol: send command as
+                # plain text, read the full response
+                s.sendall(b'activesubmap')
+                s.shutdown(socket.SHUT_WR)
+                chunks = []
+                while True:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                mode = b''.join(chunks).decode('utf-8').strip()
+                if not mode:
+                    mode = 'default'
+                self._update_mode(mode)
+        except Exception as e:
+            c.print_debug(
+                f"Failed to sync Hyprland submap: {e}",
+                color='yellow')
+            self._update_mode('default')
 
     def _update_mode(self, mode):
         fmt = self.config.get('format', '{}')
