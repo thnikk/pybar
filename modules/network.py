@@ -5,6 +5,7 @@ Author: thnikk
 """
 from subprocess import run
 import weakref
+import os
 import common as c
 import gi
 import socket
@@ -30,6 +31,12 @@ class Network(c.BaseModule):
             'description': 'Seconds between network checks',
             'min': 1,
             'max': 60
+        },
+        'show_vpn_icon': {
+            'type': 'boolean',
+            'default': True,
+            'label': 'Show VPN Icon',
+            'description': 'Show a key icon when a VPN is active'
         }
     }
 
@@ -132,6 +139,38 @@ class Network(c.BaseModule):
             pass
         return False
 
+    def check_vpn(self):
+        """ Check if a VPN connection is active, return its name or None """
+        try:
+            # Check for tun/wireguard devices in a connected state
+            res = run(
+                ['nmcli', '-t', '-f', 'TYPE,STATE', 'd'],
+                check=True, capture_output=True
+            ).stdout.decode('utf-8')
+            for line in res.splitlines():
+                parts = line.split(':')
+                if len(parts) >= 2 and 'connected' in parts[1].lower():
+                    if parts[0] == 'wireguard':
+                        return 'WireGuard'
+                    if parts[0] == 'tun':
+                        return 'VPN (tun)'
+            # Check for active vpn-type connections (returns connection name)
+            res = run(
+                ['nmcli', '-t', '-f', 'NAME,TYPE,STATE',
+                    'c', 'show', '--active'],
+                check=True, capture_output=True
+            ).stdout.decode('utf-8')
+            for line in res.splitlines():
+                parts = line.split(':')
+                if len(parts) >= 3 and parts[1] == 'vpn':
+                    return parts[0] or 'VPN'
+            # Check for tailscale0 interface (Tailscale bypasses nmcli)
+            if os.path.exists('/sys/class/net/tailscale0'):
+                return 'Tailscale'
+        except Exception as e:
+            c.print_debug(f"VPN check error: {e}", color='red')
+        return None
+
     def get_remembered_ssids(self):
         """ Get SSIDs of saved Wi-Fi connections """
         try:
@@ -209,6 +248,7 @@ class Network(c.BaseModule):
                     break
 
         always_show = self.config.get('always_show', True)
+        show_vpn_icon = self.config.get('show_vpn_icon', True)
 
         # Only show wifi icon if actually connected with an SSID
         if connection_type == 'wifi' and not connection_ssid:
@@ -224,6 +264,11 @@ class Network(c.BaseModule):
             text = "\uf127" if always_show else ""
             # tooltip = "No connection"
 
+        # Append VPN icon alongside the connection icon when visible
+        vpn_name = self.check_vpn() if show_vpn_icon else None
+        if vpn_name and text:
+            text += " \uf084"
+
         return {
             "text": text,
             # "tooltip": tooltip,
@@ -232,6 +277,7 @@ class Network(c.BaseModule):
             "connection_type": connection_type,
             "connection_ssid": connection_ssid,
             "always_show": always_show,
+            "vpn_name": vpn_name,
         }
 
     def get_wifi_device(self):
@@ -478,6 +524,20 @@ class Network(c.BaseModule):
         if not connected_any:
             main_box.append(c.label("No active connections", style='gray'))
 
+        # VPN row (shown when a VPN is active)
+        vpn_name = data.get('vpn_name')
+        if vpn_name:
+            vpn_box = c.box('v', spacing=10)
+            vpn_box.append(
+                c.label('VPN', style='title', ha='start'))
+            vpn_info_box = c.box('v', style='box')
+            vpn_line = c.box('h', style='inner-box')
+            vpn_line.append(c.label('Name'))
+            vpn_line.append(c.label(vpn_name, ha='end', he=True))
+            vpn_info_box.append(vpn_line)
+            vpn_box.append(vpn_info_box)
+            main_box.append(vpn_box)
+
         # Available networks
         if data.get('wifi_networks'):
             main_box.append(c.sep('h'))
@@ -690,6 +750,13 @@ class Network(c.BaseModule):
             elif wifi_list_changed:
                 if not popover.get_visible():
                     needs_rebuild = True
+
+            # VPN state change updates the label only (no rebuild needed)
+            old_vpn = getattr(widget, '_vpn_name', None)
+            new_vpn = data.get('vpn_name', None)
+            if old_vpn != new_vpn:
+                devices_changed = True
+            widget._vpn_name = new_vpn
 
         # Rebuild when needed
         if needs_rebuild:
