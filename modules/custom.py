@@ -314,12 +314,14 @@ class SchemaWidgetBuilder:
         min_val = params.get('min')
         max_val = params.get('max')
 
+        hover_labels = params.get('hover_labels')
         graph = c.Graph(
             data=data,
             height=height,
             width=width,
             min_config=min_val,
-            max_config=max_val
+            max_config=max_val,
+            hover_labels=hover_labels
         )
 
         # Store reference if widget has an ID

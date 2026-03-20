@@ -381,6 +381,10 @@ class CPU(c.BaseModule):
                     if cpu_hist:
                         graph_data.append(cpu_hist)
 
+        # Always show combined total for hover labels regardless of mode.
+        hover_labels = [
+            f"{v:.0f}%" for v in data.get('history', [])
+        ]
         graph = c.Graph(
             data=graph_data if graph_data else [[0]],
             state=round(data['total']),
@@ -390,7 +394,8 @@ class CPU(c.BaseModule):
             smooth=False,
             min_config=0,
             max_config=100,
-            colors=colors
+            colors=colors,
+            hover_labels=hover_labels
         )
         usage_box.append(graph)
         widget.popover_widgets['graph'] = graph
@@ -494,6 +499,11 @@ class CPU(c.BaseModule):
                     cpu_count = data.get('cpu_count', 0)
                     pw['graph'].colors = self.get_colors(cpu_count)
 
+                # Rebuild hover labels from combined total history.
+                hover_labels = [
+                    f"{v:.0f}%" for v in data.get('history', [])
+                ]
+                pw['graph'].hover_labels = hover_labels
                 pw['graph'].update_data(
                     graph_data if graph_data else [[0]],
                     round(data['total']))

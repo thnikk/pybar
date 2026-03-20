@@ -167,10 +167,14 @@ class HASS(c.BaseModule):
         if data.get('history'):
             graph_box = c.box('v', style='box')
             graph_box.set_overflow(Gtk.Overflow.HIDDEN)
+            unit = data['unit']
+            hover_labels = [
+                f"{v}{unit}" for v in data['history']
+            ]
             widget.graph = c.Graph(
                 data['history'],
                 state=data['state'],
-                unit=data['unit'],
+                unit=unit,
                 # Pass None to auto-range, or the config value to fix range
                 min_config=(
                     None if data.get('auto_range')
@@ -180,7 +184,8 @@ class HASS(c.BaseModule):
                     None if data.get('auto_range')
                     else data.get('max')
                 ),
-                smooth=False
+                smooth=False,
+                hover_labels=hover_labels
             )
             graph_box.append(widget.graph)
             main_box.append(graph_box)
@@ -241,8 +246,13 @@ class HASS(c.BaseModule):
             widget.set_widget(self.build_popover(widget, data))
         else:
             if widget.graph:
-                widget.graph.update_data(
-                    data.get('history', []), data.get('state'))
+                history = data.get('history', [])
+                unit = data.get('unit', '')
+                # Rebuild hover labels as history grows.
+                widget.graph.hover_labels = [
+                    f"{v}{unit}" for v in history
+                ]
+                widget.graph.update_data(history, data.get('state'))
             if widget.duration_label:
                 widget.duration_label.set_text(
                     format_duration(data.get('duration', 0)) + ' ago')
