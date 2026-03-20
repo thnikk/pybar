@@ -137,22 +137,15 @@ class StatusNotifierItem:
 
     def item_available_handler(self, _observer):
         try:
-            debug_print(
-                f"SNI Item available: {self.service_name}{self.object_path}")
-
-            # Resolve PID and Process Name for identification
+            # Resolve PID and process name for identification.
             try:
                 self.pid = self.session_bus.proxy.GetConnectionUnixProcessID(
                     self.service_name)
                 if os.path.exists(f"/proc/{self.pid}/cmdline"):
                     with open(f"/proc/{self.pid}/cmdline", "r") as f:
                         self.proc_name = f.read().replace('\0', ' ').lower()
-                debug_print(
-                    f"  Identified process: PID={self.pid}, "
-                    f"Name='{self.proc_name[:50]}...'")
-            except Exception as e:
-                debug_print(
-                    f"  Failed to resolve process info (non-fatal): {e}")
+            except Exception:
+                pass
 
             self.item_proxy = self.session_bus.get_proxy(
                 self.service_name,
@@ -343,7 +336,6 @@ class StatusNotifierWatcherInterface:
             full_name = f"{sender}/StatusNotifierItem"
 
         if full_name not in self._items:
-            debug_print(f"StatusNotifierWatcher: Registering item {full_name}")
             self._items.append(full_name)
             self.StatusNotifierItemRegistered.emit(full_name)
             self._emit_properties_changed("RegisteredStatusNotifierItems",
@@ -359,8 +351,6 @@ class StatusNotifierWatcherInterface:
 
     def _unregister_item(self, full_name):
         if full_name in self._items:
-            debug_print(
-                f"StatusNotifierWatcher: Unregistering item {full_name}")
             self._items.remove(full_name)
             self.StatusNotifierItemUnregistered.emit(full_name)
             self._emit_properties_changed(
@@ -377,8 +367,6 @@ class StatusNotifierWatcherInterface:
     @accepts_additional_arguments
     def RegisterStatusNotifierHost(self, service, call_info):
         sender = call_info.get("sender", "internal")
-        debug_print(
-            f"StatusNotifierWatcher: Registering host {sender} ({service})")
         if sender not in self._hosts:
             self._hosts.append(sender)
             self.StatusNotifierHostRegistered.emit()
@@ -440,8 +428,6 @@ class TrayHost:
 
     def cleanup(self):
         """Cleanup DBus registrations and connections"""
-        debug_print("TrayHost cleanup starting")
-        
         # Disconnect all items
         for item in self._items[:]:
             if item.item_observer:
@@ -477,8 +463,6 @@ class TrayHost:
         if self.watcher_proxy:
             disconnect_proxy(self.watcher_proxy)
             self.watcher_proxy = None
-        
-        debug_print("TrayHost cleanup complete")
 
     def add_module(self, module):
         self.modules.append(module)
@@ -509,7 +493,7 @@ class TrayHost:
         self.watcher_observer.connect_once_available()
 
         if not self.watcher_observer.is_service_available:
-            debug_print("SNI Watcher not found, starting internal watcher")
+            debug_print('Starting internal SNI watcher')
             try:
                 self.watcher_interface = StatusNotifierWatcherInterface()
                 # Connect directly to internal interface signals
@@ -527,14 +511,12 @@ class TrayHost:
 
     def _watcher_available(self, _observer):
         if hasattr(self, 'watcher_interface'):
-            debug_print("Using internal SNI watcher")
-            # We still need to register as a host on our own watcher
+            # Register as a host on the internal watcher.
             host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
             self.watcher_interface.RegisterStatusNotifierHost(
                 host_object_path, call_info={})
             return
 
-        debug_print("External SNI Watcher service available, connecting proxy")
         self.watcher_proxy = self.session_bus.get_proxy(
             WATCHER_SERVICE_NAME, WATCHER_OBJECT_PATH)
         self.watcher_proxy.StatusNotifierItemRegistered.connect(
@@ -544,14 +526,12 @@ class TrayHost:
 
         host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
         try:
-            debug_print(f"Registering host: {host_object_path}")
             self.watcher_proxy.RegisterStatusNotifierHost(host_object_path)
         except Exception as e:
             c.print_debug(f"Failed to register host: {e}", color='red')
 
         try:
             items = self.watcher_proxy.RegisteredStatusNotifierItems
-            debug_print(f"Already registered items: {items}")
             for full_name in items:
                 self._item_registered(full_name)
         except Exception as e:
@@ -563,7 +543,6 @@ class TrayHost:
             self._item_unregistered(f"{item.service_name}{item.object_path}")
 
     def _item_registered(self, full_name):
-        debug_print(f"TrayHost._item_registered: {full_name}")
         service, path = get_service_name_and_object_path(full_name)
 
         if not any(
@@ -573,28 +552,23 @@ class TrayHost:
             item.on_loaded_callback = self._on_item_loaded
             item.on_updated_callback = self._on_item_updated
             self._items.append(item)
-            debug_print(f"  Created StatusNotifierItem for {full_name}")
 
     def _on_item_loaded(self, item):
-        # Log item identification once here rather than once per bar widget.
+        # Log each item once when fully loaded.
         props = item.properties
-        identifiers = {
-            'proc': getattr(item, 'proc_name', ''),
-            'id': props.get('Id', ''),
-            'title': props.get('Title', ''),
-            'tooltip': '',
-        }
         tooltip = props.get('ToolTip')
-        if (
-            tooltip
-            and isinstance(tooltip, (list, tuple))
+        tooltip_title = (
+            tooltip[2]
+            if tooltip and isinstance(tooltip, (list, tuple))
             and len(tooltip) >= 3
-        ):
-            identifiers['tooltip'] = tooltip[2]
-        id_str = ', '.join(
-            f"{k}='{v}'" for k, v in identifiers.items() if v
+            else ''
         )
-        debug_print(f'Tray Item Candidates: {id_str}')
+        parts = [
+            f"proc='{getattr(item, 'proc_name', '').strip()}'",
+            f"id='{props.get('Id', '')}'",
+            f"tooltip='{tooltip_title}'",
+        ]
+        debug_print(f"Tray item loaded: {', '.join(parts)}")
 
         for module in self.modules:
             module.add_item(item)
