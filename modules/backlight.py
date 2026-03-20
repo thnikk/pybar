@@ -124,6 +124,9 @@ class Backlight(c.BaseModule):
 
     def _ddcutil(self, args):
         """Run ddcutil with args; return stdout or None on error."""
+        # Skip silently if ddcutil was already found to be missing
+        if getattr(self, '_ddcutil_missing', False):
+            return None
         try:
             r = subprocess.run(
                 ['ddcutil'] + args,
@@ -131,7 +134,11 @@ class Backlight(c.BaseModule):
             )
             if r.returncode == 0:
                 return r.stdout
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        except FileNotFoundError:
+            # Log once and suppress all future calls this session
+            self._ddcutil_missing = True
+            c.print_debug('ddcutil not found', color='red')
+        except subprocess.TimeoutExpired as e:
             c.print_debug(f"ddcutil error: {e}", color='red')
         return None
 
