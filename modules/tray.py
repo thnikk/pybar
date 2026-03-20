@@ -576,6 +576,26 @@ class TrayHost:
             debug_print(f"  Created StatusNotifierItem for {full_name}")
 
     def _on_item_loaded(self, item):
+        # Log item identification once here rather than once per bar widget.
+        props = item.properties
+        identifiers = {
+            'proc': getattr(item, 'proc_name', ''),
+            'id': props.get('Id', ''),
+            'title': props.get('Title', ''),
+            'tooltip': '',
+        }
+        tooltip = props.get('ToolTip')
+        if (
+            tooltip
+            and isinstance(tooltip, (list, tuple))
+            and len(tooltip) >= 3
+        ):
+            identifiers['tooltip'] = tooltip[2]
+        id_str = ', '.join(
+            f"{k}='{v}'" for k, v in identifiers.items() if v
+        )
+        debug_print(f'Tray Item Candidates: {id_str}')
+
         for module in self.modules:
             module.add_item(item)
 
@@ -1111,47 +1131,45 @@ class TrayModuleWidget(Gtk.Box):
     def add_item(self, item):
         full_name = f"{item.service_name}{item.object_path}"
 
-        # Gather all possible identifiers
+        # Gather identifiers for ghost-icon and blacklist checks.
+        props = item.properties
         identifiers = {
-            "proc": getattr(item, "proc_name", ""),
-            "id": item.properties.get("Id", ""),
-            "title": item.properties.get("Title", ""),
-            "tooltip": ""
+            'proc': getattr(item, 'proc_name', ''),
+            'id': props.get('Id', ''),
+            'title': props.get('Title', ''),
+            'tooltip': '',
         }
+        tooltip = props.get('ToolTip')
+        if (
+            tooltip
+            and isinstance(tooltip, (list, tuple))
+            and len(tooltip) >= 3
+        ):
+            identifiers['tooltip'] = tooltip[2]
 
-        # Extract tooltip title if available
-        tooltip = item.properties.get("ToolTip")
-        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
-            identifiers["tooltip"] = tooltip[2]
-
-        # Log identification info for user debugging
-        id_str = ", ".join(f"{k}='{v}'" for k, v in identifiers.items() if v)
-        debug_print(f"Tray Item Candidates: {id_str}")
-
-        # Check for minimum requirements (ghost icon protection)
-        has_id = bool(identifiers["id"])
-        has_title = bool(identifiers["title"])
-        has_proc = bool(identifiers["proc"])
-        
-        icon_name = item.properties.get("IconName")
-        icon_pixmap = item.properties.get("IconPixmap")
-        has_icon = bool(icon_name or icon_pixmap)
-
-        if not (has_id or has_title or has_proc or has_icon):
-            debug_print(f"Skipping empty item: {full_name}")
+        # Ghost-icon protection: skip items with no identifying info.
+        has_icon = bool(props.get('IconName') or props.get('IconPixmap'))
+        if not (
+            identifiers['id'] or identifiers['title']
+            or identifiers['proc'] or has_icon
+        ):
+            debug_print(f'Skipping empty item: {full_name}')
             return
 
-        # Check blacklist
-        blacklist = self.config.get("blacklist", [])
+        # Check blacklist.
+        blacklist = self.config.get('blacklist', [])
         if blacklist:
-            # Normalize identifiers for case-insensitive comparison
-            check_values = [v.lower() for v in identifiers.values() if v]
-            
+            check_values = [
+                v.lower() for v in identifiers.values() if v
+            ]
             for entry in blacklist:
                 entry_lower = entry.lower()
                 for val in check_values:
                     if entry_lower in val:
-                        debug_print(f"Blacklisted item matched '{entry}': {val} ({full_name})")
+                        debug_print(
+                            f"Blacklisted '{entry}' matched: "
+                            f"{val} ({full_name})"
+                        )
                         return
 
         if full_name not in self.icons:

@@ -107,7 +107,6 @@ def get_instance(name, config):
     """Get or create a module instance"""
     # Check if instance already exists
     if name in _instances:
-        c.print_debug(f"Reusing existing instance for {name}", color="yellow")
         return _instances[name]
 
     if not _discovery_done:
@@ -137,7 +136,6 @@ def get_instance(name, config):
 
     instance = cls(name, config)
     _instances[name] = instance
-    c.print_debug(f"Created new instance for {name}")
     return instance
 
 

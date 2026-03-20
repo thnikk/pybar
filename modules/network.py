@@ -37,6 +37,8 @@ class Network(c.BaseModule):
         super().__init__(name, config)
         self.monitor_thread = None
         self.monitor_running = False
+        # Start the nmcli event monitor once on construction.
+        self.start_monitor()
 
     def start_monitor(self):
         """ Monitor NetworkManager events for immediate updates """
@@ -593,14 +595,13 @@ class Network(c.BaseModule):
         return main_box
 
     def create_widget(self, bar):
-        # Start network event monitor
-        if not self.monitor_running:
-            self.start_monitor()
-
         m = c.Module()
         m.set_position(bar.position)
         m.set_label('...')
         m.popover_widgets = {}
+
+        # Use the shared fan-out subscription from BaseModule.
+        self._ensure_subscription()
 
         widget_ref = weakref.ref(m)
 
@@ -609,8 +610,8 @@ class Network(c.BaseModule):
             if widget is not None:
                 self.update_ui(widget, data)
 
-        sub_id = c.state_manager.subscribe(self.name, update_callback)
-        m._subscriptions.append(sub_id)
+        self._widget_callbacks.append(weakref.ref(update_callback))
+        m._update_callback = update_callback
         return m
 
     def update_ui(self, widget, data):

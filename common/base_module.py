@@ -34,6 +34,9 @@ class BaseModule:
         )
         self.empty_is_error = getattr(
             self.__class__, 'EMPTY_IS_ERROR', True)
+        # Single shared subscription; widgets register weak callbacks here.
+        self._widget_callbacks = []
+        self._state_sub_id = None
 
     def cleanup(self):
         """Override in subclass if cleanup is needed."""
@@ -146,12 +149,42 @@ class BaseModule:
             else:
                 time.sleep(sleep_time)
 
+    def _ensure_subscription(self):
+        """Register one shared state subscription for all widgets."""
+        if self._state_sub_id is not None:
+            return
+
+        def _fan_out(data):
+            # Iterate over a snapshot so removals during iteration are safe.
+            for cb_ref in list(self._widget_callbacks):
+                cb = cb_ref()
+                if cb is not None:
+                    cb(data)
+            # Prune dead references.
+            self._widget_callbacks = [
+                r for r in self._widget_callbacks if r() is not None
+            ]
+
+        self._state_sub_id = state_manager.subscribe(
+            self.name, _fan_out
+        )
+
+    def _unregister_subscription(self):
+        """Unsubscribe the shared state subscription."""
+        if self._state_sub_id is not None:
+            state_manager.unsubscribe(self._state_sub_id)
+            self._state_sub_id = None
+        self._widget_callbacks.clear()
+
     def create_widget(self, bar):
         """Create and return the GTK widget for the bar."""
         from common.widgets import Module
 
         m = Module()
         m.set_position(bar.position)
+
+        # Ensure one shared subscription exists before adding the callback.
+        self._ensure_subscription()
 
         widget_ref = weakref.ref(m)
 
@@ -160,8 +193,12 @@ class BaseModule:
             if widget is not None:
                 self.update_ui(widget, data)
 
-        sub_id = state_manager.subscribe(self.name, update_callback)
-        m._subscriptions.append(sub_id)
+        # Store a weak reference to the bound callback so the widget
+        # can be garbage-collected without holding it alive here.
+        self._widget_callbacks.append(weakref.ref(update_callback))
+
+        # Keep a strong reference on the widget so the callback stays
+        # alive for as long as the widget does.
         m._update_callback = update_callback
         return m
 
