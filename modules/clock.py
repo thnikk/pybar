@@ -103,9 +103,15 @@ class Clock(c.BaseModule):
             events_container = c.box('v', style='box')
             events_container.set_overflow(Gtk.Overflow.HIDDEN)
 
-            # Horizontal size group for date blocks
-            # Attach to container to prevent garbage collection
-            events_container.size_group = Gtk.SizeGroup(
+            # Map event color names to RGB tuples
+            color_map = {
+                'blue':   (0x8f, 0xa1, 0xbe),
+                'orange': (0xd0, 0x87, 0x70),
+                'green':  (0xa3, 0xbe, 0x8c),
+            }
+
+            # Size group keeps all left-side (indicator + date) cells equal
+            left_size_group = Gtk.SizeGroup(
                 mode=Gtk.SizeGroupMode.HORIZONTAL)
 
             def get_ordinal(n):
@@ -116,32 +122,41 @@ class Clock(c.BaseModule):
             for i, (day, event) in enumerate(month_events):
                 row = c.box('h')
                 color_style = self.event_lookup(event)
+                r, g, b = color_map.get(color_style, color_map['green'])
 
-                # Date Block - Fixed width based on SizeGroup
-                date_box = c.box('h', style=color_style)
-                date_box.get_style_context().add_class('event-date-box')
-                date_box.set_valign(Gtk.Align.FILL)
-                date_box.set_hexpand(False)
-                events_container.size_group.add_widget(date_box)
+                # Left cell: indicator bar + date label, width equalised
+                left_cell = c.box('h')
+                left_size_group.add_widget(left_cell)
 
-                # Internal centering for date/ordinal
-                date_content = c.box('h')
-                date_content.set_halign(Gtk.Align.CENTER)
-                date_content.set_hexpand(True)
-                date_content.append(c.label(day, style='event-day-number'))
-                date_content.append(
-                    c.label(get_ordinal(day),
-                            style='event-day-ordinal', va='start'))
-                date_box.append(date_content)
+                # Colored vertical bar indicator (same style as disks/cpu)
+                indicator = Gtk.Box()
+                indicator.set_size_request(6, 16)
+                indicator.set_valign(Gtk.Align.CENTER)
+                indicator.set_margin_start(10)
+                indicator.set_margin_end(4)
+                css = (
+                    f"box {{ background-color: rgb({r}, {g}, {b}); "
+                    f"border-radius: 999px; }}"
+                )
+                provider = Gtk.CssProvider()
+                provider.load_from_data(css.encode())
+                indicator.get_style_context().add_provider(
+                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                left_cell.append(indicator)
 
-                row.append(date_box)
+                # Date label (day number + ordinal suffix)
+                date_label = c.label(
+                    f"{day}{get_ordinal(day)}", style='inner-box')
+                left_cell.append(date_label)
+
+                row.append(left_cell)
                 row.append(c.sep('v'))
 
-                # Event description - Takes up all remaining space
-                desc_label = c.label(
-                    event, style='inner-box', wrap=25, ha='start')
+                # Event description - truncates with ellipsis
+                desc_label = c.label(event, style='inner-box', ha='end')
                 desc_label.set_hexpand(True)
-                desc_label.set_halign(Gtk.Align.START)
+                desc_label.set_halign(Gtk.Align.END)
+                desc_label.set_ellipsize(c.Pango.EllipsizeMode.END)
                 row.append(desc_label)
 
                 events_container.append(row)

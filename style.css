@@ -633,25 +633,6 @@ calendar.view label.day-number.today {
 .day-number.today.calendar-event.orange-fg { background-color: @orange; color: @black; }
 .day-number.today.calendar-event.green-fg { background-color: @green; color: @black; }
 
-/* Event list styling */
-.event-date-box {
-    padding: 10px;
-    border-radius: 0;
-    border: none;
-}
-
-.event-day-number {
-    font-weight: bold;
-    font-size: 16px;
-    color: @black;
-}
-
-.event-day-ordinal {
-    font-size: 10px;
-    color: @black;
-    margin-top: 2px;
-}
-
 /* GPU module */
 .gpu-info {
 	background: #2b303b;
