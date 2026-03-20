@@ -922,3 +922,21 @@ button.power-wide-item:active {
 	color: @white;
 	opacity: 0.4;
 }
+
+/* pin button on sensor rows in hass_lovelace popover */
+.pin-button {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	padding: 0px;
+	color: @light_gray;
+	font-size: 14px;
+}
+
+.pin-button:hover {
+	color: @white;
+}
+
+.pin-button.pinned {
+	color: @blue;
+}

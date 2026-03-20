@@ -4,6 +4,8 @@ Description: Home Assistant module that generates UI from a Lovelace dashboard
 Author: thnikk
 """
 
+import json
+import os
 import weakref
 import requests
 import common as c
@@ -24,13 +26,17 @@ class HASSLovelace(c.BaseModule):
             "type": "string",
             "default": "",
             "label": "Server",
-            "description": "Home Assistant server address (e.g. 10.0.0.3:8123)",
+            "description": (
+                "Home Assistant server address (e.g. 10.0.0.3:8123)"
+            ),
         },
         "bearer_token": {
             "type": "string",
             "default": "",
             "label": "Bearer Token",
-            "description": "Long-lived access token from Home Assistant",
+            "description": (
+                "Long-lived access token from Home Assistant"
+            ),
         },
         "dashboard_id": {
             "type": "string",
@@ -48,15 +54,65 @@ class HASSLovelace(c.BaseModule):
         },
     }
 
+    # --- Pin helpers ---------------------------------------------------
+
+    @property
+    def _pin_cache_path(self):
+        """Path to the JSON file that persists the pinned entity ID."""
+        return os.path.expanduser(
+            f"~/.cache/pybar/{self.name}_pin.json"
+        )
+
+    def _load_pinned(self):
+        """Return the pinned entity ID, or None if nothing is pinned."""
+        try:
+            with open(self._pin_cache_path) as f:
+                return json.load(f).get("pinned_eid")
+        except Exception:
+            return None
+
+    def _save_pinned(self, eid):
+        """Persist the pinned entity ID (pass None to clear)."""
+        try:
+            os.makedirs(
+                os.path.dirname(self._pin_cache_path), exist_ok=True
+            )
+            with open(self._pin_cache_path, "w") as f:
+                json.dump({"pinned_eid": eid}, f)
+        except Exception:
+            pass
+
+    def _format_pinned_label(self, states, eid):
+        """
+        Return a formatted bar label for the pinned sensor entity,
+        or None if the entity is unavailable.
+        """
+        if not eid or eid not in states:
+            return None
+        state_data = states[eid]
+        val = state_data.get("state", "")
+        unit = state_data.get("attributes", {}).get(
+            "unit_of_measurement", ""
+        )
+        try:
+            val = f"{float(val):.1f}"
+        except (ValueError, TypeError):
+            pass
+        return f"{val}{unit}" if val else None
+
+    # --- Session / fetch -----------------------------------------------
+
     def _get_session(self):
         if not hasattr(self, "_session") or self._session is None:
             self._session = requests.Session()
         return self._session
 
     async def _fetch_config_ws(self, base_url, token, dash_id):
-        """Fetch Lovelace config via WebSocket (supports YAML mode)"""
+        """Fetch Lovelace config via WebSocket (supports YAML mode)."""
         ws_url = (
-            base_url.replace("http://", "ws://").replace("https://", "wss://")
+            base_url
+            .replace("http://", "ws://")
+            .replace("https://", "wss://")
             + "/api/websocket"
         )
 
@@ -68,42 +124,39 @@ class HASSLovelace(c.BaseModule):
                     if msg.get("type") != "auth_required":
                         return None
 
+                    raw = token.replace("Bearer ", "") \
+                        if token.startswith("Bearer ") else token
                     await ws.send_json(
-                        {
-                            "type": "auth",
-                            "access_token": token.replace("Bearer ", "")
-                            if token.startswith("Bearer ")
-                            else token,
-                        }
+                        {"type": "auth", "access_token": raw}
                     )
 
                     msg = await ws.receive_json()
                     if msg.get("type") != "auth_ok":
                         c.print_debug(
-                            f"HASS Lovelace: WS Auth failed: {msg}", color="red"
+                            f"HASS Lovelace: WS Auth failed: {msg}",
+                            color="red",
                         )
                         return None
 
                     # 2. Get Config
-                    cmd = {
-                        "id": 1,
-                        "type": "lovelace/config",
-                    }
+                    cmd = {"id": 1, "type": "lovelace/config"}
                     if dash_id != "lovelace":
                         cmd["url_path"] = dash_id
 
                     await ws.send_json(cmd)
-
                     msg = await ws.receive_json()
                     if msg.get("success"):
                         return msg.get("result")
-                    else:
-                        c.print_debug(
-                            f"HASS Lovelace: WS Config fetch failed: {msg}", color="red"
-                        )
-                        return None
+                    c.print_debug(
+                        "HASS Lovelace: WS Config fetch failed: "
+                        f"{msg}",
+                        color="red",
+                    )
+                    return None
         except Exception as e:
-            c.print_debug(f"HASS Lovelace: WS Error: {e}", color="red")
+            c.print_debug(
+                f"HASS Lovelace: WS Error: {e}", color="red"
+            )
             return None
 
     def fetch_data(self):
@@ -114,13 +167,21 @@ class HASSLovelace(c.BaseModule):
         if not server or not token:
             return None
 
-        if "://" in server:
-            base_url = server.rstrip("/")
-        else:
-            base_url = f"http://{server}"
+        base_url = (
+            server.rstrip("/")
+            if "://" in server
+            else f"http://{server}"
+        )
 
-        bearer_token = f"Bearer {token}" if not token.startswith("Bearer ") else token
-        headers = {"Authorization": bearer_token, "content-type": "application/json"}
+        bearer_token = (
+            f"Bearer {token}"
+            if not token.startswith("Bearer ")
+            else token
+        )
+        headers = {
+            "Authorization": bearer_token,
+            "content-type": "application/json",
+        }
 
         config = None
         try:
@@ -131,13 +192,19 @@ class HASSLovelace(c.BaseModule):
             )
             loop.close()
         except Exception as e:
-            c.print_debug(f"HASS Lovelace: Failed to fetch via WS: {e}", color="yellow")
+            c.print_debug(
+                f"HASS Lovelace: Failed to fetch via WS: {e}",
+                color="yellow",
+            )
 
         if config is None:
-            url_config = f"{base_url}/api/config/lovelace/config"
-            if dash_id != "lovelace":
-                url_config = f"{base_url}/api/config/lovelace/config/{dash_id}"
-
+            url_config = (
+                f"{base_url}/api/config/lovelace/config"
+                if dash_id == "lovelace"
+                else (
+                    f"{base_url}/api/config/lovelace/config/{dash_id}"
+                )
+            )
             try:
                 with self._get_session().get(
                     url_config, headers=headers, timeout=5
@@ -170,22 +237,26 @@ class HASSLovelace(c.BaseModule):
                 "token": bearer_token,
             }
         except Exception as e:
-            c.print_debug(f"HASS Lovelace: Error fetching states: {e}", color="red")
+            c.print_debug(
+                f"HASS Lovelace: Error fetching states: {e}",
+                color="red",
+            )
             return None
 
-    def build_popover(self, data):
+    # --- Popover build -------------------------------------------------
+
+    def build_popover(self, data, widget):
         server = data["server"]
         token = data["token"]
         config = data.get("config", {})
         states = data.get("states", {})
 
-        container = c.box("v", spacing=15)
+        container = c.box("v", spacing=20)
 
-        # Dashboard Title (Main Widget Heading)
         title = config.get("title", "Home Assistant")
         container.append(c.label(title, style="heading"))
 
-        main_box = c.box("v", spacing=15)
+        main_box = c.box("v", spacing=20)
 
         views = config.get("views", [])
         if not views:
@@ -193,14 +264,15 @@ class HASSLovelace(c.BaseModule):
             if cards:
                 ibox = c.box("v", style="box")
                 for card in cards:
-                    self.build_card_rows(card, states, server, token, ibox)
+                    self.build_card_rows(
+                        card, states, server, token, ibox,
+                        widget=widget,
+                    )
                 if ibox.get_first_child():
                     main_box.append(ibox)
         else:
             for view in views:
-                # 20px gap between sections
                 view_box = c.box("v", spacing=20)
-
                 cards = view.get("cards", [])
                 sections = view.get("sections", [])
 
@@ -208,19 +280,21 @@ class HASSLovelace(c.BaseModule):
                     for section in sections:
                         sec_cards = section.get("cards", [])
                         self._render_cards_with_headings(
-                            sec_cards, states, server, token, view_box
+                            sec_cards, states, server, token,
+                            view_box, widget=widget,
                         )
-
                 else:
                     self._render_cards_with_headings(
-                        cards, states, server, token, view_box
+                        cards, states, server, token,
+                        view_box, widget=widget,
                     )
 
                 if view_box.get_first_child():
                     main_box.append(view_box)
 
         res = c.VScrollGradientBox(
-            main_box, max_height=500, bg_color="#1c1f26")
+            main_box, max_height=500, bg_color="#1c1f26"
+        )
         c.add_style(res, "scroll")
         container.append(res)
         return container
@@ -244,12 +318,9 @@ class HASSLovelace(c.BaseModule):
     def group_toggle_ha(self, server, token, eids, state, switch_widgets):
         service = "turn_on" if state else "turn_off"
 
-        # Optimistically update the local UI switches immediately
+        # Optimistically update local switches immediately.
         for sw in switch_widgets:
             if sw.get_active() != state:
-                # We use a custom property to prevent the individual toggle_ha
-                # from sending redundant requests when triggered by
-                # group toggle
                 sw._by_group = True
                 sw.set_active(state)
                 delattr(sw, "_by_group")
@@ -257,7 +328,10 @@ class HASSLovelace(c.BaseModule):
         try:
             with self._get_session().post(
                 f"{server}/api/services/homeassistant/{service}",
-                headers={"Authorization": token, "content-type": "application/json"},
+                headers={
+                    "Authorization": token,
+                    "content-type": "application/json",
+                },
                 json={"entity_id": eids},
                 timeout=3,
             ):
@@ -267,8 +341,7 @@ class HASSLovelace(c.BaseModule):
         return False
 
     def toggle_ha(self, server, token, eid, switch=None):
-        # If this was triggered by a group toggle, don't send
-        # individual request
+        # Skip individual request when triggered by a group toggle.
         if switch and getattr(switch, "_by_group", False):
             return False
 
@@ -276,7 +349,10 @@ class HASSLovelace(c.BaseModule):
             domain = eid.split(".")[0]
             with self._get_session().post(
                 f"{server}/api/services/{domain}/toggle",
-                headers={"Authorization": token, "content-type": "application/json"},
+                headers={
+                    "Authorization": token,
+                    "content-type": "application/json",
+                },
                 json={"entity_id": eid},
                 timeout=3,
             ):
@@ -286,21 +362,20 @@ class HASSLovelace(c.BaseModule):
         return False
 
     def _update_group_switch(self, group_sw, eids, states):
-        """Update the group switch state based on individual entity states."""
+        """Update group switch state from individual entity states."""
         if not group_sw:
             return
-        any_on = any(states.get(eid, {}).get("state") == "on" for eid in eids)
+        any_on = any(
+            states.get(eid, {}).get("state") == "on"
+            for eid in eids
+        )
         if group_sw.get_active() != any_on:
-            # We don't want to trigger the group_sw signal here
-            # but setting active programmatically usually doesn't trigger
-            # 'state-set'
-            # if changed via user it does.
-            # In GTK4, set_active() emits 'notify::active'.
-            # 'state-set' is specifically for user interaction usually.
             group_sw.set_active(any_on)
 
-    def _render_cards_with_headings(self, cards, states, server, token, parent):
-        """Render a list of cards into parent, grouping by heading cards."""
+    def _render_cards_with_headings(
+        self, cards, states, server, token, parent, widget=None
+    ):
+        """Render a list of cards grouped by heading cards."""
         groups = []
         current_group = {"heading": None, "cards": []}
 
@@ -317,7 +392,7 @@ class HASSLovelace(c.BaseModule):
         for group in groups:
             current_section = c.box("v", spacing=10)
 
-            # Find all toggleable entities in this section
+            # Collect toggleable entity IDs in this section.
             toggleable_eids = []
             for card in group["cards"]:
                 for eid in self._extract_entities(card):
@@ -330,41 +405,43 @@ class HASSLovelace(c.BaseModule):
                         "input_boolean",
                         "automation",
                         "script",
-                    ]:
-                        if eid not in toggleable_eids:
-                            toggleable_eids.append(eid)
+                    ] and eid not in toggleable_eids:
+                        toggleable_eids.append(eid)
 
-            # Dictionary to collect the created switch widgets for local
-            # optimistic update
             switch_widgets_dict = {}
             group_sw = None
 
-            # Render heading if present (create group_sw if needed)
             if group["heading"]:
                 card = group["heading"]
-                heading = card.get("heading") or card.get("text") or card.get("title")
+                heading = (
+                    card.get("heading")
+                    or card.get("text")
+                    or card.get("title")
+                )
                 if heading:
                     header_box = c.box("h", spacing=10)
                     header_box.append(
-                        c.label(heading, style="title", ha="start", he=True)
+                        c.label(
+                            heading, style="title", ha="start", he=True
+                        )
                     )
-
                     if toggleable_eids:
                         any_on = any(
-                            states[eid].get("state") == "on" for eid in toggleable_eids
+                            states[eid].get("state") == "on"
+                            for eid in toggleable_eids
                         )
                         group_sw = Gtk.Switch.new()
                         group_sw.set_active(any_on)
                         group_sw.set_valign(Gtk.Align.CENTER)
                         header_box.append(group_sw)
-
                     current_section.append(header_box)
             else:
                 if toggleable_eids and len(toggleable_eids) > 1:
                     header_box = c.box("h", spacing=10)
                     header_box.append(c.label("", ha="start", he=True))
                     any_on = any(
-                        states[eid].get("state") == "on" for eid in toggleable_eids
+                        states[eid].get("state") == "on"
+                        for eid in toggleable_eids
                     )
                     group_sw = Gtk.Switch.new()
                     group_sw.set_active(any_on)
@@ -372,27 +449,24 @@ class HASSLovelace(c.BaseModule):
                     header_box.append(group_sw)
                     current_section.append(header_box)
 
-            # Render cards
+            # Render cards.
             ibox = c.box("v", style="box")
             if group["cards"]:
                 for card in group["cards"]:
                     self.build_card_rows(
-                        card, states, server, token, ibox, switch_widgets_dict
+                        card, states, server, token, ibox,
+                        switch_widgets_dict, widget=widget,
                     )
 
-            # Connect group switch now that we have all individual switches
+            # Connect group switch now that individual switches exist.
             if group_sw:
 
                 def on_group_switch_set(
-                    _sw,
-                    state,
-                    s=server,
-                    t=token,
+                    _sw, state,
+                    s=server, t=token,
                     e=toggleable_eids,
                     w=switch_widgets_dict.values(),
                 ):
-                    # If this change is coming from the individual switches
-                    # sync, don't trigger HA
                     if getattr(_sw, "_by_sync", False):
                         return False
                     self.group_toggle_ha(s, t, e, state, list(w))
@@ -400,71 +474,71 @@ class HASSLovelace(c.BaseModule):
 
                 group_sw.connect("state-set", on_group_switch_set)
 
-                # Add listeners to individual switches to update the group
-                # switch state
                 def on_individual_switch_change(
-                    _sw, _new_state, gsw=group_sw, sw_dict=switch_widgets_dict
+                    _sw, _new_state,
+                    gsw=group_sw,
+                    sw_dict=switch_widgets_dict,
                 ):
-                    # If this change was triggered by the group toggle, don't
-                    # update back
                     if getattr(_sw, "_by_group", False):
                         return False
-
-                    # Calculate if ANY switch will be on after this change
-                    # We use the new state of the current switch and current
-                    # state of others
                     any_on = any(
                         _new_state if s == _sw else s.get_active()
                         for s in sw_dict.values()
                     )
-
                     if gsw.get_active() != any_on:
-                        # Set a flag so the group switch knows this is a sync,
-                        # not a user action
                         gsw._by_sync = True
                         gsw.set_active(any_on)
-                        # We use GLib.idle_add or similar if needed, but
-                        # delattr here is fine if set_active is synchronous
                         delattr(gsw, "_by_sync")
                     return False
 
                 for sw in switch_widgets_dict.values():
-                    sw.connect("state-set", on_individual_switch_change)
+                    sw.connect(
+                        "state-set", on_individual_switch_change
+                    )
 
-            # Now append the cards box if it has children
             if ibox.get_first_child():
                 current_section.append(ibox)
 
             if current_section.get_first_child():
                 parent.append(current_section)
 
-    def build_card_rows(self, card, states, server, token, container, switch_dict=None):
+    def build_card_rows(
+        self, card, states, server, token, container,
+        switch_dict=None, widget=None,
+    ):
         ctype = card.get("type")
         if ctype in ["grid", "horizontal-stack", "vertical-stack"]:
-            cards = card.get("cards", [])
-            for c_info in cards:
+            for c_info in card.get("cards", []):
                 self.build_card_rows(
-                    c_info, states, server, token, container, switch_dict
+                    c_info, states, server, token, container,
+                    switch_dict, widget=widget,
                 )
             return
 
         if ctype in ["entities", "glance"]:
-            entities = card.get("entities", [])
-            for ent in entities:
-                row = self._create_entity_row(ent, states, server, token, switch_dict)
+            for ent in card.get("entities", []):
+                row = self._create_entity_row(
+                    ent, states, server, token, switch_dict,
+                    widget=widget,
+                )
                 if row:
                     if container.get_first_child():
                         container.append(c.sep("h"))
                     container.append(row)
         elif ctype in ["button", "sensor"]:
-            row = self._create_entity_row(card, states, server, token, switch_dict)
+            row = self._create_entity_row(
+                card, states, server, token, switch_dict,
+                widget=widget,
+            )
             if row:
                 if container.get_first_child():
                     container.append(c.sep("h"))
                 container.append(row)
 
-    def _create_entity_row(self, ent, states, server, token, switch_dict=None):
-
+    def _create_entity_row(
+        self, ent, states, server, token,
+        switch_dict=None, widget=None,
+    ):
         if isinstance(ent, dict):
             eid = ent.get("entity")
         else:
@@ -474,30 +548,86 @@ class HASSLovelace(c.BaseModule):
             return None
 
         state_data = states[eid]
-        name = (ent.get("name") if isinstance(ent, dict) else None) or state_data.get(
-            "attributes", {}
-        ).get("friendly_name")
-
+        name = (
+            (ent.get("name") if isinstance(ent, dict) else None)
+            or state_data.get("attributes", {}).get("friendly_name")
+        )
         if not name:
             name = eid.split(".")[-1].replace("_", " ").title()
 
-        row = c.box("h", spacing=20, style="inner-box")
+        row = c.box("h", spacing=10, style="inner-box")
         row.append(c.label(name, ha="start", he=True))
 
         domain = eid.split(".")[0]
-        if domain in ["sensor", "binary_sensor"]:
+        if domain == "sensor":
             val = state_data.get("state", "unknown")
             try:
                 val = f"{float(val):.1f}"
             except (ValueError, TypeError):
                 pass
-            unit = state_data.get("attributes", {}).get("unit_of_measurement", "")
+            unit = state_data.get(
+                "attributes", {}
+            ).get("unit_of_measurement", "")
             row.append(c.label(f"{val}{unit}", ha="end"))
-        elif domain in ["switch", "light", "input_boolean", "automation", "script"]:
+
+            # Pin button — filled icon when this entity is pinned.
+            pinned = (
+                widget is not None
+                and getattr(widget, "_pinned_eid", None) == eid
+            )
+            pin_btn = c.button(
+                "" if pinned else "",
+                style="pin-button",
+            )
+            if pinned:
+                c.add_style(pin_btn, "pinned")
+            pin_btn.set_valign(Gtk.Align.CENTER)
+            pin_btn.set_tooltip_text(
+                "Unpin from bar" if pinned else "Pin value to bar"
+            )
+
+            def on_pin_clicked(
+                _btn, e=eid, w=widget, s=states,
+            ):
+                # Toggle: unpin if already pinned, else pin this entity.
+                if getattr(w, "_pinned_eid", None) == e:
+                    w._pinned_eid = None
+                    self._save_pinned(None)
+                else:
+                    w._pinned_eid = e
+                    self._save_pinned(e)
+                # Update bar label immediately.
+                label_text = self._format_pinned_label(
+                    s, w._pinned_eid
+                )
+                if label_text:
+                    w.set_label(label_text)
+                else:
+                    # Revert to the module icon only.
+                    w.set_label("")
+                # Rebuild popover to reflect new pin state.
+                data = c.state_manager.get(self.name)
+                if data:
+                    w.set_widget(self.build_popover(data, w))
+                    w.get_popover().popup()
+
+            pin_btn.connect("clicked", on_pin_clicked)
+            row.append(pin_btn)
+
+        elif domain == "binary_sensor":
+            val = state_data.get("state", "unknown")
+            row.append(c.label(val, ha="end"))
+        elif domain in [
+            "switch", "light", "input_boolean",
+            "automation", "script",
+        ]:
             sw = Gtk.Switch.new()
             sw.set_active(state_data.get("state") == "on")
             sw.set_valign(Gtk.Align.CENTER)
-            sw.connect("state-set", self._make_toggle_handler(server, token, eid))
+            sw.connect(
+                "state-set",
+                self._make_toggle_handler(server, token, eid),
+            )
             if switch_dict is not None:
                 switch_dict[eid] = sw
             row.append(sw)
@@ -510,11 +640,16 @@ class HASSLovelace(c.BaseModule):
     def _make_toggle_handler(self, server, token, eid):
         return lambda sw, _st: self.toggle_ha(server, token, eid, sw)
 
+    # --- Widget lifecycle ----------------------------------------------
+
     def create_widget(self, bar):
-        m = c.Module(True, False)
+        m = c.Module(True, True)
         m.set_position(bar.position)
         m.set_icon("")
         m.set_visible(False)
+
+        # Restore persisted pin on startup.
+        m._pinned_eid = self._load_pinned()
 
         widget_ref = weakref.ref(m)
 
@@ -532,16 +667,27 @@ class HASSLovelace(c.BaseModule):
             return
         widget.set_visible(True)
 
+        # Update bar label from pinned sensor every cycle.
+        states = data.get("states", {})
+        pinned = getattr(widget, "_pinned_eid", None)
+        label_text = self._format_pinned_label(states, pinned)
+        if label_text:
+            widget.set_label(label_text)
+        else:
+            widget.set_label("")
+
         if not widget.get_active():
-            states = data.get("states", {})
             fingerprint = tuple(
-                (eid, s.get("state")) for eid, s in sorted(states.items())
+                (eid, s.get("state"))
+                for eid, s in sorted(states.items())
             )
-            if getattr(widget, "_popover_fingerprint", None) == fingerprint:
+            if (
+                getattr(widget, "_popover_fingerprint", None)
+                == fingerprint
+            ):
                 return
             widget._popover_fingerprint = fingerprint
-
-            widget.set_widget(self.build_popover(data))
+            widget.set_widget(self.build_popover(data, widget))
 
 
 module_map = {"hass_lovelace": HASSLovelace}
