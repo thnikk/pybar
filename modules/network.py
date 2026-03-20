@@ -646,11 +646,28 @@ class Network(c.BaseModule):
 
             devices_changed = curr_devs != new_devs
 
-            # Also check if any device state changed
+            # Also check if any device state changed. Normalise the
+            # state string (nmcli sometimes returns "100 (connected)")
+            # to just the word inside the parens to avoid spurious hits.
             if not devices_changed:
+                def _norm_state(s):
+                    # "100 (connected)" -> "connected", else lowercase as-is
+                    s = s.lower()
+                    if '(' in s and ')' in s:
+                        return s[s.index('(') + 1:s.index(')')]
+                    return s
+                normalised = {
+                    dev: {
+                        'state': _norm_state(v['state']),
+                        'ip': v['ip'],
+                        'ssid': v['ssid'],
+                    }
+                    for dev, v in new_dev_states.items()
+                }
                 old_states = getattr(widget, '_dev_states', {})
-                if old_states != new_dev_states:
+                if old_states != normalised:
                     devices_changed = True
+                new_dev_states = normalised
 
             # Store current state for next comparison
             widget._dev_states = new_dev_states
@@ -661,14 +678,6 @@ class Network(c.BaseModule):
                 n['SSID'] for n in data.get('wifi_networks', []))
 
             wifi_list_changed = curr_wifi != new_wifi
-
-            # Debug output
-            if devices_changed:
-                c.print_debug(
-                    f"Network: devices changed {curr_devs} -> {new_devs}",
-                    color='yellow')
-                c.print_debug(
-                    "Network: state change detected", color='yellow')
 
             # Connection status changes require rebuild
             if devices_changed:
