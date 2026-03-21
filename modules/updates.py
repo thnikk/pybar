@@ -157,8 +157,6 @@ class Updates(c.BaseModule):
     def build_popover(self, widget, data):
         """ Build popover for updates """
         main_box = c.box('v', spacing=20, style='small-widget')
-        # Cap total popover height; content scrolls within each manager
-        main_box.set_size_request(-1, 600)
         main_box.append(c.label('Updates', style='heading'))
 
         urls = {
