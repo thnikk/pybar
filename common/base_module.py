@@ -56,7 +56,11 @@ class BaseModule:
         while True:
             data = None
 
-            # Load from cache on first run (non-hass modules only)
+            # Load from cache on first run (non-hass modules only).
+            # If the cache is still fresh (age < interval), skip the
+            # first fetch and sleep out the remaining interval instead.
+            skip_fetch = False
+            sleep_time = None
             if first_run and not self.is_hass and \
                     os.path.exists(self.cache_path):
                 try:
@@ -65,6 +69,7 @@ class BaseModule:
                     if cached:
                         self.last_data = cached
                         stale_init = cached.copy()
+                        cache_age = 0
                         if 'timestamp' in cached:
                             cache_age = time.time() - cached['timestamp']
                             if cache_age > self.interval * 2:
@@ -75,6 +80,15 @@ class BaseModule:
                         print_debug(
                             f"Loaded {self.name} from cache",
                             color='green')
+                        if cache_age < self.interval:
+                            # Cache is fresh; defer the first real fetch
+                            skip_fetch = True
+                            sleep_time = max(
+                                0, self.interval - cache_age)
+                            print_debug(
+                                f"{self.name} cache is fresh, "
+                                f"skipping first fetch",
+                                color='green')
                 except Exception as e:
                     print_debug(
                         f"Failed to load cache for {self.name}: {e}",
@@ -82,40 +96,43 @@ class BaseModule:
 
             start_time = time.time()
             try:
-                new_data = self.fetch_data()
-                if new_data is not None:
-                    if new_data == {} and self.last_data \
-                            and self.empty_is_error:
-                        # Use stale cache when fetch returns empty
-                        data = self.last_data.copy()
-                        if 'timestamp' in self.last_data:
-                            cache_age = (
-                                time.time() - self.last_data['timestamp'])
-                            if cache_age > self.interval * 2:
+                if not skip_fetch:
+                    new_data = self.fetch_data()
+                    if new_data is not None:
+                        if new_data == {} and self.last_data \
+                                and self.empty_is_error:
+                            # Use stale cache when fetch returns empty
+                            data = self.last_data.copy()
+                            if 'timestamp' in self.last_data:
+                                cache_age = (
+                                    time.time() -
+                                    self.last_data['timestamp'])
+                                if cache_age > self.interval * 2:
+                                    data['stale'] = True
+                            else:
                                 data['stale'] = True
+                            print_debug(
+                                f"{self.name} returned empty, "
+                                f"using stale cache",
+                                color='yellow')
                         else:
-                            data['stale'] = True
-                        print_debug(
-                            f"{self.name} returned empty, using stale cache",
-                            color='yellow')
+                            data = new_data
+                            self.last_data = data
+                            if not self.is_hass:
+                                try:
+                                    os.makedirs(
+                                        os.path.dirname(self.cache_path),
+                                        exist_ok=True)
+                                    with open(self.cache_path, 'w') as f:
+                                        json.dump(data, f)
+                                except Exception as e:
+                                    print_debug(
+                                        f"Failed to save cache for "
+                                        f"{self.name}: {e}", color='red')
                     else:
-                        data = new_data
-                        self.last_data = data
-                        if not self.is_hass:
-                            try:
-                                os.makedirs(
-                                    os.path.dirname(self.cache_path),
-                                    exist_ok=True)
-                                with open(self.cache_path, 'w') as f:
-                                    json.dump(data, f)
-                            except Exception as e:
-                                print_debug(
-                                    f"Failed to save cache for "
-                                    f"{self.name}: {e}", color='red')
-                else:
-                    if self.last_data:
-                        data = self.last_data.copy()
-                        data['stale'] = True
+                        if self.last_data:
+                            data = self.last_data.copy()
+                            data['stale'] = True
             except Exception as e:
                 print_debug(
                     f"Worker {self.name} failed: {e}", color='red')
@@ -134,7 +151,10 @@ class BaseModule:
             if self.interval <= 0:
                 break
 
-            sleep_time = max(0, self.interval - execution_time)
+            # Use the remaining interval from cache skip, or subtract
+            # the time spent fetching from the full interval.
+            if sleep_time is None:
+                sleep_time = max(0, self.interval - execution_time)
 
             if stop_event:
                 if wake_event:
