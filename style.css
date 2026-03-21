@@ -683,7 +683,7 @@ popover.bar-context-menu contents,
 popover.tray-popover arrow,
 popover.bar-context-menu arrow {
 	border: 1px solid rgba(255,255,255,0.1);
-	background: alpha(#2b303b, 1);
+	background: #2b303b;
 }
 
 popover.tray-popover modelbutton {

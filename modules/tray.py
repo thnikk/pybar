@@ -3,6 +3,7 @@
 Description: System tray module for GTK4 with collapsible feature
 Author: thnikk (ported and enhanced)
 """
+
 import dasbus.typing
 from dasbus.signal import Signal
 from dasbus.server.interface import accepts_additional_arguments
@@ -20,9 +21,9 @@ import gi
 import logging
 import time
 
-gi.require_version('Gtk', '4.0')
-gi.require_version('Gdk', '4.0')
-gi.require_version('GdkPixbuf', '2.0')
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+gi.require_version("GdkPixbuf", "2.0")
 
 
 # SNI Constants
@@ -35,10 +36,22 @@ HOST_OBJECT_PATH_TEMPLATE = "/StatusNotifierHost/{}"
 logging.getLogger("dasbus.connection").setLevel(logging.WARNING)
 
 PROPERTIES = [
-    "Id", "Category", "Title", "Status", "WindowId", "IconName", "IconPixmap",
-    "OverlayIconName", "OverlayIconPixmap", "AttentionIconName",
-    "AttentionIconPixmap", "AttentionMovieName", "ToolTip", "IconThemePath",
-    "ItemIsMenu", "Menu"
+    "Id",
+    "Category",
+    "Title",
+    "Status",
+    "WindowId",
+    "IconName",
+    "IconPixmap",
+    "OverlayIconName",
+    "OverlayIconPixmap",
+    "AttentionIconName",
+    "AttentionIconPixmap",
+    "AttentionMovieName",
+    "ToolTip",
+    "IconThemePath",
+    "ItemIsMenu",
+    "Menu",
 ]
 
 
@@ -109,8 +122,7 @@ class StatusNotifierItemInterface:
 
 class SNIClientHandler(ClientObjectHandler):
     def _get_specification(self):
-        return DBusSpecification.from_xml(
-                StatusNotifierItemInterface.__dbus_xml__)
+        return DBusSpecification.from_xml(StatusNotifierItemInterface.__dbus_xml__)
 
 
 class StatusNotifierItem:
@@ -126,13 +138,10 @@ class StatusNotifierItem:
         self.proc_name = ""
 
         self.item_observer = DBusObserver(
-            message_bus=self.session_bus,
-            service_name=self.service_name
+            message_bus=self.session_bus, service_name=self.service_name
         )
-        self.item_observer.service_available.connect(
-            self.item_available_handler)
-        self.item_observer.service_unavailable.connect(
-            self.item_unavailable_handler)
+        self.item_observer.service_available.connect(self.item_available_handler)
+        self.item_observer.service_unavailable.connect(self.item_unavailable_handler)
         self.item_observer.connect_once_available()
 
     def item_available_handler(self, _observer):
@@ -140,28 +149,29 @@ class StatusNotifierItem:
             # Resolve PID and process name for identification.
             try:
                 self.pid = self.session_bus.proxy.GetConnectionUnixProcessID(
-                    self.service_name)
+                    self.service_name
+                )
                 if os.path.exists(f"/proc/{self.pid}/cmdline"):
                     with open(f"/proc/{self.pid}/cmdline", "r") as f:
-                        self.proc_name = f.read().replace('\0', ' ').lower()
+                        self.proc_name = f.read().replace("\0", " ").lower()
             except Exception:
                 pass
 
             self.item_proxy = self.session_bus.get_proxy(
-                self.service_name,
-                self.object_path,
-                handler_factory=SNIClientHandler
+                self.service_name, self.object_path, handler_factory=SNIClientHandler
             )
 
             # Connect signals if they exist
             for signal_name, prop_names in [
-                ('NewTitle', ["Title", "ToolTip"]),
-                ('NewIcon', ["IconName", "IconPixmap", "ToolTip", "Title"]),
-                ('NewAttentionIcon', [
-                 "AttentionIconName", "AttentionIconPixmap", "ToolTip"]),
-                ('NewOverlayIcon', ["OverlayIconName", "OverlayIconPixmap"]),
-                ('NewToolTip', ["ToolTip", "Title"]),
-                ('NewStatus', ["Status", "ToolTip"])
+                ("NewTitle", ["Title", "ToolTip"]),
+                ("NewIcon", ["IconName", "IconPixmap", "ToolTip", "Title"]),
+                (
+                    "NewAttentionIcon",
+                    ["AttentionIconName", "AttentionIconPixmap", "ToolTip"],
+                ),
+                ("NewOverlayIcon", ["OverlayIconName", "OverlayIconPixmap"]),
+                ("NewToolTip", ["ToolTip", "Title"]),
+                ("NewStatus", ["Status", "ToolTip"]),
             ]:
                 if hasattr(self.item_proxy, signal_name):
                     getattr(self.item_proxy, signal_name).connect(
@@ -184,7 +194,7 @@ class StatusNotifierItem:
             if self.on_loaded_callback:
                 GLib.idle_add(self.on_loaded_callback, self)
         except Exception as e:
-            debug_print(f"Error in item_available_handler: {e}", color='red')
+            debug_print(f"Error in item_available_handler: {e}", color="red")
 
     def item_unavailable_handler(self, _observer):
         if self.item_proxy:
@@ -213,7 +223,7 @@ class StatusNotifierItem:
     def context_menu(self, x, y):
         if self.item_proxy:
             try:
-                if hasattr(self.item_proxy, 'ContextMenu'):
+                if hasattr(self.item_proxy, "ContextMenu"):
                     self.item_proxy.ContextMenu(x, y)
                     return True
             except Exception as e:
@@ -222,13 +232,12 @@ class StatusNotifierItem:
             if "Menu" in self.properties:
                 return False
             else:
-                debug_print(
-                    f"Item {self.service_name} has no context menu support.")
+                debug_print(f"Item {self.service_name} has no context menu support.")
         return False
 
     def secondary_action(self, x, y):
         if self.item_proxy:
-            if hasattr(self.item_proxy, 'SecondaryAction'):
+            if hasattr(self.item_proxy, "SecondaryAction"):
                 try:
                     self.item_proxy.SecondaryAction(x, y)
                 except Exception as e:
@@ -338,9 +347,10 @@ class StatusNotifierWatcherInterface:
         if full_name not in self._items:
             self._items.append(full_name)
             self.StatusNotifierItemRegistered.emit(full_name)
-            self._emit_properties_changed("RegisteredStatusNotifierItems",
-                                          dasbus.typing.get_variant(
-                                              typing.List[str], self._items))
+            self._emit_properties_changed(
+                "RegisteredStatusNotifierItems",
+                dasbus.typing.get_variant(typing.List[str], self._items),
+            )
 
             # Watch for service disappearance
             observer = DBusObserver(self.session_bus, sender)
@@ -354,15 +364,12 @@ class StatusNotifierWatcherInterface:
             self._items.remove(full_name)
             self.StatusNotifierItemUnregistered.emit(full_name)
             self._emit_properties_changed(
-                    "RegisteredStatusNotifierItems",
-                    dasbus.typing.get_variant(typing.List[str], self._items))
+                "RegisteredStatusNotifierItems",
+                dasbus.typing.get_variant(typing.List[str], self._items),
+            )
 
     def _emit_properties_changed(self, prop_name, variant):
-        self.PropertiesChanged.emit(
-            WATCHER_SERVICE_NAME,
-            {prop_name: variant},
-            []
-        )
+        self.PropertiesChanged.emit(WATCHER_SERVICE_NAME, {prop_name: variant}, [])
 
     @accepts_additional_arguments
     def RegisterStatusNotifierHost(self, service, call_info):
@@ -371,8 +378,8 @@ class StatusNotifierWatcherInterface:
             self._hosts.append(sender)
             self.StatusNotifierHostRegistered.emit()
             self._emit_properties_changed(
-                    "IsStatusNotifierHostRegistered",
-                    dasbus.typing.get_variant(bool, True))
+                "IsStatusNotifierHostRegistered", dasbus.typing.get_variant(bool, True)
+            )
 
             if sender != "internal":
                 observer = DBusObserver(self.session_bus, sender)
@@ -435,31 +442,32 @@ class TrayHost:
             if item.item_proxy:
                 disconnect_proxy(item.item_proxy)
         self._items.clear()
-        
+
         # Unregister DBus services
         try:
-            if hasattr(self, 'watcher_interface') and self.watcher_interface:
+            if hasattr(self, "watcher_interface") and self.watcher_interface:
                 self.session_bus.unpublish_object(WATCHER_OBJECT_PATH)
                 self.watcher_interface = None
         except Exception as e:
             debug_print(f"Failed to unpublish watcher: {e}")
-        
+
         try:
             self.session_bus.unregister_service(WATCHER_SERVICE_NAME)
         except Exception as e:
             debug_print(f"Failed to unregister watcher service: {e}")
-        
+
         try:
             host_service_name = HOST_SERVICE_NAME_TEMPLATE.format(
-                os.getpid(), self.host_id)
+                os.getpid(), self.host_id
+            )
             self.session_bus.unregister_service(host_service_name)
         except Exception as e:
             debug_print(f"Failed to unregister host service: {e}")
-        
+
         # Disconnect observers
-        if hasattr(self, 'watcher_observer') and self.watcher_observer:
+        if hasattr(self, "watcher_observer") and self.watcher_observer:
             self.watcher_observer.disconnect()
-        
+
         if self.watcher_proxy:
             disconnect_proxy(self.watcher_proxy)
             self.watcher_proxy = None
@@ -476,59 +484,59 @@ class TrayHost:
 
     def _setup_watcher(self):
         # Register as a host
-        host_service_name = HOST_SERVICE_NAME_TEMPLATE.format(
-            os.getpid(), self.host_id)
+        host_service_name = HOST_SERVICE_NAME_TEMPLATE.format(os.getpid(), self.host_id)
         try:
             self.session_bus.register_service(host_service_name)
         except Exception:
             pass
 
         # Check if watcher exists
-        self.watcher_observer = DBusObserver(
-            self.session_bus, WATCHER_SERVICE_NAME)
-        self.watcher_observer.service_available.connect(
-            self._watcher_available)
-        self.watcher_observer.service_unavailable.connect(
-            self._watcher_unavailable)
+        self.watcher_observer = DBusObserver(self.session_bus, WATCHER_SERVICE_NAME)
+        self.watcher_observer.service_available.connect(self._watcher_available)
+        self.watcher_observer.service_unavailable.connect(self._watcher_unavailable)
         self.watcher_observer.connect_once_available()
 
         if not self.watcher_observer.is_service_available:
-            debug_print('Starting internal SNI watcher')
+            debug_print("Starting internal SNI watcher")
             try:
                 self.watcher_interface = StatusNotifierWatcherInterface()
                 # Connect directly to internal interface signals
                 self.watcher_interface.StatusNotifierItemRegistered.connect(
-                    self._item_registered)
+                    self._item_registered
+                )
                 self.watcher_interface.StatusNotifierItemUnregistered.connect(
-                    self._item_unregistered)
+                    self._item_unregistered
+                )
 
                 self.session_bus.publish_object(
-                    WATCHER_OBJECT_PATH, self.watcher_interface)
+                    WATCHER_OBJECT_PATH, self.watcher_interface
+                )
                 self.session_bus.register_service(WATCHER_SERVICE_NAME)
             except Exception as e:
-                c.print_debug(
-                    f"Failed to start internal SNI watcher: {e}", color='red')
+                c.print_debug(f"Failed to start internal SNI watcher: {e}", color="red")
 
     def _watcher_available(self, _observer):
-        if hasattr(self, 'watcher_interface'):
+        if hasattr(self, "watcher_interface"):
             # Register as a host on the internal watcher.
             host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
             self.watcher_interface.RegisterStatusNotifierHost(
-                host_object_path, call_info={})
+                host_object_path, call_info={}
+            )
             return
 
         self.watcher_proxy = self.session_bus.get_proxy(
-            WATCHER_SERVICE_NAME, WATCHER_OBJECT_PATH)
-        self.watcher_proxy.StatusNotifierItemRegistered.connect(
-            self._item_registered)
+            WATCHER_SERVICE_NAME, WATCHER_OBJECT_PATH
+        )
+        self.watcher_proxy.StatusNotifierItemRegistered.connect(self._item_registered)
         self.watcher_proxy.StatusNotifierItemUnregistered.connect(
-            self._item_unregistered)
+            self._item_unregistered
+        )
 
         host_object_path = HOST_OBJECT_PATH_TEMPLATE.format(self.host_id)
         try:
             self.watcher_proxy.RegisterStatusNotifierHost(host_object_path)
         except Exception as e:
-            c.print_debug(f"Failed to register host: {e}", color='red')
+            c.print_debug(f"Failed to register host: {e}", color="red")
 
         try:
             items = self.watcher_proxy.RegisteredStatusNotifierItems
@@ -546,8 +554,8 @@ class TrayHost:
         service, path = get_service_name_and_object_path(full_name)
 
         if not any(
-                i.service_name == service and
-                i.object_path == path for i in self._items):
+            i.service_name == service and i.object_path == path for i in self._items
+        ):
             item = StatusNotifierItem(service, path)
             item.on_loaded_callback = self._on_item_loaded
             item.on_updated_callback = self._on_item_updated
@@ -556,12 +564,11 @@ class TrayHost:
     def _on_item_loaded(self, item):
         # Log each item once when fully loaded.
         props = item.properties
-        tooltip = props.get('ToolTip')
+        tooltip = props.get("ToolTip")
         tooltip_title = (
             tooltip[2]
-            if tooltip and isinstance(tooltip, (list, tuple))
-            and len(tooltip) >= 3
-            else ''
+            if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3
+            else ""
         )
         parts = [
             f"proc='{getattr(item, 'proc_name', '').strip()}'",
@@ -579,8 +586,14 @@ class TrayHost:
 
     def _item_unregistered(self, full_name):
         service, path = get_service_name_and_object_path(full_name)
-        item = next((i for i in self._items if i.service_name ==
-                    service and i.object_path == path), None)
+        item = next(
+            (
+                i
+                for i in self._items
+                if i.service_name == service and i.object_path == path
+            ),
+            None,
+        )
         if item:
             self._items.remove(item)
             for module in self.modules:
@@ -593,9 +606,7 @@ class DBusMenuClient:
         self.path = path
         self.bus = SessionMessageBus()
         self.proxy = self.bus.get_proxy(
-            service,
-            path,
-            handler_factory=DBusMenuClientHandler
+            service, path, handler_factory=DBusMenuClientHandler
         )
 
     def get_layout(self, parent_id=0, recursion_depth=-1, property_names=None):
@@ -603,7 +614,8 @@ class DBusMenuClient:
             property_names = []
         try:
             _revision, layout = self.proxy.GetLayout(
-                parent_id, recursion_depth, property_names)
+                parent_id, recursion_depth, property_names
+            )
             return layout
         except Exception as e:
             debug_print(f"Failed to get dbusmenu layout: {e}")
@@ -659,11 +671,7 @@ class TrayIcon(Gtk.Box):
             getattr(self.item, "proc_name", ""),
         ]
         tooltip = props.get("ToolTip")
-        if (
-            tooltip
-            and isinstance(tooltip, (list, tuple))
-            and len(tooltip) >= 3
-        ):
+        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
             # Index 2 is the tooltip title string
             candidates.append(tooltip[2])
         return [s.lower() for s in candidates if s]
@@ -720,13 +728,14 @@ class TrayIcon(Gtk.Box):
 
     def _on_click(self, gesture, _n_press, x, y):
         button = gesture.get_current_button()
-        
+
         proc = getattr(self.item, "proc_name", "")
         item_id = self.item.properties.get("Id", "")
         title = self.item.properties.get("Title", "")
         debug_print(
             f"TrayIcon._on_click: button {button} for {self.item.service_name}\n"
-            f"  Details: proc='{proc}', id='{item_id}', title='{title}'")
+            f"  Details: proc='{proc}', id='{item_id}', title='{title}'"
+        )
 
         if self.popover_menu and self.popover_menu.get_visible():
             debug_print("  Hiding existing popover")
@@ -761,13 +770,13 @@ class TrayIcon(Gtk.Box):
             return
 
         if not self.menu_client:
-            self.menu_client = DBusMenuClient(
-                self.item.service_name, menu_path)
+            self.menu_client = DBusMenuClient(self.item.service_name, menu_path)
 
         layout = self.menu_client.get_layout(
-            0, -1, [
-                "label", "enabled", "visible", "type",
-                "toggle-type", "toggle-state"])
+            0,
+            -1,
+            ["label", "enabled", "visible", "type", "toggle-type", "toggle-state"],
+        )
         if not layout:
             return
 
@@ -787,15 +796,15 @@ class TrayIcon(Gtk.Box):
         self.popover_menu.set_parent(self)
         self.popover_menu.set_can_focus(False)
         self.popover_menu.insert_action_group("menu", action_group)
+
         self.popover_menu.set_has_arrow(True)
         self.popover_menu.connect("map", lambda p: c.handle_popover_edge(p))
 
         # Keep the revealer open while a context menu is visible
-        if hasattr(self.module, 'notify_menu_opened'):
+        if hasattr(self.module, "notify_menu_opened"):
             self.module.notify_menu_opened()
             self.popover_menu.connect(
-                "closed",
-                lambda _: self.module.notify_menu_closed()
+                "closed", lambda _: self.module.notify_menu_closed()
             )
 
         if self.module.config.get("position", "bottom") == "bottom":
@@ -838,8 +847,7 @@ class TrayIcon(Gtk.Box):
 
                 if toggle_type in ["checkmark", "radio"]:
                     state = GLib.Variant.new_boolean(bool(toggle_state))
-                    action = Gio.SimpleAction.new_stateful(
-                        action_name, None, state)
+                    action = Gio.SimpleAction.new_stateful(action_name, None, state)
 
                     def on_toggle(act, _, cid=child_id, mc=self.menu_client):
                         new_state = not act.get_state().get_boolean()
@@ -881,8 +889,7 @@ class TrayIcon(Gtk.Box):
 
             if icon_name:
                 if theme_path and os.path.exists(theme_path):
-                    theme = Gtk.IconTheme.get_for_display(
-                        Gdk.Display.get_default())
+                    theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
                     if theme_path not in theme.get_search_path():
                         theme.add_search_path(theme_path)
 
@@ -907,7 +914,11 @@ class TrayIcon(Gtk.Box):
         else:
             self._tooltip_text = ""
 
-        if hasattr(self, '_hover_popover') and self._hover_popover and self._hover_popover.get_visible():
+        if (
+            hasattr(self, "_hover_popover")
+            and self._hover_popover
+            and self._hover_popover.get_visible()
+        ):
             if self._tooltip_text:
                 self._hover_popover.label.set_text(self._tooltip_text)
             else:
@@ -923,10 +934,11 @@ class TrayIcon(Gtk.Box):
         w, h, data = best
         ba = bytearray(data)
         for i in range(0, len(ba), 4):
-            a, r, g, b = ba[i], ba[i+1], ba[i+2], ba[i+3]
-            ba[i], ba[i+1], ba[i+2], ba[i+3] = r, g, b, a
+            a, r, g, b = ba[i], ba[i + 1], ba[i + 2], ba[i + 3]
+            ba[i], ba[i + 1], ba[i + 2], ba[i + 3] = r, g, b, a
         return GdkPixbuf.Pixbuf.new_from_data(
-            ba, GdkPixbuf.Colorspace.RGB, True, 8, w, h, w * 4)
+            ba, GdkPixbuf.Colorspace.RGB, True, 8, w, h, w * 4
+        )
 
 
 class TrayModuleWidget(Gtk.Box):
@@ -938,12 +950,10 @@ class TrayModuleWidget(Gtk.Box):
         self.get_style_context().add_class("tray-module")
 
         self.direction = config.get("direction", "left")
+        self.use_popover = config.get("use_popover", False)
 
-        self.revealer = Gtk.Revealer()
-        self.icons_box = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        self.icons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         self.icons_box.get_style_context().add_class("tray-icons")
-        self.revealer.set_child(self.icons_box)
 
         self.toggle_btn = Gtk.Button()
         self.toggle_btn.get_style_context().add_class("tray-toggle")
@@ -955,20 +965,41 @@ class TrayModuleWidget(Gtk.Box):
 
         self.toggle_btn.connect("clicked", self._on_toggle)
 
-        if self.direction == "left":
-            self.revealer.set_transition_type(
-                Gtk.RevealerTransitionType.SLIDE_LEFT)
-            self.append(self.revealer)
+        if self.use_popover:
+            self.popover = c.Widget()
+            # Widget has a vertical box by default. Append icons_box to it.
+            self.popover.box.append(self.icons_box)
+            self.popover.box.set_spacing(0)
+            self.popover.draw()
+            self.popover.set_parent(self.toggle_btn)
+
+            bar_pos = config.get("position", "bottom")
+            if bar_pos == "bottom":
+                self.popover.set_position(Gtk.PositionType.TOP)
+            else:
+                self.popover.set_position(Gtk.PositionType.BOTTOM)
+
+            self.popover.connect("closed", lambda _: self._update_ui_state())
             self.append(self.toggle_btn)
         else:
-            self.revealer.set_transition_type(
-                Gtk.RevealerTransitionType.SLIDE_RIGHT)
-            self.append(self.toggle_btn)
-            self.append(self.revealer)
+            self.revealer = Gtk.Revealer()
+            self.revealer.set_child(self.icons_box)
+
+            if self.direction == "left":
+                self.revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT)
+                self.append(self.revealer)
+                self.append(self.toggle_btn)
+            else:
+                self.revealer.set_transition_type(
+                    Gtk.RevealerTransitionType.SLIDE_RIGHT
+                )
+                self.append(self.toggle_btn)
+                self.append(self.revealer)
 
         is_collapsed = config.get("collapsed", True)
         self.user_wants_expanded = not is_collapsed
-        self.revealer.set_reveal_child(not is_collapsed)
+        if not self.use_popover:
+            self.revealer.set_reveal_child(not is_collapsed)
 
         # Auto-reveal hover state tracking; must be set before
         # _update_ui_state() so the auto_reveal branch can read them
@@ -988,6 +1019,8 @@ class TrayModuleWidget(Gtk.Box):
     def cleanup(self):
         """Cleanup resources"""
         TrayHost.get_instance().remove_module(self)
+        if hasattr(self, "popover") and self.popover:
+            self.popover.destroy()
         self.icons.clear()
         # Clean up icons
         child = self.icons_box.get_first_child()
@@ -1001,6 +1034,9 @@ class TrayModuleWidget(Gtk.Box):
 
     def _setup_auto_reveal(self):
         """Configure hover-based auto reveal, disabling the toggle button."""
+        if self.use_popover:
+            return
+
         # Disable the toggle button; hover controls reveal instead
         self.toggle_btn.set_sensitive(False)
 
@@ -1024,6 +1060,9 @@ class TrayModuleWidget(Gtk.Box):
 
     def _set_auto_revealed(self, revealed):
         """Show or hide the revealer in auto-reveal mode."""
+        if self.use_popover:
+            return
+
         has_icons = len(self.icons) > 0
         self._auto_revealed = revealed and has_icons
         self.revealer.set_visible(has_icons)
@@ -1043,17 +1082,30 @@ class TrayModuleWidget(Gtk.Box):
             self._set_auto_revealed(False)
 
     def _on_toggle(self, _btn):
-        self.user_wants_expanded = not self.user_wants_expanded
+        if self.use_popover:
+            if self.popover.get_visible():
+                self.popover.popdown()
+            else:
+                self.popover.popup()
+        else:
+            self.user_wants_expanded = not self.user_wants_expanded
         self._update_ui_state()
 
     def _update_ui_state(self):
         has_icons = len(self.icons) > 0
 
-        # Hide revealer completely when no icons to prevent width change
-        self.revealer.set_visible(has_icons)
+        if not self.use_popover:
+            # Hide revealer completely when no icons to prevent width change
+            self.revealer.set_visible(has_icons)
+        else:
+            # Hide button when no icons in popover mode
+            self.toggle_btn.set_visible(has_icons)
 
         auto_reveal = self.config.get("auto_reveal", False)
-        if auto_reveal:
+        if self.use_popover:
+            expanded = self.popover.get_visible()
+            self.set_spacing(0)
+        elif auto_reveal:
             # Reveal/spacing are owned by _set_auto_revealed; only
             # ensure spacing is 0 on startup before any hover occurs.
             if not self._auto_revealed:
@@ -1066,32 +1118,32 @@ class TrayModuleWidget(Gtk.Box):
             self.set_spacing(5 if should_reveal else 0)
             expanded = self.user_wants_expanded
 
+        bar_pos = self.config.get("position", "bottom")
         label_text = ""
-        if self.direction == "right":
-            label_text = "" if expanded else ""
+        if bar_pos == "bottom":
+            label_text = "" if expanded else ""
         else:
-            label_text = "" if expanded else ""
+            label_text = "" if expanded else ""
 
         self.toggle_label.set_text(label_text)
 
         # Only change CSS class when there are icons to prevent padding
-        # changes
-        if has_icons:
+        # changes. In popover mode, we always use the 'collapsed' class
+        # (which has smaller padding) to keep the toggle size consistent.
+        if has_icons and not self.use_popover:
             if expanded:
                 self.get_style_context().remove_class("collapsed")
             else:
                 self.get_style_context().add_class("collapsed")
         else:
-            # Keep collapsed class when no icons
+            # Keep collapsed class when no icons or in popover mode
             self.get_style_context().add_class("collapsed")
+
     def _sort_key(self, icon):
         """Return lowercase sort key: Id > Title > service_name."""
         props = icon.item.properties
         return (
-            props.get("Id") or
-            props.get("Title") or
-            icon.item.service_name or
-            ""
+            props.get("Id") or props.get("Title") or icon.item.service_name or ""
         ).lower()
 
     def _sort_icons(self):
@@ -1108,41 +1160,33 @@ class TrayModuleWidget(Gtk.Box):
         # Gather identifiers for ghost-icon and blacklist checks.
         props = item.properties
         identifiers = {
-            'proc': getattr(item, 'proc_name', ''),
-            'id': props.get('Id', ''),
-            'title': props.get('Title', ''),
-            'tooltip': '',
+            "proc": getattr(item, "proc_name", ""),
+            "id": props.get("Id", ""),
+            "title": props.get("Title", ""),
+            "tooltip": "",
         }
-        tooltip = props.get('ToolTip')
-        if (
-            tooltip
-            and isinstance(tooltip, (list, tuple))
-            and len(tooltip) >= 3
-        ):
-            identifiers['tooltip'] = tooltip[2]
+        tooltip = props.get("ToolTip")
+        if tooltip and isinstance(tooltip, (list, tuple)) and len(tooltip) >= 3:
+            identifiers["tooltip"] = tooltip[2]
 
         # Ghost-icon protection: skip items with no identifying info.
-        has_icon = bool(props.get('IconName') or props.get('IconPixmap'))
+        has_icon = bool(props.get("IconName") or props.get("IconPixmap"))
         if not (
-            identifiers['id'] or identifiers['title']
-            or identifiers['proc'] or has_icon
+            identifiers["id"] or identifiers["title"] or identifiers["proc"] or has_icon
         ):
-            debug_print(f'Skipping empty item: {full_name}')
+            debug_print(f"Skipping empty item: {full_name}")
             return
 
         # Check blacklist.
-        blacklist = self.config.get('blacklist', [])
+        blacklist = self.config.get("blacklist", [])
         if blacklist:
-            check_values = [
-                v.lower() for v in identifiers.values() if v
-            ]
+            check_values = [v.lower() for v in identifiers.values() if v]
             for entry in blacklist:
                 entry_lower = entry.lower()
                 for val in check_values:
                     if entry_lower in val:
                         debug_print(
-                            f"Blacklisted '{entry}' matched: "
-                            f"{val} ({full_name})"
+                            f"Blacklisted '{entry}' matched: {val} ({full_name})"
                         )
                         return
 
@@ -1168,59 +1212,63 @@ class TrayModuleWidget(Gtk.Box):
 
 class Tray(c.BaseModule):
     SCHEMA = {
-        'icon_size': {
-            'type': 'integer',
-            'default': 18,
-            'label': 'Icon Size',
-            'description': 'Size of tray icons in pixels',
-            'min': 12,
-            'max': 48
+        "icon_size": {
+            "type": "integer",
+            "default": 18,
+            "label": "Icon Size",
+            "description": "Size of tray icons in pixels",
+            "min": 12,
+            "max": 48,
         },
-        'direction': {
-            'type': 'choice',
-            'default': 'left',
-            'label': 'Expand Direction',
-            'description': 'Direction the tray expands when opened',
-            'choices': ['left', 'right']
+        "direction": {
+            "type": "choice",
+            "default": "left",
+            "label": "Expand Direction",
+            "description": "Direction the tray expands when opened",
+            "choices": ["left", "right"],
         },
-        'collapsed': {
-            'type': 'boolean',
-            'default': True,
-            'label': 'Start Collapsed',
-            'description': 'Start with tray icons hidden'
+        "collapsed": {
+            "type": "boolean",
+            "default": True,
+            "label": "Start Collapsed",
+            "description": "Start with tray icons hidden",
         },
-        'custom_icons': {
-            'type': 'dict',
-            'default': {},
-            'label': 'Custom Icons',
-            'description': 'Set custom icons for tray programs'
+        "custom_icons": {
+            "type": "dict",
+            "default": {},
+            "label": "Custom Icons",
+            "description": "Set custom icons for tray programs",
         },
-        'blacklist': {
-            'type': 'list',
-            'default': [],
-            'label': 'Blacklist',
-            'description': 'List of partial process names to hide from tray',
-            'element_type': 'string'
+        "blacklist": {
+            "type": "list",
+            "default": [],
+            "label": "Blacklist",
+            "description": "List of partial process names to hide from tray",
+            "element_type": "string",
         },
-        'auto_reveal': {
-            'type': 'boolean',
-            'default': False,
-            'label': 'Auto Reveal',
-            'description': (
-                'Reveal tray icons on hover and hide on leave; '
-                'disables the toggle button'
-            )
-        }
+        "auto_reveal": {
+            "type": "boolean",
+            "default": False,
+            "label": "Auto Reveal",
+            "description": (
+                "Reveal tray icons on hover and hide on leave; "
+                "disables the toggle button"
+            ),
+        },
+        "use_popover": {
+            "type": "boolean",
+            "default": False,
+            "label": "Use Popover",
+            "description": "Show tray icons in a popover instead of a revealer",
+        },
     }
 
     def run_worker(self):
-        """ Tray uses D-Bus, no periodic fetch needed """
+        """Tray uses D-Bus, no periodic fetch needed"""
         pass
 
     def create_widget(self, bar):
         return TrayModuleWidget(self, self.config)
 
 
-module_map = {
-    'tray': Tray
-}
+module_map = {"tray": Tray}
