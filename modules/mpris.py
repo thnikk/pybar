@@ -404,6 +404,22 @@ class MPRIS(c.BaseModule):
 
         return None
 
+    def cleanup(self):
+        """ Disconnect DBus proxies so glycin/bwrap subprocesses can exit """
+        try:
+            if self.active_player_props_proxy is not None:
+                disconnect_proxy(self.active_player_props_proxy)
+                self.active_player_props_proxy = None
+        except Exception:
+            pass
+        try:
+            if self.active_player_proxy is not None:
+                disconnect_proxy(self.active_player_proxy)
+                self.active_player_proxy = None
+        except Exception:
+            pass
+        self.active_player_bus_name = None
+
     def fetch_data(self):
         return self.get_mpris_status()
 

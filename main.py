@@ -33,6 +33,28 @@ def parse_args():
 # Parse early to set environment variables and log level
 args = parse_args()
 
+# Reap child processes automatically so they never linger as zombies.
+# This covers both children inherited from a previous execv-based reload
+# and any that exit later during normal operation (e.g. nvtop, nmcli).
+import signal as _signal
+
+
+def _reap_children(signum, frame):
+    """SIGCHLD handler: reap all exited children without blocking."""
+    try:
+        while True:
+            pid, _ = os.waitpid(-1, os.WNOHANG)
+            if pid == 0:
+                break
+    except ChildProcessError:
+        pass
+
+
+_signal.signal(_signal.SIGCHLD, _reap_children)
+
+# Do an initial reap pass for any children already waiting.
+_reap_children(None, None)
+
 # Set GTK debug env var if GTK debug is requested
 if args.gtk_log_level.upper() == 'DEBUG':
     os.environ['G_MESSAGES_DEBUG'] = 'all'

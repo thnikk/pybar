@@ -30,6 +30,16 @@ class Display:
         self.app = app
         # Set by reload() so the shutdown handler knows to exec.
         self._reloading = False
+
+        # Replace the process image only after GTK has fully shut down so
+        # that GLib-managed subprocesses (e.g. bwrap/glycin from GdkPixbuf
+        # image loading) are reaped before execv() is called.
+        def _on_shutdown(application):
+            if self._reloading:
+                import sys
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        self.app.connect('shutdown', _on_shutdown)
         self.display = Gdk.Display.get_default()
         self.display.connect('closed', self._on_display_closed)
         monitors = self.display.get_monitors()
@@ -473,7 +483,6 @@ class Display:
 
     def reload(self):
         """ Reload by replacing the process image """
-        import sys
         import module
         # Signal completion before exec so the settings window
         # isn't left waiting for a response that will never come.
@@ -490,7 +499,36 @@ class Display:
         # the process image is replaced.
         module.stop_all_workers()
         module.clear_instances()
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        # Terminate known library-managed persistent child processes that
+        # we have no direct handle to (e.g. the glycin-image-rs sandbox
+        # worker kept alive by GdkPixbuf between image decode calls).
+        # We match by executable name rather than sweeping all children,
+        # so transient module subprocesses (nvtop, nmcli, etc.) that are
+        # mid-run are not killed prematurely.
+        _LIBRARY_WORKERS = {'glycin-image-rs', 'bwrap'}
+        import signal as _signal
+        our_pid = str(os.getpid())
+        try:
+            for entry in os.listdir('/proc'):
+                if not entry.isdigit():
+                    continue
+                try:
+                    with open(f'/proc/{entry}/stat', 'r') as _f:
+                        _stat = _f.read().split()
+                    # Index 3 is PPID; index 1 is comm wrapped in parens.
+                    if _stat[3] != our_pid:
+                        continue
+                    comm = _stat[1].strip('()')
+                    if comm in _LIBRARY_WORKERS:
+                        os.kill(int(entry), _signal.SIGTERM)
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        # Mark that we want to exec on shutdown, then ask GTK to quit.
+        # This lets GTK/GLib run its full teardown before execv() fires.
+        self._reloading = True
+        self.app.quit()
 
     def _check_reload_signal(self):
         """ Check if settings window has signaled a reload """
