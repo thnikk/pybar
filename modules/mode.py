@@ -120,10 +120,9 @@ class Mode(c.BaseModule):
             with socket.socket(
                     socket.AF_UNIX, socket.SOCK_STREAM) as s:
                 s.connect(socket1_path)
-                # Hyprland socket1 protocol: prefix with 'j/' for
-                # JSON output or plain command name for text output.
-                s.sendall(b'j/activesubmap')
-                s.shutdown(socket.SHUT_WR)
+                # Socket1 protocol: null-terminated command string.
+                # 'submap' returns the active submap as plain text.
+                s.sendall(b'submap\0')
                 chunks = []
                 while True:
                     chunk = s.recv(4096)
@@ -131,10 +130,7 @@ class Mode(c.BaseModule):
                         break
                     chunks.append(chunk)
                 raw = b''.join(chunks).decode('utf-8').strip()
-                # Response is a JSON string e.g. "resize" or ""
-                mode = json.loads(raw) if raw else ''
-                if not mode:
-                    mode = 'default'
+                mode = raw if raw else 'default'
                 self._update_mode(mode)
         except Exception as e:
             c.print_debug(
