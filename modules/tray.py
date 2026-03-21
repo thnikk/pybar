@@ -1118,12 +1118,18 @@ class TrayModuleWidget(Gtk.Box):
             self.set_spacing(5 if should_reveal else 0)
             expanded = self.user_wants_expanded
 
-        bar_pos = self.config.get("position", "bottom")
         label_text = ""
-        if bar_pos == "bottom":
-            label_text = "" if expanded else ""
+        if self.use_popover:
+            bar_pos = self.config.get("position", "bottom")
+            if bar_pos == "bottom":
+                label_text = "" if expanded else ""
+            else:
+                label_text = "" if expanded else ""
         else:
-            label_text = "" if expanded else ""
+            if self.direction == "right":
+                label_text = "" if expanded else ""
+            else:
+                label_text = "" if expanded else ""
 
         self.toggle_label.set_text(label_text)
 
@@ -1246,20 +1252,20 @@ class Tray(c.BaseModule):
             "description": "List of partial process names to hide from tray",
             "element_type": "string",
         },
-        "auto_reveal": {
-            "type": "boolean",
-            "default": False,
-            "label": "Auto Reveal",
-            "description": (
-                "Reveal tray icons on hover and hide on leave; "
-                "disables the toggle button"
-            ),
-        },
         "use_popover": {
             "type": "boolean",
             "default": False,
             "label": "Use Popover",
             "description": "Show tray icons in a popover instead of a revealer",
+        },
+        "auto_reveal": {
+            "type": "boolean",
+            "default": False,
+            "label": "Auto Reveal",
+            "description": (
+                "Reveal tray icons on hover and hide on leave when using "
+                "revealer"
+            ),
         },
     }
 
