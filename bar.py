@@ -28,6 +28,8 @@ class Display:
     """ Display class """
     def __init__(self, config, app):
         self.app = app
+        # Set by reload() so the shutdown handler knows to exec.
+        self._reloading = False
         self.display = Gdk.Display.get_default()
         self.display.connect('closed', self._on_display_closed)
         monitors = self.display.get_monitors()
@@ -472,6 +474,7 @@ class Display:
     def reload(self):
         """ Reload by replacing the process image """
         import sys
+        import module
         # Signal completion before exec so the settings window
         # isn't left waiting for a response that will never come.
         try:
@@ -482,6 +485,11 @@ class Display:
                 f"Failed to signal reload completion: {e}",
                 name='display', color='red'
             )
+        # Stop workers and run cleanup() on all instances so that
+        # subprocesses (e.g. nmcli monitor) are terminated before
+        # the process image is replaced.
+        module.stop_all_workers()
+        module.clear_instances()
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _check_reload_signal(self):

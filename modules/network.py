@@ -44,6 +44,7 @@ class Network(c.BaseModule):
         super().__init__(name, config)
         self.monitor_thread = None
         self.monitor_running = False
+        self.monitor_process = None
         # Start the nmcli event monitor once on construction.
         self.start_monitor()
 
@@ -62,6 +63,8 @@ class Network(c.BaseModule):
                     text=True,
                     bufsize=1
                 )
+                # Store handle so stop_monitor() can terminate it.
+                self.monitor_process = process
 
                 self.monitor_running = True
                 while self.monitor_running:
@@ -79,6 +82,8 @@ class Network(c.BaseModule):
             except Exception as e:
                 c.print_debug(
                     f"Network monitor error: {e}", color='red')
+            finally:
+                self.monitor_process = None
 
         self.monitor_thread = threading.Thread(
             target=monitor_events, daemon=True)
@@ -87,6 +92,15 @@ class Network(c.BaseModule):
     def stop_monitor(self):
         """ Stop the network monitor """
         self.monitor_running = False
+        if self.monitor_process is not None:
+            try:
+                self.monitor_process.terminate()
+            except Exception:
+                pass
+
+    def cleanup(self):
+        """ Terminate the nmcli monitor process """
+        self.stop_monitor()
 
     def get_devices(self):
         """ Get active NetworkManager connections """
