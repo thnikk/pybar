@@ -68,14 +68,18 @@ class Updates(c.BaseModule):
     }
 
     def get_output(
-        self, command, seperator, values, _empty_error, alerts
+        self, command, seperator, values, empty_error, alerts
     ) -> list:
         """ Get formatted command output """
         try:
-            output = subprocess.run(
-                command, check=True,
-                capture_output=True).stdout.decode('utf-8').splitlines()
-        except (subprocess.CalledProcessError, FileNotFoundError):
+            result = subprocess.run(command, capture_output=True)
+            # Treat the empty_error exit code as "no updates", not a
+            # failure. Any other non-zero code means the command failed.
+            if result.returncode not in (0, empty_error):
+                output = []
+            else:
+                output = result.stdout.decode('utf-8').splitlines()
+        except FileNotFoundError:
             output = []
 
         move = []
