@@ -319,7 +319,25 @@ class Display:
         return fallback
 
     def on_monitors_changed(self, model, position, removed, added):
-        """ Schedule a reload when monitors are added """
+        """ Handle monitor changes """
+        if removed > 0:
+            # Destroy bars for monitors no longer present
+            current_plugs = set(
+                self._get_monitor_name(m, i)
+                for i, m in enumerate(self.get_monitors())
+            )
+            for plug in list(self.bars):
+                if plug not in current_plugs:
+                    bar = self.bars.pop(plug)
+                    try:
+                        bar.window.destroy()
+                    except Exception as e:
+                        logging.warning(
+                            "Error destroying bar for %s: %s", plug, e
+                        )
+                    logging.info(
+                        "Removed bar for disconnected monitor %s", plug
+                    )
         if added > 0:
             self._schedule_reload()
 
