@@ -60,7 +60,14 @@ The `top` field controls how many allocation sites are returned (default: 30).
 The helper script `pybar-memsnap` (found in `scripts/` in the repo) automates this workflow — it records a baseline, waits 5 minutes, then prints the diff:
 
 ```bash
+    # Object count diff (default)
     python3 scripts/pybar-memsnap
+
+    # Tracemalloc allocation diff
+    python3 scripts/pybar-memsnap --mode tracemalloc
+
+    # Shorter 60s window for either mode
+    python3 scripts/pybar-memsnap --quick
 ```
 
 ### Widget instance counter

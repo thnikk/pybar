@@ -1,19 +1,28 @@
 #!/usr/bin/env python3
 """
-Description: Measure live Python object growth over time via pybar's
-             debug IPC commands. Requires pybar to be running with --debug.
+Description: Profile pybar memory growth via debug IPC commands.
+             Requires pybar to be running with --debug.
 Author: thnikk
 
+Modes:
+    objcount    (default) Diff live Python object counts over time.
+                Fast and accurate — only counts objects that are alive now.
+
+    tracemalloc Diff Python allocation sites over time.
+                Shows where memory is being allocated, including transient
+                objects. Useful for finding hot allocation paths.
+
 Usage:
-    pybar-memsnap           baseline + wait 5 min + diff
-    pybar-memsnap --quick   baseline + wait 1 min + diff (less accurate)
+    python3 scripts/pybar-memsnap                      objcount, 5 min
+    python3 scripts/pybar-memsnap --mode tracemalloc   tracemalloc, 5 min
+    python3 scripts/pybar-memsnap --quick              objcount, 1 min
 """
 import argparse
 import json
+import os
 import socket
 import sys
 import time
-import os
 
 SOCK = os.path.expanduser('~/.cache/pybar/pybar.sock')
 
@@ -34,6 +43,17 @@ def ipc(cmd):
     return json.loads(data.decode().strip())
 
 
+def check_ok(response):
+    """ Exit with an error message if the IPC response is not ok. """
+    if response.get('status') != 'ok':
+        print(
+            f"Error: {response.get('message', 'unknown error')}",
+            file=sys.stderr)
+        sys.exit(1)
+
+
+# --- objcount mode ---------------------------------------------------
+
 def parse_counts(lines):
     """ Parse object count lines into a dict of {type: count}. """
     result = {}
@@ -44,48 +64,99 @@ def parse_counts(lines):
     return result
 
 
-def run(wait):
-    """ Take a baseline count, wait, then print the diff. """
+def run_objcount(wait):
+    """ Diff live gc object counts between two snapshots. """
     print('Taking baseline object count...', flush=True)
     r0 = ipc({'action': 'objcount', 'top': 200})
-    if r0.get('status') != 'ok':
-        print(f"Error: {r0.get('message', 'unknown error')}", file=sys.stderr)
-        sys.exit(1)
+    check_ok(r0)
     counts0 = parse_counts(r0['counts'])
-    total0 = sum(counts0.values())
-    print(f'Baseline: {total0} total objects', flush=True)
+    print(f'Baseline: {sum(counts0.values())} total objects', flush=True)
 
     print(f'Waiting {wait}s...', flush=True)
     time.sleep(wait)
 
     print('Taking second object count...', flush=True)
     r1 = ipc({'action': 'objcount', 'top': 200})
+    check_ok(r1)
     counts1 = parse_counts(r1['counts'])
-    total1 = sum(counts1.values())
-    print(f'After:    {total1} total objects')
+    print(f'After:    {sum(counts1.values())} total objects')
 
-    diff = {}
-    for t in set(counts0) | set(counts1):
-        d = counts1.get(t, 0) - counts0.get(t, 0)
-        if d != 0:
-            diff[t] = d
+    diff = {
+        t: counts1.get(t, 0) - counts0.get(t, 0)
+        for t in set(counts0) | set(counts1)
+        if counts1.get(t, 0) - counts0.get(t, 0) != 0
+    }
 
     print(f'\n=== Object count diff over {wait}s ===')
     print('(positive = grew, negative = shrank)')
     for name, delta in sorted(diff.items(), key=lambda x: -x[1])[:40]:
-        bar_len = min(abs(delta) // 10, 40)
-        bar = ('+' if delta > 0 else '-') * bar_len
+        bar = ('+' if delta > 0 else '-') * min(abs(delta) // 10, 40)
         print(f'  {delta:+6d}  {name:40s}  {bar}')
 
 
+# --- tracemalloc mode ------------------------------------------------
+
+def run_tracemalloc(wait):
+    """ Diff tracemalloc allocation sites between two snapshots. """
+    # First call: start tracing and record baseline
+    r0 = ipc({'action': 'tracemalloc', 'top': 40})
+    check_ok(r0)
+
+    if r0.get('mode') == 'diff':
+        # Tracing was already running with a baseline recorded; print the
+        # diff and reset by taking a fresh baseline for next time.
+        print('=== tracemalloc diff (allocation growth since last snapshot) ===')
+        for line in r0.get('top', []):
+            print(f'  {line}')
+        return
+
+    if r0.get('mode') == 'baseline':
+        print(
+            f"Baseline recorded ({len(r0.get('top', []))} sites). "
+            f"Waiting {wait}s...",
+            flush=True)
+    else:
+        # Tracing just started; take a baseline snapshot
+        r0 = ipc({'action': 'tracemalloc', 'top': 40})
+        check_ok(r0)
+        print(
+            f"Tracing started, baseline recorded. Waiting {wait}s...",
+            flush=True)
+
+    time.sleep(wait)
+
+    r1 = ipc({'action': 'tracemalloc', 'top': 40})
+    check_ok(r1)
+    print('\n=== tracemalloc diff (what grew over the window) ===')
+    for line in r1.get('top', []):
+        print(f'  {line}')
+
+
+# --- entry point -----------------------------------------------------
+
 def main():
     parser = argparse.ArgumentParser(
-        description='Profile pybar memory growth via debug IPC.')
+        description='Profile pybar memory growth via debug IPC.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            'modes:\n'
+            '  objcount     diff live gc object counts (default)\n'
+            '  tracemalloc  diff Python allocation sites\n'
+        )
+    )
+    parser.add_argument(
+        '--mode', choices=['objcount', 'tracemalloc'], default='objcount',
+        help='profiling mode (default: objcount)')
     parser.add_argument(
         '--quick', action='store_true',
-        help='Use a 60s window instead of 300s (less accurate)')
+        help='use a 60s window instead of 300s (less accurate)')
     args = parser.parse_args()
-    run(wait=60 if args.quick else 300)
+    wait = 60 if args.quick else 300
+
+    if args.mode == 'tracemalloc':
+        run_tracemalloc(wait)
+    else:
+        run_objcount(wait)
 
 
 if __name__ == '__main__':
