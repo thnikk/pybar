@@ -692,14 +692,20 @@ class HASSLovelace(c.BaseModule):
             widget.set_label("")
 
         if not widget.get_active():
-            # Fingerprint only the entities actually shown in the
-            # dashboard; the full states dict contains every HA entity
-            # and changes every cycle, causing constant popover rebuilds.
+            # Fingerprint only toggleable entities (switches, lights,
+            # automations). Sensor values change constantly and don't
+            # affect popover structure, so excluding them prevents a
+            # full rebuild on every polling cycle.
             displayed = self._get_displayed_eids(data["config"])
+            toggleable_domains = {
+                "switch", "light", "input_boolean",
+                "automation", "script",
+            }
             fingerprint = tuple(
                 (eid, states[eid].get("state"))
                 for eid in sorted(displayed)
                 if eid in states
+                and eid.split(".")[0] in toggleable_domains
             )
             if (
                 getattr(widget, "_popover_fingerprint", None)

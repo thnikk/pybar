@@ -231,15 +231,35 @@ class HASS(c.BaseModule):
         widget.set_visible(bool(data.get('text')))
 
         if not widget.get_active():
-            # Build a lightweight fingerprint to avoid storing a full
-            # data copy (including the history list) on the widget.
+            # Only rebuild when the popover doesn't exist yet or when
+            # the history buffer first reaches capacity. State value
+            # changes are handled in-place by the else branch below,
+            # so including them in the fingerprint caused a full
+            # Graph rebuild on every 5s poll (3 bars = 36 new Graph
+            # instances/min).
             history = data.get('history', [])
+            has_popover = widget.get_popover() is not None
             fingerprint = (
-                data.get('state'),
-                len(history),
-                history[-1] if history else None
+                bool(history),
+                len(history) >= self.config.get('history', 100),
             )
-            if getattr(widget, '_popover_fingerprint', None) == fingerprint:
+            if has_popover and (
+                getattr(widget, '_popover_fingerprint', None)
+                == fingerprint
+            ):
+                # Popover exists and structure hasn't changed;
+                # still update labels via the graph path.
+                if widget.graph:
+                    widget.graph.hover_labels = [
+                        f"{v}{data.get('unit', '')}"
+                        for v in history
+                    ]
+                    widget.graph.update_data(
+                        history, data.get('state'))
+                if widget.duration_label:
+                    widget.duration_label.set_text(
+                        format_duration(
+                            data.get('duration', 0)) + ' ago')
                 return
 
             widget._popover_fingerprint = fingerprint
