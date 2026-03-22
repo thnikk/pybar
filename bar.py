@@ -68,15 +68,10 @@ class Display:
         # Apply initial CSS
         self.apply_css()
 
-        # Track sleep/wake state to serialise suspend and wake redraws
+        # Track sleep state to avoid scheduling reloads while sleeping
         self.is_sleeping = False
-        # Set True between PrepareForSleep(false) and the first successful
-        # post-wake redraw so that on_monitors_changed does not race with
-        # the dedicated wake handler.
-        self._is_waking = False
-        # GLib source ID of any pending _redraw_bars timer so it can be
-        # cancelled when the extended-delay wake path supersedes it.
-        self._redraw_timer_id = None
+        # GLib source ID of the pending debounced reload timer
+        self._reload_timer_id = None
         self._setup_dbus_sleep_handler()
 
         # Watch for reload signal from settings
@@ -224,61 +219,40 @@ class Display:
         logging.warning("GDK display closed with error; restarting")
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
-    def _on_prepare_for_sleep(self, proxy, sender_name, signal_name, parameters):
+    def _on_prepare_for_sleep(self, proxy, sender_name, signal_name,
+                              parameters):
         """ Handle PrepareForSleep signal from logind """
         if len(parameters) > 0:
             entering = parameters[0]
             if entering:
-                logging.info("System entering sleep - pausing bar operations")
+                logging.info("System entering sleep")
                 self.is_sleeping = True
-                # Optionally: hide bars during sleep
-                # for bar in self.bars.values():
-                #     if hasattr(bar.window, 'set_visible'):
-                #         bar.window.set_visible(False)
             else:
-                logging.info("System waking from sleep - reloading bars")
+                logging.info("System waking from sleep - scheduling reload")
                 self.is_sleeping = False
-                # Block on_monitors_changed from racing the wake reload
-                self._is_waking = True
-                # Schedule reload on main loop after wake
                 GLib.idle_add(self._on_wake_from_sleep)
 
     def _on_wake_from_sleep(self):
-        """ Reload bars after waking from sleep """
-        try:
-            # Give the compositor longer to rebuild Wayland/Vulkan surfaces.
-            # 500 ms is not enough; 3 s covers slow GPU/compositor wake paths.
-            GLib.timeout_add_seconds(3, self._safe_reload_after_sleep)
-        except Exception as e:
-            logging.error(f"Error during wake handling: {e}")
+        """ Schedule a debounced reload after waking from sleep """
+        self._schedule_reload()
 
-    def _safe_reload_after_sleep(self):
-        """ Safely reload all bars after sleep """
-        # Clear the waking flag before redrawing so _redraw_bars does not
-        # see it and bail out — the flag was only needed to block racing
-        # monitor-change events during the delay window.
-        self._is_waking = False
-        try:
-            # Reinitialize display connection if needed
-            self.display = Gdk.Display.get_default()
-            if self.display is None:
-                logging.error("Failed to get GDK display after sleep")
-                return False
+    def _schedule_reload(self):
+        """
+        Debounced reload: reset the 5s timer on each call.
+        Only fires once the timer elapses without being reset,
+        so multiple rapid monitor-add events collapse into one reload.
+        """
+        if self._reload_timer_id is not None:
+            GLib.source_remove(self._reload_timer_id)
+        self._reload_timer_id = GLib.timeout_add_seconds(
+            5, self._do_reload
+        )
 
-            # Force refresh of monitor list
-            self.monitors = self.get_monitors()
-            self.plugs = self.get_plugs()
-
-            # Redraw all bars
-            self._redraw_bars()
-
-            logging.info("Successfully reloaded bars after sleep")
-            return False
-        except Exception as e:
-            logging.error(
-                f"Error reloading bars after sleep: {e}", exc_info=True
-            )
-            return False
+    def _do_reload(self):
+        """ Timer callback: clear the timer ID and trigger a reload """
+        self._reload_timer_id = None
+        self.reload()
+        return False
 
     def get_monitors(self):
         """ Get monitor objects from gdk """
@@ -345,49 +319,12 @@ class Display:
         return fallback
 
     def on_monitors_changed(self, model, position, removed, added):
-        """
-        Handle monitor changes by redrawing all bars.
-        Skip during a wake-from-sleep cycle; the dedicated wake handler
-        manages that redraw on a longer, safer timeline.
-        When monitors are added (reconnect), use the same extended-delay
-        path as wake-from-sleep to let the compositor rebuild surfaces.
-        """
-        if self._is_waking:
-            logging.debug(
-                "on_monitors_changed skipped: "
-                "wake-from-sleep/reconnect in progress"
-            )
-            return
+        """ Schedule a reload when monitors are added """
         if added > 0:
-            # Monitor reconnected; compositor may be rebuilding Wayland
-            # surfaces. Cancel any short-delay redraw already scheduled
-            # (e.g. from a preceding removal event in the same DPMS cycle)
-            # then use the extended-delay safe-reload path.
-            if self._redraw_timer_id is not None:
-                GLib.source_remove(self._redraw_timer_id)
-                self._redraw_timer_id = None
-                logging.debug(
-                    "on_monitors_changed: cancelled pending redraw timer"
-                )
-            logging.debug(
-                "on_monitors_changed: %d monitor(s) added, "
-                "using extended-delay reload", added
-            )
-            self._is_waking = True
-            GLib.timeout_add_seconds(3, self._safe_reload_after_sleep)
-        else:
-            # Only removals; a quick redraw is safe.
-            self._redraw_timer_id = GLib.timeout_add(
-                500, self._redraw_bars
-            )
+            self._schedule_reload()
 
     def draw_bar(self, monitor):
         """ Draw a bar on a monitor """
-        # Skip if system is sleeping
-        if self.is_sleeping:
-            logging.debug("Skipping bar creation during sleep")
-            return
-
         # Validate monitor is still valid
         if monitor and hasattr(monitor, 'is_valid') and not monitor.is_valid():
             logging.warning(f"Monitor is invalid, skipping: {monitor}")
@@ -432,49 +369,6 @@ class Display:
             logging.info(f"Successfully created bar on {plug}")
         except Exception as e:
             logging.error(f"Failed to create bar on {plug}: {e}", exc_info=True)
-
-    def _redraw_bars(self):
-        """ Redraw all bars (called from idle callback) """
-        self._redraw_timer_id = None
-
-        # Skip if the extended-delay wake path has taken over
-        if self._is_waking:
-            logging.debug("Skipping bar redraw: wake/reconnect in progress")
-            return False
-
-        # Skip if system is sleeping
-        if self.is_sleeping:
-            logging.debug("Skipping bar redraw during sleep")
-            return False
-
-        try:
-            # Destroy existing bars safely
-            for plug, bar in list(self.bars.items()):
-                try:
-                    if bar:
-                        bar.cleanup_modules()
-                        if hasattr(bar, 'window') and bar.window:
-                            bar.window.destroy()
-                except Exception as e:
-                    logging.warning(f"Error destroying bar {plug}: {e}")
-            self.bars.clear()
-
-            # Reinitialize display connection if needed
-            self.display = Gdk.Display.get_default()
-            if self.display is None:
-                logging.error("Failed to get GDK display during redraw")
-                return False
-
-            # Update monitor list with error handling
-            self.monitors = self.get_monitors()
-            self.plugs = self.get_plugs()
-
-            # Redraw all
-            self.draw_all()
-            return False
-        except Exception as e:
-            logging.error(f"Error during bar redraw: {e}", exc_info=True)
-            return False
 
     def draw_all(self):
         """ Initialize all monitors """
