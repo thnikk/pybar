@@ -251,6 +251,11 @@ class Memory(c.BaseModule):
         except Exception as e:
             c.print_debug(f"Failed to fetch processes: {e}", self.name)
 
+        # Clear psutil's internal process cache (_pmap). Without this,
+        # psutil retains a Process object for every pid seen since startup,
+        # which accumulates ~2 MB/min of Python heap over time.
+        psutil.process_iter.cache_clear()
+
         return {
             "total": total,
             "used": used,
