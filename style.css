@@ -215,8 +215,7 @@ scale trough slider {
 	transition: none;
 }
 
-.mpris-slider trough:hover slider,
-.mpris-slider trough slider:hover,
+.mpris-slider.slider-hovered trough slider,
 .mpris-slider trough slider:active {
 	background: #4b505b;
 	border-color: @gray;

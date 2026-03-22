@@ -539,6 +539,23 @@ class MPRIS(c.BaseModule):
             else:
                 widget.pop_visualizer.stop()
 
+    def _make_hover_slider(self, slider_widget):
+        """Wrap slider in a box; reveal handle on box hover."""
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        box.set_hexpand(True)
+        box.append(slider_widget)
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect(
+            'enter',
+            lambda *_: slider_widget.add_css_class('slider-hovered')
+        )
+        motion.connect(
+            'leave',
+            lambda *_: slider_widget.remove_css_class('slider-hovered')
+        )
+        box.add_controller(motion)
+        return box
+
     def build_popover(self, widget, data):
         """ Build mpris popover """
         main_box = c.box('v', spacing=10, style='small-widget')
@@ -644,6 +661,7 @@ class MPRIS(c.BaseModule):
         # Seekbar
         widget.pop_seekbar = c.slider(data.get('percent', 0), scrollable=False)
         widget.pop_seekbar.get_style_context().add_class('mpris-slider')
+        widget.pop_seekbar.set_hexpand(True)
 
         def on_seek(s):
             if self.active_player_proxy:
@@ -663,7 +681,7 @@ class MPRIS(c.BaseModule):
 
         widget.pop_seekbar_handler = widget.pop_seekbar.connect(
             'value-changed', on_seek)
-        seek_box.append(widget.pop_seekbar)
+        seek_box.append(self._make_hover_slider(widget.pop_seekbar))
 
         # Timestamps
         pos = data.get('position_str', '00:00')
@@ -721,7 +739,7 @@ class MPRIS(c.BaseModule):
         widget.pop_volume_handler = widget.pop_volume.connect(
             'value-changed', on_volume)
         widget.pop_volume.set_hexpand(True)
-        vol_box.append(widget.pop_volume)
+        vol_box.append(self._make_hover_slider(widget.pop_volume))
 
         btn_box = c.box('h')
         btn_box.append(prev_btn)
