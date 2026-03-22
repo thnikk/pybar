@@ -172,6 +172,9 @@ class IPCServer:
         if action == 'tracemalloc':
             return self._tracemalloc_snapshot(cmd.get('top', 30))
 
+        if action == 'objcount':
+            return self._object_counts(cmd.get('top', 30))
+
         return {'status': 'error', 'message': f'Unknown action: {action}'}
 
     def _widget_action(self, action, widget_name, monitor=None):
@@ -228,31 +231,69 @@ class IPCServer:
             'message': f"Module '{module_name}' not found or not running",
         }
 
+    def _object_counts(self, top=30):
+        """Count live Python objects by type using gc."""
+        import gc
+        import collections
+        gc.collect()
+        counts = collections.Counter()
+        for obj in gc.get_objects():
+            counts[type(obj).__name__] += 1
+        lines = [
+            f'{count:6d}x  {name}'
+            for name, count in counts.most_common(top)
+        ]
+        return {'status': 'ok', 'counts': lines}
+
     def _tracemalloc_snapshot(self, top=30):
-        """Take a tracemalloc snapshot and return top allocators."""
+        """Take a tracemalloc snapshot, diffing against the previous one."""
         import tracemalloc
-        import linecache
         if not tracemalloc.is_tracing():
             tracemalloc.start(10)
+            self._tm_snapshot1 = None
             return {
                 'status': 'ok',
                 'message': 'tracemalloc started, call again for snapshot'
             }
         snapshot = tracemalloc.take_snapshot()
-        # Group by filename+lineno, strip internal frames
         filters = [
             tracemalloc.Filter(False, '<frozen importlib._bootstrap>'),
-            tracemalloc.Filter(False, '<frozen importlib._bootstrap_external>'),
+            tracemalloc.Filter(
+                False, '<frozen importlib._bootstrap_external>'),
         ]
         snapshot = snapshot.filter_traces(filters)
-        stats = snapshot.statistics('lineno')
         lines = []
-        for stat in stats[:top]:
-            frame = stat.traceback[0]
-            fname = frame.filename.split('/')[-1]
-            lines.append(
-                f'{stat.size/1024:.1f}kB  '
-                f'{stat.count}x  '
-                f'{fname}:{frame.lineno}'
-            )
-        return {'status': 'ok', 'top': lines}
+        # If we have a previous snapshot, diff against it to show growth
+        prev = getattr(self, '_tm_snapshot1', None)
+        if prev is not None:
+            stats = snapshot.compare_to(prev, 'lineno')
+            for stat in stats[:top]:
+                if stat.size_diff <= 0:
+                    continue
+                frame = stat.traceback[0]
+                fname = frame.filename.split('/')[-1]
+                lines.append(
+                    f'+{stat.size_diff/1024:.1f}kB  '
+                    f'{stat.count_diff:+d}x  '
+                    f'{fname}:{frame.lineno}'
+                )
+            self._tm_snapshot1 = snapshot
+            return {'status': 'ok', 'mode': 'diff', 'top': lines}
+        else:
+            # First snapshot — store it and report current totals
+            self._tm_snapshot1 = snapshot
+            stats = snapshot.statistics('lineno')
+            for stat in stats[:top]:
+                frame = stat.traceback[0]
+                fname = frame.filename.split('/')[-1]
+                lines.append(
+                    f'{stat.size/1024:.1f}kB  '
+                    f'{stat.count}x  '
+                    f'{fname}:{frame.lineno}'
+                )
+            return {
+                'status': 'ok',
+                'mode': 'baseline',
+                'message': 'Baseline recorded. Call again in 5+ min for diff.',
+                'top': lines
+            }
