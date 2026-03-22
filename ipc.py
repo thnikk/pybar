@@ -9,6 +9,7 @@ import threading
 import json
 import logging
 import module as mod
+import common as c
 from gi.repository import GLib
 
 # Default socket path
@@ -169,10 +170,14 @@ class IPCServer:
                 return {'status': 'error', 'message': 'Missing module'}
             return self._reload_module(module_name)
 
-        if action == 'tracemalloc':
-            return self._tracemalloc_snapshot(cmd.get('top', 30))
-
-        if action == 'objcount':
+        if action in ('tracemalloc', 'objcount'):
+            if not c.state_manager.get('debug'):
+                return {
+                    'status': 'error',
+                    'message': 'Debug commands require --debug flag'
+                }
+            if action == 'tracemalloc':
+                return self._tracemalloc_snapshot(cmd.get('top', 30))
             return self._object_counts(cmd.get('top', 30))
 
         return {'status': 'error', 'message': f'Unknown action: {action}'}
