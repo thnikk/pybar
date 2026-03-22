@@ -57,10 +57,10 @@ Tracks Python memory allocations. The first call starts tracing and records a ba
 
 The `top` field controls how many allocation sites are returned (default: 30).
 
-The helper script `pybar-memsnap` automates this workflow — it records a baseline, waits 5 minutes, then prints the diff:
+The helper script `pybar-memsnap` (found in `scripts/` in the repo) automates this workflow — it records a baseline, waits 5 minutes, then prints the diff:
 
 ```bash
-    pybar-memsnap
+    python3 scripts/pybar-memsnap
 ```
 
 ### Widget instance counter
