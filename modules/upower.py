@@ -350,7 +350,14 @@ class UPower(c.BaseModule):
         widget.set_visible(bool(data.get('text')))
 
         if not widget.get_active():
-            widget.set_widget(self.build_popover(widget, data))
+            # Only rebuild when the device list or percentages change.
+            fingerprint = tuple(
+                (d['name'], d['percentage'])
+                for d in data.get('devices', [])
+            )
+            if getattr(widget, '_popover_fp', None) != fingerprint:
+                widget._popover_fp = fingerprint
+                widget.set_widget(self.build_popover(widget, data))
         else:
             # Live update
             devices = {d['name']: d for d in data.get('devices', [])}

@@ -264,6 +264,14 @@ class Systemd(c.BaseModule):
         widget.set_label(data.get('text', ''))
         widget.set_visible(bool(data.get('text')))
         if not widget.get_active():
+            # Only rebuild when the set of failed services changes.
+            fingerprint = (
+                tuple(data.get('failed_system', [])),
+                tuple(data.get('failed_user', []))
+            )
+            if getattr(widget, '_popover_fp', None) == fingerprint:
+                return
+            widget._popover_fp = fingerprint
             widget.set_widget(self.build_popover(data))
 
 

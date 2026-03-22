@@ -169,6 +169,9 @@ class IPCServer:
                 return {'status': 'error', 'message': 'Missing module'}
             return self._reload_module(module_name)
 
+        if action == 'tracemalloc':
+            return self._tracemalloc_snapshot(cmd.get('top', 30))
+
         return {'status': 'error', 'message': f'Unknown action: {action}'}
 
     def _widget_action(self, action, widget_name, monitor=None):
@@ -224,3 +227,32 @@ class IPCServer:
             'status': 'error',
             'message': f"Module '{module_name}' not found or not running",
         }
+
+    def _tracemalloc_snapshot(self, top=30):
+        """Take a tracemalloc snapshot and return top allocators."""
+        import tracemalloc
+        import linecache
+        if not tracemalloc.is_tracing():
+            tracemalloc.start(10)
+            return {
+                'status': 'ok',
+                'message': 'tracemalloc started, call again for snapshot'
+            }
+        snapshot = tracemalloc.take_snapshot()
+        # Group by filename+lineno, strip internal frames
+        filters = [
+            tracemalloc.Filter(False, '<frozen importlib._bootstrap>'),
+            tracemalloc.Filter(False, '<frozen importlib._bootstrap_external>'),
+        ]
+        snapshot = snapshot.filter_traces(filters)
+        stats = snapshot.statistics('lineno')
+        lines = []
+        for stat in stats[:top]:
+            frame = stat.traceback[0]
+            fname = frame.filename.split('/')[-1]
+            lines.append(
+                f'{stat.size/1024:.1f}kB  '
+                f'{stat.count}x  '
+                f'{fname}:{frame.lineno}'
+            )
+        return {'status': 'ok', 'top': lines}

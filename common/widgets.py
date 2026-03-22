@@ -364,10 +364,15 @@ def slider(value, min=0, max=100, style=None, scrollable=True):
     return widget
 
 
+_widget_instance_count = 0
+
+
 class Widget(Gtk.Popover):
     """Template popover widget."""
 
     def __init__(self):
+        global _widget_instance_count
+        _widget_instance_count += 1
         super().__init__()
         self.set_position(Gtk.PositionType.TOP)
 
@@ -385,12 +390,13 @@ class Widget(Gtk.Popover):
             orientation=Gtk.Orientation.VERTICAL, spacing=20)
         self.connect("map", self._on_map)
         self.connect("unmap", self._on_unmap)
+        self.connect("destroy", self._on_destroy_widget)
         self._destroyed = False
 
         self._workspace_subscription = None
         self._opened_on_workspace = None
 
-    def destroy(self):
+    def cleanup(self):
         """Clean up widget resources."""
         if self._destroyed:
             return
@@ -398,14 +404,13 @@ class Widget(Gtk.Popover):
 
         self.popdown()
 
+        # Unsubscribe unconditionally — _on_unmap only fires when the
+        # popover has been shown, so popovers that are built but never
+        # opened would otherwise retain their subscription (and a strong
+        # ref to self) in StateManager forever.
         if self._workspace_subscription:
             state_manager.unsubscribe(self._workspace_subscription)
             self._workspace_subscription = None
-
-        try:
-            GObject.signal_handlers_destroy(self)
-        except Exception:
-            pass
 
         if self.box:
             child = self.box.get_first_child()
@@ -421,7 +426,14 @@ class Widget(Gtk.Popover):
                 child = next_child
 
         self.box = None
-        self.unparent()
+        try:
+            self.run_dispose()
+        except Exception:
+            pass
+
+    def _on_destroy_widget(self, _):
+        global _widget_instance_count
+        _widget_instance_count -= 1
 
     def _on_map(self, _):
         """Handle edge CSS and exclusive-popover logic on show."""
@@ -538,10 +550,15 @@ class Module(Gtk.MenuButton):
             if hasattr(popover, 'popdown'):
                 popover.popdown()
             self.set_popover(None)
-            if hasattr(popover, 'destroy'):
-                popover.destroy()
-            elif hasattr(popover, 'unparent'):
-                popover.unparent()
+            if hasattr(popover, 'cleanup'):
+                popover.cleanup()
+            # run_dispose() triggers GObject finalisation, releasing
+            # C-side resources (style context, renderer state, signal
+            # closures) even while the Python wrapper is still alive.
+            try:
+                popover.run_dispose()
+            except Exception:
+                pass
 
     def cleanup(self):
         """Unsubscribe and release all resources."""

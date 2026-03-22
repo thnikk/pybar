@@ -541,6 +541,25 @@ class Display:
                     f"Failed to handle reload signal: {e}",
                     name='display', color='red'
                 )
+
+        # Log Widget instance count every 30s to track popover leaks.
+        self._reload_check_ticks = getattr(
+            self, '_reload_check_ticks', 0) + 1
+        if self._reload_check_ticks % 30 == 0:
+            from common.widgets import _widget_instance_count
+            from common.state import state_manager as _sm
+            # Count total subscribers across all keys
+            total_subs = sum(
+                len(v) for v in _sm.subscribers.values()
+            )
+            ws_subs = len(_sm.subscribers.get('workspaces', {}))
+            logging.debug(
+                f"Widget instances: {_widget_instance_count}  "
+                f"total subs: {total_subs}  "
+                f"workspaces subs: {ws_subs}  "
+                f"state keys: {len(_sm.data)}"
+            )
+
         return True  # Continue checking
 
 

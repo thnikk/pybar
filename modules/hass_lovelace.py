@@ -662,6 +662,21 @@ class HASSLovelace(c.BaseModule):
         m._subscriptions.append(sub_id)
         return m
 
+    def _get_displayed_eids(self, config):
+        """Return the set of entity IDs rendered in the dashboard."""
+        eids = set()
+        views = config.get("views", [])
+        cards = config.get("cards", []) if not views else []
+        for view in views:
+            for card in view.get("cards", []):
+                eids.update(self._extract_entities(card))
+            for section in view.get("sections", []):
+                for card in section.get("cards", []):
+                    eids.update(self._extract_entities(card))
+        for card in cards:
+            eids.update(self._extract_entities(card))
+        return eids
+
     def update_ui(self, widget, data):
         if not data or "config" not in data:
             return
@@ -677,9 +692,14 @@ class HASSLovelace(c.BaseModule):
             widget.set_label("")
 
         if not widget.get_active():
+            # Fingerprint only the entities actually shown in the
+            # dashboard; the full states dict contains every HA entity
+            # and changes every cycle, causing constant popover rebuilds.
+            displayed = self._get_displayed_eids(data["config"])
             fingerprint = tuple(
-                (eid, s.get("state"))
-                for eid, s in sorted(states.items())
+                (eid, states[eid].get("state"))
+                for eid in sorted(displayed)
+                if eid in states
             )
             if (
                 getattr(widget, "_popover_fingerprint", None)

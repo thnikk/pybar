@@ -578,14 +578,16 @@ class _ScrollGradientBase(Gtk.Overlay):
         self._bg_color = _parse_color(bg_color) if bg_color else self.BG
         self._flash_color = _parse_color(flash_color) if flash_color else self.FLASH
         self._radius = radius if radius is not None else self.RADIUS
+        self._radius_provider = None
         if radius is not None:
             add_style(self, f"radius-{int(self._radius)}")
-            provider = Gtk.CssProvider()
+            self._radius_provider = Gtk.CssProvider()
             css = f"* {{ border-radius: {int(self._radius)}px; }}"
-            provider.load_from_data(css.encode())
+            self._radius_provider.load_from_data(css.encode())
             self.get_style_context().add_provider(
-                provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                self._radius_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
+            self.connect("destroy", self._on_destroy)
         self._flash_opacity = 0.0
         self._flash_dir = 0
         self._anim_id = None
@@ -608,6 +610,12 @@ class _ScrollGradientBase(Gtk.Overlay):
         )
         self._scroll_controller.connect("scroll", self._on_scroll_event)
         self._scroll.add_controller(self._scroll_controller)
+
+    def _on_destroy(self, _widget):
+        """Remove the radius CSS provider to prevent a style context leak."""
+        if self._radius_provider is not None:
+            self.get_style_context().remove_provider(self._radius_provider)
+            self._radius_provider = None
 
     def _on_scroll_event(self, _controller, dx, dy):
         delta = dy if hasattr(self, "_sw_height") else dx

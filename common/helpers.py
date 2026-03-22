@@ -128,12 +128,22 @@ def scroll(width=0, height=0, style=None, vexpand=False, hexpand=True):
     return window
 
 
+# Shared provider for suppressing ScrolledWindow overshoot highlights.
+# A single instance is reused across all windows; it never needs to be
+# removed because it carries no per-widget state.
+_overshoot_provider = None
+
+
 def _suppress_overshoot(scrolled_window):
     """Remove the built-in overshoot highlight from a ScrolledWindow."""
-    provider = Gtk.CssProvider()
-    provider.load_from_data(b"overshoot { background: none; box-shadow: none; }")
+    global _overshoot_provider
+    if _overshoot_provider is None:
+        _overshoot_provider = Gtk.CssProvider()
+        _overshoot_provider.load_from_data(
+            b"overshoot { background: none; box-shadow: none; }"
+        )
     scrolled_window.get_style_context().add_provider(
-        provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        _overshoot_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
     )
 
 

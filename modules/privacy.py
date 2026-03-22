@@ -386,20 +386,22 @@ class Privacy(c.BaseModule):
             widget.set_label("  ".join(icons))
             widget.set_visible(True)
 
-            # Real-time update without dismissal
-            popover = widget.get_popover()
-            if not popover:
+            # Rebuild popover only when content fingerprint changes.
+            # Comparing sorted device names + process sets avoids the
+            # previous bug of rebuilding (and leaking) the widget tree
+            # every 3 seconds whenever any device is active.
+            fingerprint = tuple(sorted(
+                (k, tuple(sorted(v.get('processes', [])))
+                 )
+                for k, v in data.items()
+                if isinstance(v, dict)
+            ))
+            if (not widget.get_popover() or
+                    getattr(widget, '_privacy_fp', None) != fingerprint):
+                widget._privacy_fp = fingerprint
                 widget.set_widget(self.build_popover(data))
-            else:
-                # Update the existing popover content
-                widget_box = popover.get_child()
-                if widget_box:
-                    # Clear existing content box and replace it
-                    main_box = widget_box.get_first_child()
-                    if main_box:
-                        widget_box.remove(main_box)
-                    widget_box.append(self.build_popover(data))
         else:
+            widget._privacy_fp = None
             widget.set_visible(False)
 
 
