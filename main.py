@@ -27,6 +27,8 @@ def parse_args():
                         help="Set the GTK/GLib logging level")
     parser.add_argument('-d', '--debug', action='store_true',
                         help="Enable debug mode (enables inspector and screenshots)")
+    parser.add_argument('--clear-cache', action='store_true',
+                        help="Clear cache directory contents on startup")
     args, unknown = parser.parse_known_args()
     return args
 
@@ -193,6 +195,21 @@ def on_activate(app, config):
         sys.exit(1)
 
 
+def clear_cache(cache_path):
+    """ Remove cache directory contents, preserving the log file """
+    import shutil
+    cache_path = os.path.expanduser(cache_path)
+    if not os.path.exists(cache_path):
+        return
+    for entry in os.scandir(cache_path):
+        if entry.name == 'pybar.log':
+            continue
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path)
+        else:
+            os.remove(entry.path)
+
+
 def launch_settings(config_path):
     """Launch settings window"""
     from settings.window import SettingsApplication
@@ -210,6 +227,11 @@ def main():
     # log_level was parsed early
     app_log_level = getattr(logging, args.log_level.upper(), logging.WARNING)
     gtk_log_level = getattr(logging, args.gtk_log_level.upper(), logging.WARNING)
+
+    # Clear cache before logging so the log starts fresh this session
+    if args.clear_cache:
+        clear_cache('~/.cache/pybar')
+
     log_file = setup_logging(app_log_level, gtk_log_level)
     logging.info(f"Starting pybar, logging to {log_file}")
 
