@@ -36,6 +36,9 @@ class Updates(c.BaseModule):
         }
     }
 
+    # Pixel height of a single package row, used to size scroll boxes.
+    ITEM_HEIGHT = 45
+
     manager_config = {
         "Pacman": {
             "command": ["checkupdates"],
@@ -154,6 +157,34 @@ class Updates(c.BaseModule):
     def click_link(self, _btn, url):
         Popen(['xdg-open', url])
 
+    def calc_visible_counts(self, counts, min_items=4, total_slots=12):
+        """ Compute per-manager visible item counts dynamically.
+
+        Each manager gets at least min(count, min_items) slots. Remaining
+        slots are distributed evenly among unsatisfied managers; when the
+        remainder is odd, the topmost unsatisfied manager gets the extra.
+        """
+        alloc = [min(c, min_items) for c in counts]
+        remaining = total_slots - sum(alloc)
+
+        while remaining > 0:
+            # Managers that still have packages beyond their allocation
+            unsatisfied = [
+                i for i, c in enumerate(counts) if alloc[i] < c
+            ]
+            if not unsatisfied:
+                break
+            per = remaining // len(unsatisfied)
+            leftover = remaining % len(unsatisfied)
+            for i in unsatisfied:
+                alloc[i] += per
+            # Topmost unsatisfied manager gets the extra slot
+            if leftover:
+                alloc[unsatisfied[0]] += leftover
+            remaining = 0
+
+        return alloc
+
     def build_popover(self, widget, data):
         """ Build popover for updates """
         main_box = c.box('v', spacing=20, style='small-widget')
@@ -169,10 +200,18 @@ class Updates(c.BaseModule):
         # Expand to put update button at the bottom of the widget
         content_box.set_vexpand(True)
 
-        for manager, info in data['managers'].items():
+        # Only consider managers that have packages, preserving
+        # manager_config order (which is also the widget display order).
+        active_managers = [
+            (manager, info)
+            for manager, info in data['managers'].items()
+            if info['packages']
+        ]
+        counts = [len(info['packages']) for _, info in active_managers]
+        visible_counts = self.calc_visible_counts(counts)
+
+        for (manager, info), visible in zip(active_managers, visible_counts):
             packages = info['packages']
-            if not packages:
-                continue
             manager_box = c.box('v', spacing=10)
             heading = c.label(
                 f"{manager} ({len(packages)} updates)",
@@ -197,12 +236,11 @@ class Updates(c.BaseModule):
                 if package != packages[-1]:
                     packages_box.append(c.sep('h'))
 
-            # Large lists expand to fill remaining space and scroll;
-            # small lists stay at natural height with no wasted space.
-            large = len(packages) > 5
+            # Height is driven by the computed visible count so that
+            # managers with fewer updates leave room for others.
             vsgb = c.VScrollGradientBox(
                 packages_box, gradient_size=60,
-                max_height=180 if large else None)
+                max_height=visible * self.ITEM_HEIGHT)
             c.add_style(vsgb, 'box')
             manager_box.append(vsgb)
             content_box.append(manager_box)
