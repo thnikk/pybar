@@ -37,7 +37,7 @@ def load(path):
             file.write(default_config)
         output = default_config
         output = re.sub(re.compile(r"/\*.*?\*/", re.DOTALL), "", output)
-        output = re.sub(re.compile(r"//.*?\n"), "", output)
+        output = re.sub(re.compile(r"^\s*//.*?$", re.MULTILINE), "", output)
         return json.loads(output)
     with open(
         os.path.expanduser(f'{config_path}/config.json'),
@@ -45,7 +45,7 @@ def load(path):
     ) as file:
         output = file.read()
         output = re.sub(re.compile(r"/\*.*?\*/", re.DOTALL), "", output)
-        output = re.sub(re.compile(r"//.*?\n"), "", output)
+        output = re.sub(re.compile(r"^\s*//.*?$", re.MULTILINE), "", output)
         return json.loads(output)
 
 
