@@ -118,6 +118,7 @@ button.restart-btn.reloading {
 from settings.tabs.general import GeneralTab
 from settings.tabs.modules import ModulesTab
 from settings.tabs.appearance import AppearanceTab
+from settings.tabs.integrations import IntegrationsTab
 from settings.tabs.about import AboutTab
 
 
@@ -219,6 +220,27 @@ class SettingsWindow(Adw.ApplicationWindow):
         appearance_page.set_child(appearance_box)
         view_stack.add_titled_with_icon(
             appearance_page, "appearance", "Appearance", "preferences-color-symbolic"
+        )
+
+        integrations_page = Gtk.ScrolledWindow()
+        integrations_page.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC
+        )
+        integrations_page.set_focusable(True)
+
+        integrations_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL
+        )
+        integrations_box.set_margin_top(24)
+        integrations_box.set_margin_bottom(24)
+        integrations_box.set_margin_start(24)
+        integrations_box.set_margin_end(24)
+        self.integrations_tab = IntegrationsTab(config_path)
+        integrations_box.append(self.integrations_tab)
+        integrations_page.set_child(integrations_box)
+        view_stack.add_titled_with_icon(
+            integrations_page, "integrations", "Integrations",
+            "network-server-symbolic"
         )
 
         about_page = Gtk.ScrolledWindow()

@@ -242,6 +242,7 @@ def main():
 
     config = Config.load(args.config)
     c.state_manager.update('config', config)
+    c.state_manager.update('config_path', args.config)
     c.state_manager.update('debug', args.debug)
 
     # Set the cache directory if it's not specified in the config

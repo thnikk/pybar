@@ -1,4 +1,6 @@
 aiohappyeyeballs==2.4.4
+caldav
+icalendar
 aiohttp==3.11.11
 aiosignal==1.3.2
 altgraph==0.17.5
