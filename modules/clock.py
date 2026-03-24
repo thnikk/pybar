@@ -273,6 +273,15 @@ class Clock(c.BaseModule):
         # Start background fetch right away.
         self._start_background_fetch()
 
+    def fetch_data(self):
+        """Fetch the current time."""
+        now = datetime.now()
+        fmt = self.config.get('format', self.SCHEMA['format']['default'])
+        return {
+            'text': now.strftime(fmt),
+            'day': now.day
+        }
+
     def _start_background_fetch(self):
         """Spawn a daemon thread to fetch all remote sources."""
         t = threading.Thread(
@@ -608,7 +617,7 @@ class Clock(c.BaseModule):
         """Clock module widget."""
         m = c.Module()
         m.set_position(bar.position)
-        m.set_icon('')
+        m.set_icon('\uf017')
         m.set_widget(self.widget_content())
 
         widget_ref = weakref.ref(m)
@@ -624,11 +633,14 @@ class Clock(c.BaseModule):
 
     def update_ui(self, widget, data):
         """Update clock UI."""
-        if widget.text is None:
+        if not data or widget.text is None:
+            return
+
+        new = data.get('text')
+        if new is None:
             return
 
         last = widget.text.get_text()
-        new = data['text']
         widget.set_visible(True)
         if new != last:
             widget.set_label(new)
