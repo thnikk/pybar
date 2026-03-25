@@ -491,10 +491,12 @@ class Clock(c.BaseModule):
                 row.append(c.sep('v'))
 
                 desc_label = c.label(
-                    event, style='inner-box', ha='end'
+                    event, style='inner-box', ha='end',
+                    length=20
                 )
                 desc_label.set_hexpand(True)
-                desc_label.set_halign(Gtk.Align.END)
+                desc_label.set_xalign(1.0)
+                desc_label.set_width_chars(20)
                 desc_label.set_ellipsize(c.Pango.EllipsizeMode.END)
                 row.append(desc_label)
 
