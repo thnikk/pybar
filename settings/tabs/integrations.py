@@ -11,7 +11,6 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib  # noqa
-import config as Config
 import credentials as Creds
 
 
@@ -332,19 +331,8 @@ class IntegrationsTab(Gtk.Box):
         self._ics_rows = []
         self._caldav_rows = []
 
-        # Load existing sources from config
-        full_config = Config.load(config_path)
-        clock_cfg = full_config.get('modules', {}).get('clock', {})
-        existing_sources = clock_cfg.get('sources', [])
-
-        # Load existing CalDAV credentials
-        existing_creds = Creds.load(config_path)
-
-        # Index credentials by (url, username) for lookup
-        cred_index = {
-            (e.get('url', ''), e.get('username', '')): e
-            for e in existing_creds.get('caldav', [])
-        }
+        # Load all integrations from credentials.json
+        existing = Creds.load(config_path)
 
         # --- ICS URLs group ---
         self._ics_group = Adw.PreferencesGroup()
@@ -355,9 +343,8 @@ class IntegrationsTab(Gtk.Box):
         )
         self.append(self._ics_group)
 
-        for source in existing_sources:
-            if source.get('type') == 'ics_url':
-                self._add_ics_row(source)
+        for url in existing.get('ics_urls', []):
+            self._add_ics_row({'url': url})
 
         add_ics_btn = Gtk.Button(label='Add ICS URL')
         add_ics_btn.set_icon_name('list-add-symbolic')
@@ -377,16 +364,8 @@ class IntegrationsTab(Gtk.Box):
         )
         self.append(self._caldav_group)
 
-        for source in existing_sources:
-            if source.get('type') == 'caldav':
-                key = (
-                    source.get('url', ''),
-                    source.get('username', '')
-                )
-                # Merge saved credentials back into the row data
-                account = dict(source)
-                account.update(cred_index.get(key, {}))
-                self._add_caldav_row(account)
+        for account in existing.get('caldav', []):
+            self._add_caldav_row(account)
 
         add_caldav_btn = Gtk.Button(label='Add CalDAV Account')
         add_caldav_btn.set_icon_name('list-add-symbolic')
@@ -441,39 +420,23 @@ class IntegrationsTab(Gtk.Box):
             self._caldav_rows.remove(row)
 
     def _on_save(self, _btn):
-        """
-        Save sources to config.json and credentials to
-        credentials.json. The JSON source entry is always
-        prepended so the clock module reads the local file too.
-        """
+        """Save all integrations to credentials.json."""
         try:
-            # Build sources list: json always first, then ICS, then
-            # CalDAV (url+username only — no passwords in config)
-            sources = [{'type': 'json'}]
-
-            for row in self._ics_rows:
-                src = row.get_source()
-                if src.get('url'):
-                    sources.append(src)
-
-            caldav_accounts = []
-            for row in self._caldav_rows:
-                src = row.get_source()
-                if src.get('url') and src.get('username'):
-                    sources.append(src)
-                    caldav_accounts.append(row.get_account())
-
-            # Write sources into the clock module config
-            full_config = Config.load(self._config_path)
-            modules = full_config.setdefault('modules', {})
-            modules.setdefault('clock', {})['sources'] = sources
-            Config.save(self._config_path, full_config)
-
-            # Write CalDAV credentials separately
-            Creds.save(
-                self._config_path, {'caldav': caldav_accounts}
-            )
-
+            ics_urls = [
+                row.get_source()['url']
+                for row in self._ics_rows
+                if row.get_source().get('url')
+            ]
+            caldav_accounts = [
+                row.get_account()
+                for row in self._caldav_rows
+                if row.get_account().get('url')
+                and row.get_account().get('username')
+            ]
+            Creds.save(self._config_path, {
+                'ics_urls': ics_urls,
+                'caldav': caldav_accounts,
+            })
             self._show_toast('Saved')
         except Exception as e:
             self._show_toast(f'Save failed: {e}')

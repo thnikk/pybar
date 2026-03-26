@@ -289,64 +289,52 @@ class Clock(c.BaseModule):
         if not self._fetch_lock.acquire(blocking=False):
             return
         try:
-            sources = self.config.get("sources") if self.config else None
-            if not sources:
-                # JSON-only — already loaded in __init__, nothing to do.
+            config_path = c.state_manager.get("config_path")
+            integrations = _load_credentials(config_path)
+            ics_urls = integrations.get("ics_urls", [])
+            caldav_creds = integrations.get("caldav", [])
+
+            # Skip entirely if no remote sources are configured.
+            if not ics_urls and not caldav_creds:
                 return
 
             cache = _load_events_cache()
-            merged = {}
-            config_path = c.state_manager.get("config_path")
-            credentials = _load_credentials(config_path)
-            caldav_creds = credentials.get("caldav", [])
+            # Always include local JSON events as the base.
+            merged = _load_json_events()
+            cache["json"] = merged.copy()
 
-            for source in sources:
-                stype = source.get("type", "")
-
-                if stype == "json":
-                    result = _load_json_events()
-                    cache["json"] = result
+            for url in ics_urls:
+                url = url.strip()
+                if not url:
+                    continue
+                key = f"ics_url:{url}"
+                result = _load_ics_events(url)
+                if result is None:
+                    merged.update(cache.get(key, {}))
+                else:
+                    cache[key] = result
                     merged.update(result)
 
-                elif stype == "ics_url":
-                    url = source.get("url", "").strip()
-                    if not url:
-                        continue
-                    key = f"ics_url:{url}"
-                    result = _load_ics_events(url)
-                    if result is None:
-                        merged.update(cache.get(key, {}))
-                    else:
-                        cache[key] = result
-                        merged.update(result)
-
-                elif stype == "caldav":
-                    url = source.get("url", "").strip()
-                    username = source.get("username", "").strip()
-                    if not url or not username:
-                        continue
-                    key = f"caldav:{url}:{username}"
-                    password = None
-                    for entry in caldav_creds:
-                        if (
-                            entry.get("url", "").strip() == url
-                            and entry.get("username", "").strip() == username
-                        ):
-                            password = _resolve_password(entry)
-                            break
-                    if not password:
-                        c.print_debug(
-                            f"No credentials for CalDAV {username}@{url}",
-                            color="yellow",
-                        )
-                        merged.update(cache.get(key, {}))
-                        continue
-                    result = _load_caldav_events(url, username, password)
-                    if result is None:
-                        merged.update(cache.get(key, {}))
-                    else:
-                        cache[key] = result
-                        merged.update(result)
+            for entry in caldav_creds:
+                url = entry.get("url", "").strip()
+                username = entry.get("username", "").strip()
+                if not url or not username:
+                    continue
+                key = f"caldav:{url}:{username}"
+                password = _resolve_password(entry)
+                if not password:
+                    c.print_debug(
+                        f"No credentials for CalDAV {username}@{url}",
+                        color="yellow",
+                    )
+                    merged.update(cache.get(key, {}))
+                    continue
+                result = _load_caldav_events(url, username, password)
+                if result is None:
+                    merged.update(cache.get(key, {}))
+                else:
+                    cache[key] = result
+                    merged.update(result)
 
             # Persist merged result so it's available on next startup.
             cache["merged"] = merged
