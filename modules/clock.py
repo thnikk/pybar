@@ -191,6 +191,35 @@ def _load_caldav_events(url, username, password):
         return None
 
 
+# Pre-built CSS providers keyed by (r, g, b) — shared across all
+# render calls to avoid creating a new GObject per event per render.
+_CSS_PROVIDERS = {}
+
+
+def _get_css_provider(r, g, b):
+    """Return a cached CssProvider for the given RGB colour."""
+    key = (r, g, b)
+    if key not in _CSS_PROVIDERS:
+        css = (
+            f"box {{ background-color: rgb({r},{g},{b}); "
+            f"border-radius: 999px; }}"
+        )
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css.encode())
+        _CSS_PROVIDERS[key] = provider
+    return _CSS_PROVIDERS[key]
+
+
+_ORDINAL = {1: "st", 2: "nd", 3: "rd"}
+
+
+def _ordinal(n):
+    """Return ordinal suffix for n."""
+    if 11 <= n <= 13:
+        return "th"
+    return _ORDINAL.get(n % 10, "th")
+
+
 def _load_credentials(config_path):
     """Load credentials file, return {} on any failure."""
     if not config_path:
@@ -349,7 +378,12 @@ class Clock(c.BaseModule):
         """
         Track a (calendar, event_box) pair so background fetches
         can update it. Uses weak refs to avoid keeping widgets alive.
+        Prunes dead refs eagerly on every registration.
         """
+        self._calendar_refs = [
+            (cr, br) for cr, br in self._calendar_refs
+            if cr() is not None and br() is not None
+        ]
         self._calendar_refs.append((weakref.ref(cal), weakref.ref(event_box)))
 
     def event_lookup(self, event):
@@ -400,12 +434,9 @@ class Clock(c.BaseModule):
                 "orange": (0xD0, 0x87, 0x70),
                 "green": (0xA3, 0xBE, 0x8C),
             }
+            # SizeGroup is local to this render pass; each call
+            # produces a fresh container so a new group is correct.
             left_size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
-
-            def get_ordinal(n):
-                if 11 <= n <= 13:
-                    return "th"
-                return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
 
             for i, (day, event) in enumerate(month_events):
                 row = c.box("h")
@@ -420,22 +451,17 @@ class Clock(c.BaseModule):
                 indicator.set_valign(Gtk.Align.CENTER)
                 indicator.set_margin_start(10)
                 indicator.set_margin_end(4)
-                old_provider = getattr(indicator, "_css_provider", None)
-                if old_provider:
-                    indicator.get_style_context().remove_provider(old_provider)
-                css = (
-                    f"box {{ background-color: rgb({r},{g},{b}); "
-                    f"border-radius: 999px; }}"
-                )
-                provider = Gtk.CssProvider()
-                provider.load_from_data(css.encode())
-                indicator._css_provider = provider
+                # Use the module-level cached provider — no new
+                # GObject created per event per render call.
                 indicator.get_style_context().add_provider(
-                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                    _get_css_provider(r, g, b),
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
                 )
                 left_cell.append(indicator)
 
-                date_label = c.label(f"{day}{get_ordinal(day)}", style="inner-box")
+                date_label = c.label(
+                    f"{day}{_ordinal(day)}", style="inner-box"
+                )
                 left_cell.append(date_label)
                 row.append(left_cell)
                 row.append(c.sep("v"))
