@@ -27,7 +27,9 @@ a = Analysis(
         'psutil',
         'transmission_rpc',
         'colorsys',
-        'evdev'
+        'evdev',
+        'icalendar',
+        'caldav',
     ],
     hookspath=[],
     hooksconfig={
