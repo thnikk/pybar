@@ -7,6 +7,8 @@ import os
 import sys
 import argparse
 import logging
+import version
+
 
 def parse_args():
     """ Parse arguments """
@@ -20,17 +22,23 @@ def parse_args():
     parser.add_argument('-s', '--settings', action='store_true',
                         help="Launch settings window")
     parser.add_argument('-l', '--log-level', type=str, default='WARNING',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        choices=[
+                            'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the application logging level")
     parser.add_argument('-g', '--gtk-log-level', type=str, default='WARNING',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        choices=[
+                            'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the GTK/GLib logging level")
     parser.add_argument('-d', '--debug', action='store_true',
-                        help="Enable debug mode (enables inspector and screenshots)")
+                        help="Enable debug mode "
+                        "(enables inspector and screenshots)")
     parser.add_argument('--clear-cache', action='store_true',
                         help="Clear cache directory contents on startup")
+    parser.add_argument('-v', '--version', action='version',
+                        version='%(prog)s ' + version.get_version())
     args, unknown = parser.parse_known_args()
     return args
+
 
 # Parse early to set environment variables and log level
 args = parse_args()
