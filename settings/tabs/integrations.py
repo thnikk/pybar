@@ -14,6 +14,41 @@ from gi.repository import Gtk, Adw, GLib  # noqa
 import credentials as Creds
 
 
+def _test_hass(server, token, callback):
+    """
+    Test a Home Assistant connection in a background thread.
+    Calls callback(success, message) on the GLib main loop.
+    """
+    def run():
+        try:
+            import requests
+            base = (
+                server.rstrip('/')
+                if '://' in server
+                else f'http://{server}'
+            )
+            bearer = (
+                token if token.startswith('Bearer ')
+                else f'Bearer {token}'
+            )
+            resp = requests.get(
+                f'{base}/api/',
+                headers={'Authorization': bearer},
+                timeout=5
+            )
+            if resp.status_code == 200:
+                msg = resp.json().get('message', 'API reachable')
+                GLib.idle_add(callback, True, msg)
+            else:
+                GLib.idle_add(
+                    callback, False,
+                    f'HTTP {resp.status_code}'
+                )
+        except Exception as e:
+            GLib.idle_add(callback, False, str(e))
+    threading.Thread(target=run, daemon=True).start()
+
+
 def _test_ics(url, callback):
     """
     Fetch an ICS URL in a background thread and report success.
@@ -311,6 +346,70 @@ class CalDAVAccountRow(Adw.ExpanderRow):
         }
 
 
+class HASSRow(Adw.PreferencesGroup):
+    """
+    Preferences group for a single Home Assistant server entry.
+    Unlike CalDAV and ICS, there is only one HA server so this
+    is not an expander row — just a flat group with fields.
+    """
+
+    def __init__(self, hass, on_change):
+        super().__init__()
+        self._on_change = on_change
+
+        server = hass.get('server', '')
+        token = hass.get('bearer_token', '')
+
+        # --- Server ---
+        self._server_row = Adw.EntryRow()
+        self._server_row.set_title('Server')
+        self._server_row.set_text(server)
+        self._server_row.connect('changed', lambda _: on_change())
+        self.add(self._server_row)
+
+        # --- Bearer Token ---
+        self._token_row = Adw.PasswordEntryRow()
+        self._token_row.set_title('Bearer Token')
+        self._token_row.set_text(token)
+        self._token_row.connect('changed', lambda _: on_change())
+        self.add(self._token_row)
+
+        # --- Status + Test button ---
+        status_row = Adw.ActionRow()
+        status_row.set_title('Status')
+        self._status = _status_label()
+        status_row.add_suffix(self._status)
+        test_btn = Gtk.Button(label='Test')
+        test_btn.add_css_class('flat')
+        test_btn.set_valign(Gtk.Align.CENTER)
+        test_btn.connect('clicked', self._on_test)
+        status_row.add_suffix(test_btn)
+        self.add(status_row)
+
+    def _on_test(self, _btn):
+        """Test the HA connection and update status."""
+        server = self._server_row.get_text().strip()
+        token = self._token_row.get_text().strip()
+        if not server or not token:
+            _set_status(
+                self._status, False,
+                'Server and bearer token are required'
+            )
+            return
+        self._status.set_text('Testing…')
+        _test_hass(
+            server, token,
+            lambda ok, msg: _set_status(self._status, ok, msg)
+        )
+
+    def get_hass(self):
+        """Return credentials dict for this HA server."""
+        return {
+            'server': self._server_row.get_text().strip(),
+            'bearer_token': self._token_row.get_text().strip(),
+        }
+
+
 class IntegrationsTab(Gtk.Box):
     """
     Integrations settings tab.
@@ -375,6 +474,20 @@ class IntegrationsTab(Gtk.Box):
         )
         self._caldav_group.add(add_caldav_btn)
 
+        # --- Home Assistant group ---
+        hass_group_wrapper = Adw.PreferencesGroup()
+        hass_group_wrapper.set_title('Home Assistant')
+        hass_group_wrapper.set_description(
+            'Shared server and token used by all hass modules. '
+            'Per-module overrides can still be set in config.json.'
+        )
+        self.append(hass_group_wrapper)
+        self._hass_row = HASSRow(
+            existing.get('hass', {}),
+            on_change=lambda: None
+        )
+        self.append(self._hass_row)
+
         # --- Save button ---
         save_row = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=8
@@ -433,9 +546,11 @@ class IntegrationsTab(Gtk.Box):
                 if row.get_account().get('url')
                 and row.get_account().get('username')
             ]
+            hass = self._hass_row.get_hass()
             Creds.save(self._config_path, {
                 'ics_urls': ics_urls,
                 'caldav': caldav_accounts,
+                'hass': hass,
             })
             self._show_toast('Saved')
         except Exception as e:

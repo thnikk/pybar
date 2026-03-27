@@ -31,6 +31,22 @@ def load(config_path):
         return {}
 
 
+def get_hass(config_path, module_config):
+    """
+    Return (server, bearer_token) for a hass module.
+    Module config values take priority over credentials.json,
+    allowing per-instance overrides while keeping the common
+    case (shared server) out of config.json.
+    """
+    creds = load(config_path)
+    hass = creds.get('hass', {})
+    server = module_config.get('server') or hass.get('server', '')
+    token = (
+        module_config.get('bearer_token') or hass.get('bearer_token', '')
+    )
+    return server, token
+
+
 def save(config_path, credentials):
     """
     Save credentials to file with 600 permissions.

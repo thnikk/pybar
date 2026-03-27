@@ -25,7 +25,7 @@ class HASSLovelace(c.BaseModule):
         "server": {
             "type": "string",
             "default": "",
-            "label": "Server",
+            "label": "Server (override)",
             "description": (
                 "Home Assistant server address (e.g. 10.0.0.3:8123)"
             ),
@@ -33,7 +33,7 @@ class HASSLovelace(c.BaseModule):
         "bearer_token": {
             "type": "string",
             "default": "",
-            "label": "Bearer Token",
+            "label": "Bearer Token (override)",
             "description": (
                 "Long-lived access token from Home Assistant"
             ),
@@ -160,9 +160,14 @@ class HASSLovelace(c.BaseModule):
             return None
 
     def fetch_data(self):
-        server = self.config.get("server")
-        token = self.config.get("bearer_token")
-        dash_id = self.config.get("dashboard_id", "lovelace")
+        config_path = c.state_manager.get('config_path')
+        if config_path:
+            import credentials as creds
+            server, token = creds.get_hass(config_path, self.config)
+        else:
+            server = self.config.get('server')
+            token = self.config.get('bearer_token')
+        dash_id = self.config.get('dashboard_id', 'lovelace')
 
         if not server or not token:
             return None

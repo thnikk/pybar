@@ -28,20 +28,20 @@ class HASS(c.BaseModule):
         'server': {
             'type': 'string',
             'default': '',
-            'label': 'Server',
-            'description': 'Home Assistant server address (e.g. 192.168.1.100:8123)'
+            'label': 'Server (override)',
+            'description': 'Home Assistant server address (e.g. 10.0.0.3:8123)'
+        },
+        'bearer_token': {
+            'type': 'string',
+            'default': '',
+            'label': 'Bearer Token (override)',
+            'description': 'Long-lived access token from Home Assistant'
         },
         'sensor': {
             'type': 'string',
             'default': '',
             'label': 'Sensor Entity ID',
             'description': 'Entity ID of the sensor (e.g. sensor.temperature)'
-        },
-        'bearer_token': {
-            'type': 'string',
-            'default': '',
-            'label': 'Bearer Token',
-            'description': 'Long-lived access token from Home Assistant'
         },
         'format': {
             'type': 'string',
@@ -110,9 +110,15 @@ class HASS(c.BaseModule):
             return None
 
     def fetch_data(self):
-        server = self.config.get('server')
+        config_path = c.state_manager.get('config_path')
+        if config_path:
+            import credentials as creds
+            server, token = creds.get_hass(config_path, self.config)
+        else:
+            server = self.config.get('server')
+            token = self.config.get('bearer_token')
+
         sensor = self.config.get('sensor')
-        token = self.config.get('bearer_token')
 
         if not all([server, sensor, token]):
             return {}
