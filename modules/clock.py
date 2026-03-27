@@ -200,10 +200,7 @@ def _get_css_provider(r, g, b):
     """Return a cached CssProvider for the given RGB colour."""
     key = (r, g, b)
     if key not in _CSS_PROVIDERS:
-        css = (
-            f"box {{ background-color: rgb({r},{g},{b}); "
-            f"border-radius: 999px; }}"
-        )
+        css = f"box {{ background-color: rgb({r},{g},{b}); border-radius: 999px; }}"
         provider = Gtk.CssProvider()
         provider.load_from_data(css.encode())
         _CSS_PROVIDERS[key] = provider
@@ -369,7 +366,8 @@ class Clock(c.BaseModule):
         Prunes dead refs eagerly on every registration.
         """
         self._calendar_refs = [
-            (cr, br) for cr, br in self._calendar_refs
+            (cr, br)
+            for cr, br in self._calendar_refs
             if cr() is not None and br() is not None
         ]
         self._calendar_refs.append((weakref.ref(cal), weakref.ref(event_box)))
@@ -447,9 +445,7 @@ class Clock(c.BaseModule):
                 )
                 left_cell.append(indicator)
 
-                date_label = c.label(
-                    f"{day}{_ordinal(day)}", style="inner-box"
-                )
+                date_label = c.label(f"{day}{_ordinal(day)}", style="inner-box")
                 left_cell.append(date_label)
                 row.append(left_cell)
                 row.append(c.sep("v"))
@@ -540,10 +536,22 @@ class Clock(c.BaseModule):
         heading.set_xalign(0.5)
         widget.append(heading)
 
+        now = datetime.now()
+        reset_btn = c.button(" Today", style="normal")
+        reset_btn.connect(
+            "clicked",
+            lambda *_: (
+                cal.set_month(now.month - 1),
+                cal.set_year(now.year),
+                self._render_events(cal, event_list_box),
+            ),
+        )
+
         cal = Gtk.Calendar()
         cal.add_css_class("view")
         cal.set_size_request(-1, 230)
         widget.append(cal)
+        widget.append(reset_btn)
 
         widget.append(c.label("Events", style="title", he=True, ha="start"))
 
