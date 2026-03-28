@@ -12,6 +12,9 @@ if os.path.exists('VERSION'):
 layer_shell_libs = glob.glob(
     '/usr/lib/**/libgtk4-layer-shell.so*', recursive=True
 )
+layer_shell_typelibs = glob.glob(
+    '/usr/lib/**/Gtk4LayerShell*.typelib', recursive=True
+)
 
 a = Analysis(
     ['main.py'],
@@ -23,7 +26,7 @@ a = Analysis(
         ('modules', 'modules'),
         ('fonts', 'fonts'),
         ('assets', 'assets'),
-    ] + extra_datas,
+    ] + [(tl, 'gi/') for tl in layer_shell_typelibs] + extra_datas,
     hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
         'requests',
         'aiohttp',
