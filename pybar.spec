@@ -13,7 +13,7 @@ layer_shell_libs = glob.glob(
     '/usr/lib/**/libgtk4-layer-shell.so*', recursive=True
 )
 layer_shell_typelibs = glob.glob(
-    '/usr/lib/**/Gtk4LayerShell*.typelib', recursive=True
+    '/usr/lib/**/girepository-1.0/Gtk4LayerShell*.typelib', recursive=True
 )
 
 a = Analysis(
@@ -26,7 +26,7 @@ a = Analysis(
         ('modules', 'modules'),
         ('fonts', 'fonts'),
         ('assets', 'assets'),
-    ] + [(tl, 'gi/') for tl in layer_shell_typelibs] + extra_datas,
+    ] + [(tl, 'gi_typelibs/') for tl in layer_shell_typelibs] + extra_datas,
     hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
         'requests',
         'aiohttp',
