@@ -175,7 +175,7 @@ class Display:
                 Gtk.STYLE_PROVIDER_PRIORITY_USER
             )
             self.css_providers.append(css_provider)
-        except GLib.Error as e:
+        except GLib.GError as e:
             c.print_debug(
                 f"Failed to load CSS: {e}",
                 name='display', color='red'
