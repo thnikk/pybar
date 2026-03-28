@@ -166,7 +166,8 @@ class Display:
         try:
             css_provider = Gtk.CssProvider()
             if from_string:
-                css_provider.load_from_data(data.encode('utf-8'))
+                data_bytes = data.encode('utf-8')
+                css_provider.load_from_data(data_bytes, len(data_bytes))
             else:
                 css_provider.load_from_path(os.path.expanduser(data))
             
