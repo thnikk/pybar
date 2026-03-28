@@ -142,8 +142,10 @@ jobs:
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Assemble deb package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          PKG=pybar_${{ steps.version.outputs.version }}_amd64
+          PKG=pybar_${VERSION}_amd64
           # Create directory layout
           mkdir -p ${PKG}/opt/pybar
           mkdir -p ${PKG}/DEBIAN
@@ -152,15 +154,15 @@ jobs:
           cp -r ./artifacts/ubuntu/. ${PKG}/opt/pybar/
           chmod +x ${PKG}/opt/pybar/pybar
 
-          # control file
-          cat > ${PKG}/DEBIAN/control << EOF
+          # control file - use env var to avoid YAML parsing issues
+          cat > ${PKG}/DEBIAN/control << 'CONTROL'
 Package: pybar
-Version: ${{ steps.version.outputs.version }}
 Architecture: amd64
 Maintainer: thnikk
 Depends: libgtk4-layer-shell0
 Description: pybar GTK4 status bar
-EOF
+CONTROL
+          echo "Version: ${VERSION}" >> ${PKG}/DEBIAN/control
 
           # postinst: create /usr/bin symlink
           cat > ${PKG}/DEBIAN/postinst << 'EOF'
