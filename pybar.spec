@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import glob
 from PyInstaller.utils.hooks import collect_submodules
 
 # Include VERSION file only if it exists (written by CI before build)
@@ -8,10 +9,14 @@ if os.path.exists('VERSION'):
     extra_datas.append(('VERSION', '.'))
 
 
+layer_shell_libs = glob.glob(
+    '/usr/lib/**/libgtk4-layer-shell.so*', recursive=True
+)
+
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[(lib, '.') for lib in layer_shell_libs],
     datas=[
         ('LICENSE', '.'),
         ('style.css', '.'),
