@@ -27,18 +27,23 @@ a = Analysis(
         ('fonts', 'fonts'),
         ('assets', 'assets'),
     ] + [(tl, 'gi_typelibs/') for tl in layer_shell_typelibs] + extra_datas,
-    hiddenimports=collect_submodules('modules') + collect_submodules('dasbus') + [
-        'requests',
-        'aiohttp',
-        'hid',
-        'pulsectl',
-        'psutil',
-        'transmission_rpc',
-        'colorsys',
-        'evdev',
-        'icalendar',
-        'caldav',
-    ],
+    hiddenimports=(
+        collect_submodules('modules') +
+        collect_submodules('dasbus') +
+        collect_submodules('gi.overrides') +
+        [
+            'requests',
+            'aiohttp',
+            'hid',
+            'pulsectl',
+            'psutil',
+            'transmission_rpc',
+            'colorsys',
+            'evdev',
+            'icalendar',
+            'caldav',
+        ]
+    ),
     hookspath=[],
     hooksconfig={
         "gi": {
