@@ -119,8 +119,75 @@ jobs:
           name: pybar-ubuntu
           path: dist/pybar
 
+  package-deb:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pybar-ubuntu
+          path: ./artifacts/ubuntu
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          # Strip leading 'v' for the deb version field
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Assemble deb package
+        run: |
+          PKG=pybar_${{ steps.version.outputs.version }}_amd64
+          # Create directory layout
+          mkdir -p ${PKG}/opt/pybar
+          mkdir -p ${PKG}/DEBIAN
+
+          # Copy the full onedir bundle
+          cp -r ./artifacts/ubuntu/. ${PKG}/opt/pybar/
+          chmod +x ${PKG}/opt/pybar/pybar
+
+          # control file
+          cat > ${PKG}/DEBIAN/control << EOF
+Package: pybar
+Version: ${{ steps.version.outputs.version }}
+Architecture: amd64
+Maintainer: thnikk
+Depends: libgtk4-layer-shell0
+Description: pybar GTK4 status bar
+EOF
+
+          # postinst: create /usr/bin symlink
+          cat > ${PKG}/DEBIAN/postinst << 'EOF'
+#!/bin/sh
+set -e
+ln -sf /opt/pybar/pybar /usr/bin/pybar
+EOF
+          chmod 0755 ${PKG}/DEBIAN/postinst
+
+          # prerm: remove /usr/bin symlink
+          cat > ${PKG}/DEBIAN/prerm << 'EOF'
+#!/bin/sh
+set -e
+rm -f /usr/bin/pybar
+EOF
+          chmod 0755 ${PKG}/DEBIAN/prerm
+
+          dpkg-deb --build ${PKG}
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pybar-deb
+          path: pybar_${{ steps.version.outputs.version }}_amd64.deb
+
   release:
-    needs: [build-arch, build]
+    needs: [build-arch, build, package-deb]
     runs-on: ubuntu-latest
     if: |
       startsWith(github.ref, 'refs/tags/') ||
@@ -144,6 +211,12 @@ jobs:
         with:
           name: pybar-ubuntu
           path: ./artifacts/ubuntu
+
+      - name: Download deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pybar-deb
+          path: ./artifacts/deb
 
       - name: Create zip archives
         run: |
@@ -182,6 +255,7 @@ jobs:
           echo "" >> notes.md
           echo "* \`pybar-arch.zip\` - Arch Linux build" >> notes.md
           echo "* \`pybar-ubuntu.zip\` - Ubuntu build" >> notes.md
+          echo "* \`pybar_*_amd64.deb\` - Debian/Ubuntu package" >> notes.md
 
       - name: Check if pre-release
         id: prerelease
@@ -216,6 +290,7 @@ jobs:
           files: |
             ./artifacts/pybar-arch.zip
             ./artifacts/pybar-ubuntu.zip
+            ./artifacts/deb/*.deb
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: true
         env:
