@@ -154,30 +154,22 @@ jobs:
           cp -r ./artifacts/ubuntu/. ${PKG}/opt/pybar/
           chmod +x ${PKG}/opt/pybar/pybar
 
-          # control file - use env var to avoid YAML parsing issues
-          cat > ${PKG}/DEBIAN/control << 'CONTROL'
-Package: pybar
-Architecture: amd64
-Maintainer: thnikk
-Depends: libgtk4-layer-shell0
-Description: pybar GTK4 status bar
-CONTROL
-          echo "Version: ${VERSION}" >> ${PKG}/DEBIAN/control
+          # control file - use printf to avoid heredoc YAML issues
+          printf 'Package: pybar\n' > ${PKG}/DEBIAN/control
+          printf 'Version: %s\n' "${VERSION}" >> ${PKG}/DEBIAN/control
+          printf 'Architecture: amd64\n' >> ${PKG}/DEBIAN/control
+          printf 'Maintainer: thnikk\n' >> ${PKG}/DEBIAN/control
+          printf 'Depends: libgtk4-layer-shell0\n' >> ${PKG}/DEBIAN/control
+          printf 'Description: pybar GTK4 status bar\n' >> ${PKG}/DEBIAN/control
 
           # postinst: create /usr/bin symlink
-          cat > ${PKG}/DEBIAN/postinst << 'EOF'
-#!/bin/sh
-set -e
-ln -sf /opt/pybar/pybar /usr/bin/pybar
-EOF
+          printf '#!/bin/sh\nset -e\nln -sf /opt/pybar/pybar /usr/bin/pybar\n' \
+            > ${PKG}/DEBIAN/postinst
           chmod 0755 ${PKG}/DEBIAN/postinst
 
           # prerm: remove /usr/bin symlink
-          cat > ${PKG}/DEBIAN/prerm << 'EOF'
-#!/bin/sh
-set -e
-rm -f /usr/bin/pybar
-EOF
+          printf '#!/bin/sh\nset -e\nrm -f /usr/bin/pybar\n' \
+            > ${PKG}/DEBIAN/prerm
           chmod 0755 ${PKG}/DEBIAN/prerm
 
           dpkg-deb --build ${PKG}
