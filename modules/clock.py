@@ -537,7 +537,7 @@ class Clock(c.BaseModule):
         widget.append(heading)
 
         now = datetime.now()
-        reset_btn = c.button(" Today", style="normal")
+        reset_btn = c.button("\uf783 Today", style="normal")
         reset_btn.connect(
             "clicked",
             lambda *_: (
