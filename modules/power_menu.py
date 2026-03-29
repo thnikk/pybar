@@ -3,6 +3,7 @@
 Description: Power module with list, grid, and wide-row menu styles
 Author: thnikk
 """
+import os
 import weakref
 import common as c
 from subprocess import Popen, run
@@ -59,6 +60,27 @@ class Power(c.BaseModule):
     def __init__(self, name, config):
         super().__init__(name, config)
         self.blanking_active = False
+        # Read once at startup; user never changes while bar is running
+        self._user = os.getenv('USER', 'user')
+
+    @staticmethod
+    def _format_uptime():
+        """ Read /proc/uptime and return a formatted uptime string """
+        try:
+            with open('/proc/uptime', 'r') as f:
+                seconds = int(float(f.read().split()[0]))
+        except OSError:
+            return 'up unknown'
+        days, rem = divmod(seconds, 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes = rem // 60
+        parts = []
+        if days:
+            parts.append(f'{days}d')
+        if hours:
+            parts.append(f'{hours}h')
+        parts.append(f'{minutes}m')
+        return 'up ' + ' '.join(parts)
 
     def fetch_data(self):
         """ Power module has no polled data; follow the pattern anyway """
@@ -222,6 +244,15 @@ class Power(c.BaseModule):
         grid.set_row_homogeneous(False)
         grid.set_column_homogeneous(True)
 
+        # Header row: username (left) and uptime (right)
+        header = c.box('h')
+        user_lbl = c.label(self._user, ha='start', he=True)
+        uptime_lbl = c.label(self._format_uptime(), ha='end')
+        # Keep a reference so the map handler can refresh it
+        self._uptime_label = uptime_lbl
+        header.append(user_lbl)
+        header.append(uptime_lbl)
+
         # Plain cells: everything except reboot, uefi, and poweroff
         plain = [b for b in _BUTTONS if b[2] not in ('reboot', 'uefi', 'poweroff')]
 
@@ -249,7 +280,11 @@ class Power(c.BaseModule):
         )
         grid.attach(shutdown_cell, col, row, 1, 1)
 
-        return grid
+        # Wrap header + grid in a vertical container
+        outer = c.box('v', spacing=8)
+        outer.append(header)
+        outer.append(grid)
+        return outer
 
     def _grid_cell(self, label_text, icon, command, danger=False, short=False):
         """ Single grid cell: icon above label, vertically centered """
@@ -411,6 +446,16 @@ class Power(c.BaseModule):
         self.bar = bar
         self.wm = bar.display.wm
         m.set_widget(self.build_popover())
+
+        # Refresh uptime each time the popover is opened
+        popover = m.get_popover()
+        if popover:
+            def _on_map(_widget):
+                if self._uptime_label:
+                    self._uptime_label.set_text(
+                        self._format_uptime()
+                    )
+            popover.connect('map', _on_map)
 
         widget_ref = weakref.ref(m)
 
