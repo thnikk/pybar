@@ -6,6 +6,7 @@ Author: thnikk
 import weakref
 import subprocess
 import concurrent.futures
+import shutil
 from subprocess import Popen
 import common as c
 import gi
@@ -26,13 +27,26 @@ class Updates(c.BaseModule):
             'type': 'string',
             'default': 'kitty',
             'label': 'Terminal',
-            'description': 'Terminal emulator for running updates'
+            'description': (
+                'Terminal emulator for running updates. '
+                'Include flags if needed (e.g. "ghostty -e").'
+            )
         },
         'alerts': {
             'type': 'list',
             'default': [],
             'label': 'Alerts',
             'description': 'List of packages to prioritize in package list'
+        },
+        'aur_helper': {
+            'type': 'choice',
+            'default': 'paru',
+            'label': 'AUR Helper',
+            'description': (
+                'AUR helper used to check and install updates. '
+                'Auto-detected if not set.'
+            ),
+            'choices': ['paru', 'yay']
         }
     }
 
@@ -106,11 +120,36 @@ class Updates(c.BaseModule):
             'alerts', ["linux", "discord", "qemu", "libvirt"])
         terminal = self.config.get('terminal', 'kitty')
 
-        pool = concurrent.futures.ThreadPoolExecutor(
-            max_workers=len(self.manager_config))
-        package_managers = {name: {} for name in self.manager_config}
+        # Detect which supported helpers are installed.
+        supported = ['paru', 'yay']
+        installed = [h for h in supported if shutil.which(h)]
 
-        for name, info in self.manager_config.items():
+        # Use the configured value if set, otherwise auto-detect.
+        # If only one helper is installed, use it. If both are installed,
+        # fall back to paru. If none are found, fall back to paru so the
+        # command fails gracefully via FileNotFoundError in get_output.
+        configured = self.config.get('aur_helper')
+        if configured in supported:
+            aur_helper = configured
+        elif len(installed) == 1:
+            aur_helper = installed[0]
+        else:
+            aur_helper = 'paru'
+
+        # Copy manager_config and substitute the configured AUR helper.
+        # The class-level dict is never modified.
+        manager_config = dict(self.manager_config)
+        manager_config["AUR"] = {
+            **manager_config["AUR"],
+            "command": [aur_helper, "-Qum"],
+            "update_command": f"{aur_helper} -Syua",
+        }
+
+        pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(manager_config))
+        package_managers = {name: {} for name in manager_config}
+
+        for name, info in manager_config.items():
             thread = pool.submit(
                 self.get_output, info["command"], info["seperator"],
                 info["values"], info["empty_error"], alerts)
@@ -136,7 +175,9 @@ class Updates(c.BaseModule):
         ] + [
             'echo "Packages updated, press enter to close terminal."',
             'read x']
-        process = Popen([data['terminal'], 'sh', '-c', '; '.join(commands)])
+        process = Popen(
+            data['terminal'].split() + ['sh', '-c', '; '.join(commands)]
+        )
 
         # Monitor process completion in a thread
         def monitor_completion():
