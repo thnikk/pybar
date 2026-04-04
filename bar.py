@@ -38,6 +38,12 @@ class Display:
             if self._reloading:
                 import sys
                 os.execv(sys.executable, [sys.executable] + sys.argv)
+            else:
+                # Normal exit: terminate subprocesses (e.g. nmcli monitor)
+                # before the process dies. reload() already calls these
+                # before app.quit(), so this only runs on a true exit.
+                module.stop_all_workers()
+                module.clear_instances()
 
         self.app.connect('shutdown', _on_shutdown)
         self.display = Gdk.Display.get_default()
