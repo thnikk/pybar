@@ -244,7 +244,7 @@ class NVTop(c.BaseModule):
             # GPU load row
             load_box = c.box('h', spacing=10)
             load_box.set_hexpand(True)
-            load_icon = c.label('', style='gray')
+            load_icon = c.label('\uf629', style='gray')
             icon_size_group.add_widget(load_icon)
             load_box.append(load_icon)
             load_lvl = Gtk.LevelBar.new_for_interval(0, 100)
@@ -268,7 +268,7 @@ class NVTop(c.BaseModule):
             # Temp row
             temp_box = c.box('h', spacing=10)
             temp_box.set_hexpand(True)
-            temp_icon = c.label('', style='gray')
+            temp_icon = c.label('\uf2c9', style='gray')
             icon_size_group.add_widget(temp_icon)
             temp_box.append(temp_icon)
             temp_lvl = Gtk.LevelBar.new_for_interval(0, 100)
@@ -301,7 +301,7 @@ class NVTop(c.BaseModule):
             # Memory util row
             mem_box = c.box('h', spacing=10)
             mem_box.set_hexpand(True)
-            mem_icon = c.label('', style='gray')
+            mem_icon = c.label('\uf538', style='gray')
             icon_size_group.add_widget(mem_icon)
             mem_box.append(mem_icon)
             mem_lvl = Gtk.LevelBar.new_for_interval(0, 100)
@@ -415,11 +415,13 @@ class NVTop(c.BaseModule):
 
                     # GPU usage
                     gpu_val = c.label('', ha='end')
+                    gpu_val.set_width_chars(5)
                     gpu_val.get_style_context().add_class('dim-label')
                     info.append(gpu_val)
 
                     # VRAM usage
                     mem_val = c.label('', ha='end')
+                    mem_val.set_width_chars(5)
                     mem_val.get_style_context().add_class('dim-label')
                     info.append(mem_val)
 
@@ -439,7 +441,7 @@ class NVTop(c.BaseModule):
                     p_sep.set_valign(Gtk.Align.FILL)
                     action_box.append(p_sep)
 
-                    kill_btn = c.button('', style='kill-btn')
+                    kill_btn = c.button('\uf1f8', style='kill-btn')
                     kill_btn.set_valign(Gtk.Align.FILL)
                     kill_btn.connect(
                         'clicked', self._on_kill_btn_clicked)
@@ -491,7 +493,7 @@ class NVTop(c.BaseModule):
                         proc_widgets[f'row_{j}'].set_visible(False)
 
                 vsgb = c.VScrollGradientBox(
-                    proc_list, height=250, width=400)
+                    proc_list, height=130, width=400)
                 c.add_style(vsgb, 'box')
                 proc_section.append(vsgb)
                 card_box.append(proc_section)
@@ -518,7 +520,7 @@ class NVTop(c.BaseModule):
         m.cards_box.set_margin_start(5)
         m.box.append(m.cards_box)
 
-        m.set_icon('')
+        m.set_icon('\uf03e')
         m.box.set_spacing(5)
         m.set_visible(True)
 
