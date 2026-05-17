@@ -68,6 +68,15 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# Exclude GCC runtime libs so system versions are used instead,
+# preventing version mismatches with system binaries like hyprctl.
+EXCLUDE_LIBS = ['libstdc++.so', 'libgcc_s.so']
+a.binaries = [
+    (name, path, kind)
+    for name, path, kind in a.binaries
+    if not any(excl in name for excl in EXCLUDE_LIBS)
+]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
