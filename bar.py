@@ -35,6 +35,10 @@ class Display:
         # that GLib-managed subprocesses (e.g. bwrap/glycin from GdkPixbuf
         # image loading) are reaped before execv() is called.
         def _on_shutdown(application):
+            # Hide bars before cleanup so the compositor sees no bar during
+            # the gap between this instance exiting and the new one appearing.
+            for bar in self.bars.values():
+                bar.window.set_visible(False)
             if self._reloading:
                 import sys
                 os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -403,6 +407,10 @@ class Display:
     def reload(self):
         """ Reload by replacing the process image """
         import module
+        # Hide bars before cleanup so the compositor sees no bar during
+        # the gap between this instance exiting and the new one appearing.
+        for bar in self.bars.values():
+            bar.window.set_visible(False)
         # Signal completion before exec so the settings window
         # isn't left waiting for a response that will never come.
         try:
