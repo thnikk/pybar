@@ -316,6 +316,15 @@ class Weather(c.BaseModule):
         today_right.append(aqi_lbl)
         widget_obj.popover_widgets['today']['aqi'] = aqi_lbl
 
+        ts = data.get('timestamp')
+        ts_text = (
+            f"Updated {datetime.fromtimestamp(ts).strftime('%l:%M %p').strip()}"
+            if ts else "Updated unknown"
+        )
+        ts_lbl = c.label(ts_text, style='gray', he=True, ha="end")
+        today_right.append(ts_lbl)
+        widget_obj.popover_widgets['today']['timestamp'] = ts_lbl
+
         today_box.append(today_left)
 
         sun_box = c.box('v')
@@ -563,6 +572,7 @@ class Weather(c.BaseModule):
         widget.set_icon(data.get('icon', ''))
         widget.set_label(data.get('text', ''))
         widget.set_visible(True)
+        widget.reset_style()
         if data.get('stale'):
             c.add_style(widget, 'stale')
 
@@ -609,6 +619,13 @@ class Weather(c.BaseModule):
             w['today']['aqi'].set_text(f"{today['quality']} air quality")
             w['today']['sun'].set_text(
                 f'{today["sun_icon"]} {today["sun_time"]}')
+            ts = data.get('timestamp')
+            ts_text = (
+                f"Updated "
+                f"{datetime.fromtimestamp(ts).strftime('%l:%M %p').strip()}"
+                if ts else "Updated unknown"
+            )
+            w['today']['timestamp'].set_text(ts_text)
 
             # Update Hourly
             for i, h_widgets in enumerate(w['hourly']):
