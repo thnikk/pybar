@@ -500,20 +500,24 @@ class SettingsWindow(Adw.ApplicationWindow):
 class SettingsApplication(Adw.Application):
     """Separate GTK application for settings window"""
 
-    def __init__(self, config_path, dark=False):
+    def __init__(self, config_path, theme='dark'):
         super().__init__(
             application_id="org.thnikk.pybar.settings",
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self.config_path = config_path
-        self.dark = dark
+        self.theme = theme
 
     def do_activate(self):
-        # Apply colour scheme before presenting the window
-        if self.dark:
-            Adw.StyleManager.get_default().set_color_scheme(
-                Adw.ColorScheme.FORCE_DARK
-            )
+        # Apply color scheme before presenting the window
+        _color_schemes = {
+            'dark': Adw.ColorScheme.FORCE_DARK,
+            'light': Adw.ColorScheme.FORCE_LIGHT,
+            'auto': Adw.ColorScheme.DEFAULT,
+        }
+        Adw.StyleManager.get_default().set_color_scheme(
+            _color_schemes.get(self.theme, Adw.ColorScheme.FORCE_DARK)
+        )
         config = Config.load(self.config_path)
         win = SettingsWindow(self, config, self.config_path)
         win.present()
@@ -523,15 +527,16 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('config_path', nargs='?')
-    parser.add_argument('-D', '--dark', action='store_true',
-                        help="Force GTK dark mode")
+    parser.add_argument('-t', '--theme', type=str, default='dark',
+                        choices=['light', 'dark', 'auto'],
+                        help="Set GTK color scheme (default: dark)")
     args = parser.parse_args()
 
     if not args.config_path:
         print("Usage: window.py <config_path>")
         sys.exit(1)
 
-    app = SettingsApplication(args.config_path, dark=args.dark)
+    app = SettingsApplication(args.config_path, theme=args.theme)
     app.run([])
 
 

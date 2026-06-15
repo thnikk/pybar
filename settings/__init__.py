@@ -28,8 +28,14 @@ def launch_settings_window(config_path):
 
     cmd.extend(['--settings', '--config', os.path.expanduser(config_path)])
 
-    # Forward dark mode flag if the bar was launched with it
-    if '-D' in sys.argv or '--dark' in sys.argv:
-        cmd.append('--dark')
+    # Forward theme flag to the settings subprocess
+    theme = 'dark'
+    for flag in ('-t', '--theme'):
+        if flag in sys.argv:
+            idx = sys.argv.index(flag)
+            if idx + 1 < len(sys.argv):
+                theme = sys.argv[idx + 1]
+                break
+    cmd.extend(['--theme', theme])
 
     subprocess.Popen(cmd)

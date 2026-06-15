@@ -32,8 +32,9 @@ def parse_args():
     parser.add_argument('-d', '--debug', action='store_true',
                         help="Enable debug mode "
                         "(enables inspector and screenshots)")
-    parser.add_argument('-D', '--dark', action='store_true',
-                        help="Force GTK dark mode")
+    parser.add_argument('-t', '--theme', type=str, default='dark',
+                        choices=['light', 'dark', 'auto'],
+                        help="Set GTK color scheme (default: dark)")
     parser.add_argument('--clear-cache', action='store_true',
                         help="Clear cache directory contents on startup")
     parser.add_argument('-v', '--version', action='version',
@@ -220,10 +221,10 @@ def clear_cache(cache_path):
             os.remove(entry.path)
 
 
-def launch_settings(config_path, dark=False):
+def launch_settings(config_path, theme='dark'):
     """Launch settings window"""
     from settings.window import SettingsApplication
-    app = SettingsApplication(config_path, dark=dark)
+    app = SettingsApplication(config_path, theme=theme)
     app.run([])
 
 
@@ -231,7 +232,7 @@ def main():
     """ Main function """
     # Handle settings mode
     if args.settings:
-        launch_settings(os.path.expanduser(args.config), dark=args.dark)
+        launch_settings(os.path.expanduser(args.config), theme=args.theme)
         return
 
     # log_level was parsed early
@@ -273,11 +274,15 @@ def main():
     app.config_path = args.config  # Store config path for settings window
     app.connect('activate', lambda app: on_activate(app, config))
 
-    # Force dark mode before the event loop starts
-    if args.dark:
-        Adw.StyleManager.get_default().set_color_scheme(
-            Adw.ColorScheme.FORCE_DARK
-        )
+    # Apply color scheme based on theme argument
+    _color_schemes = {
+        'dark': Adw.ColorScheme.FORCE_DARK,
+        'light': Adw.ColorScheme.FORCE_LIGHT,
+        'auto': Adw.ColorScheme.DEFAULT,
+    }
+    Adw.StyleManager.get_default().set_color_scheme(
+        _color_schemes[args.theme]
+    )
 
     # Use an empty list for argv to prevent GTK from parsing custom args
     app.run([])
