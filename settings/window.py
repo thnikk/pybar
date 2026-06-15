@@ -500,26 +500,38 @@ class SettingsWindow(Adw.ApplicationWindow):
 class SettingsApplication(Adw.Application):
     """Separate GTK application for settings window"""
 
-    def __init__(self, config_path):
+    def __init__(self, config_path, dark=False):
         super().__init__(
             application_id="org.thnikk.pybar.settings",
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self.config_path = config_path
+        self.dark = dark
 
     def do_activate(self):
+        # Apply colour scheme before presenting the window
+        if self.dark:
+            Adw.StyleManager.get_default().set_color_scheme(
+                Adw.ColorScheme.FORCE_DARK
+            )
         config = Config.load(self.config_path)
         win = SettingsWindow(self, config, self.config_path)
         win.present()
 
 
 def main():
-    if len(sys.argv) < 2:
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config_path', nargs='?')
+    parser.add_argument('-D', '--dark', action='store_true',
+                        help="Force GTK dark mode")
+    args = parser.parse_args()
+
+    if not args.config_path:
         print("Usage: window.py <config_path>")
         sys.exit(1)
 
-    config_path = sys.argv[1]
-    app = SettingsApplication(config_path)
+    app = SettingsApplication(args.config_path, dark=args.dark)
     app.run([])
 
 
