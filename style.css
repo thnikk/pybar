@@ -247,6 +247,7 @@ switch:disabled {
 	text-shadow: none;
 	box-shadow: none;
 	transition: none;
+	font-weight: normal;
 }
 
 /* Global button and entry styles */
@@ -408,6 +409,9 @@ popover.background arrow {
 
 separator { background: @gray; padding: 0; margin: 0; }
 
+.title {
+	font-weight: normal;
+}
 .heading {
 	padding: 0px 10px;
 	border-radius: 10px;
