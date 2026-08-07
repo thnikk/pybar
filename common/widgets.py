@@ -9,6 +9,79 @@ from gi.repository import Gtk, Gdk, Pango, GObject, GLib  # noqa
 from common.state import state_manager
 from common.helpers import print_debug, add_style, align
 
+# Grace period before dismissing popovers after the cursor leaves the
+# bar/popover region, allowing movement across the surface gap.
+CURSOR_LEAVE_GRACE_MS = 150
+
+# Popovers currently open that are tracked for cursor-leave dismissal.
+_open_popovers = set()
+# GLib source ID of the pending dismissal grace timer.
+_leave_grace_id = None
+
+
+def cursor_leave_tracking_enabled():
+    """Return True if cursor-leave popover dismissal is configured."""
+    config = state_manager.get('config') or {}
+    return bool(config.get('popover-hide-on-cursor-leave', False))
+
+
+def _cancel_leave_grace():
+    """Cancel a pending cursor-leave grace timer, if any."""
+    global _leave_grace_id
+    if _leave_grace_id is not None:
+        GLib.source_remove(_leave_grace_id)
+        _leave_grace_id = None
+
+
+def _arm_leave_grace():
+    """Arm a grace timer that dismisses open popovers once fired."""
+    global _leave_grace_id
+    if _leave_grace_id is None:
+        _leave_grace_id = GLib.timeout_add(
+            CURSOR_LEAVE_GRACE_MS, _on_leave_grace)
+
+
+def _on_leave_grace():
+    """Dismiss all tracked popovers; runs when the cursor left the region."""
+    global _leave_grace_id
+    _leave_grace_id = None
+    dismiss_open_popovers()
+    return False
+
+
+def _on_region_enter(controller, x, y):
+    """Cancel pending dismissal when the cursor enters the region."""
+    _cancel_leave_grace()
+
+
+def _on_region_leave(controller):
+    """Arm dismissal when the cursor leaves the region."""
+    _arm_leave_grace()
+
+
+def attach_pointer_tracking(widget):
+    """
+    Track pointer crossing over a widget for cursor-leave dismissal.
+    Should be attached to the bar and each module popover.
+    """
+    if not cursor_leave_tracking_enabled():
+        return
+    motion = Gtk.EventControllerMotion.new()
+    motion.connect('enter', _on_region_enter)
+    motion.connect('leave', _on_region_leave)
+    widget.add_controller(motion)
+
+
+def dismiss_open_popovers():
+    """Pop down all tracked open popovers."""
+    _cancel_leave_grace()
+    for popover in list(_open_popovers):
+        if not getattr(popover, '_destroyed', False):
+            try:
+                popover.popdown()
+            except Exception:
+                pass
+
 
 def apply_zone_snap(popover):
     """
@@ -396,12 +469,17 @@ class Widget(Gtk.Popover):
         self._workspace_subscription = None
         self._opened_on_workspace = None
 
+        self._track_cursor = cursor_leave_tracking_enabled()
+        if self._track_cursor:
+            attach_pointer_tracking(self)
+
     def cleanup(self):
         """Clean up widget resources."""
         if self._destroyed:
             return
         self._destroyed = True
 
+        _open_popovers.discard(self)
         self.popdown()
 
         # Unsubscribe unconditionally — _on_unmap only fires when the
@@ -438,6 +516,8 @@ class Widget(Gtk.Popover):
     def _on_map(self, _):
         """Handle edge CSS and exclusive-popover logic on show."""
         config = state_manager.get('config') or {}
+        if self._track_cursor:
+            _open_popovers.add(self)
         if config.get('popover-arrow', False):
             handle_popover_edge(self)
         # Zone-snap overrides the pointing rect before the popover
@@ -467,6 +547,9 @@ class Widget(Gtk.Popover):
 
     def _on_unmap(self, _):
         """Clear active popover state and workspace subscription on hide."""
+        if self._track_cursor:
+            _open_popovers.discard(self)
+
         if state_manager.get('active_popover') == self:
             state_manager.update('active_popover', None)
 

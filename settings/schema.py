@@ -118,6 +118,14 @@ GLOBAL_SCHEMA = {
             'the right edge, center modules spawn centered'
         )
     },
+    'popover-hide-on-cursor-leave': {
+        'type': FieldType.BOOLEAN,
+        'default': False,
+        'label': 'Hide Popovers on Cursor Leave',
+        'description': (
+            'Dismiss open popovers when the cursor leaves the bar or popover'
+        )
+    },
     'namespace': {
         'type': FieldType.STRING,
         'default': 'pybar',

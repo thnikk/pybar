@@ -21,6 +21,7 @@ def load(path):
         "weather", "volume", "network", "tray", "clock", "power"],
     "popover-autohide": true,
     "popover-exclusive": false,
+    "popover-hide-on-cursor-leave": false,
     "modules": {
         "weather": {
             "zip_code": "94102"

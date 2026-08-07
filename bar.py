@@ -524,6 +524,10 @@ class Bar:
         right_click.connect('pressed', self._on_right_click)
         self.bar.add_controller(right_click)
 
+        # Dismiss popovers when the cursor leaves the bar
+        if self.config.get('popover-hide-on-cursor-leave', False):
+            c.attach_pointer_tracking(self.bar)
+
     def cleanup_modules(self):
         """ Manually cleanup all modules to prevent leaks """
         count = 0

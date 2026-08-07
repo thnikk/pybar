@@ -34,6 +34,8 @@ from common.widgets import (  # noqa
     slider,
     Widget,
     Module,
+    attach_pointer_tracking,
+    dismiss_open_popovers,
 )
 
 # Cairo drawing widgets
