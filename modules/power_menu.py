@@ -54,6 +54,17 @@ class Power(c.BaseModule):
             'default': 'hyprlock',
             'label': 'Hyprland Lock Command',
             'description': 'Command to lock the screen in Hyprland'
+        },
+        'blank_delay': {
+            'type': 'integer',
+            'default': 1,
+            'label': 'Blank Wake Delay',
+            'description': (
+                'Delay in seconds between turning displays off and '
+                'listening for input to wake them'
+            ),
+            'min': 0,
+            'max': 30
         }
     }
 
@@ -163,7 +174,9 @@ class Power(c.BaseModule):
                     return
 
                 run(off_cmd)
-                time.sleep(1)  # Grace period to avoid instant wake
+                time.sleep(
+                    self.config.get('blank_delay', 1)
+                )  # Grace period to avoid instant wake
 
                 while True:
                     r, _, _ = select.select(devices, [], [])
