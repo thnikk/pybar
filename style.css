@@ -375,6 +375,13 @@ popover.background arrow {
 	opacity: 0.4;
 }
 
+.play-count {
+	font-size: 15px;
+	color: @white;
+	opacity: 0.6;
+	margin: 0 10px;
+}
+
 .music-button {
 	background: none;
 	border: none;
@@ -387,6 +394,54 @@ popover.background arrow {
 }
 .music-button:hover {
 	opacity: 1;
+}
+
+.music-button.active {
+	color: @blue;
+	opacity: 1;
+}
+.music-button.active:hover {
+	opacity: 0.8;
+}
+
+.toggle-button {
+	background: none;
+	border: none;
+	box-shadow: none;
+	color: @white;
+	text-shadow: none;
+	font-size: 16px;
+	padding: 5px 10px;
+	opacity: 0.8;
+}
+.toggle-button:hover {
+	opacity: 1;
+}
+
+.toggle-button.active-fav {
+	color: @red;
+	opacity: 1;
+}
+
+.toggle-button.active-shuffle {
+	color: @green;
+	opacity: 1;
+}
+
+.toggle-button.active-repeat {
+	color: @blue;
+	opacity: 1;
+}
+
+.repeat-badge {
+	font-size: 10px;
+	font-weight: bold;
+	color: @white;
+	background: @blue;
+	border-radius: 8px;
+	padding: 0px 3px;
+	min-width: 14px;
+	min-height: 14px;
 }
 
 .music-volume highlight {
