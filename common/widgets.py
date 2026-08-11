@@ -434,6 +434,18 @@ def slider(value, min=0, max=100, style=None, scrollable=True):
         scroll_controller.connect("scroll", on_scroll)
         widget.add_controller(scroll_controller)
 
+    # Ignore right-click; the scale's built-in click-to-position
+    # handler would otherwise re-fire while the button is held
+    right_click = Gtk.GestureClick.new()
+    right_click.set_button(3)
+    right_click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+
+    def _claim_right_click(gesture, _n_press, _x, _y):
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+
+    right_click.connect('pressed', _claim_right_click)
+    widget.add_controller(right_click)
+
     return widget
 
 
