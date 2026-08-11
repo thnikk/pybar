@@ -11,6 +11,7 @@ import math
 import os
 import random
 import re
+import threading
 import weakref
 import cairo
 import aiohttp
@@ -125,6 +126,8 @@ class Visualizer(Gtk.DrawingArea):
 
 CACHE_DIR = os.path.expanduser('~/.cache/pybar')
 RECONNECT_DELAY = 5
+ART_TIMEOUT = 10
+ART_CACHE_MAX = 10
 
 
 def format_time(seconds):
@@ -201,6 +204,8 @@ class Feishin(c.BaseModule):
         self.state = {}
         self._loop = None
         self._ws = None
+        self._art_path = None
+        self._art_lock = threading.Lock()
 
     def ws_url(self):
         """ WebSocket URL for the remote server """
@@ -263,10 +268,17 @@ class Feishin(c.BaseModule):
         """ Handle a message from the server """
         event = message.get('event')
         data = message.get('data')
+        song_changed = False
         if event == 'state':
+            old_id = self.state.get('song', {}).get('id')
             self.state = data or {}
+            new_id = self.state.get('song', {}).get('id')
+            song_changed = old_id != new_id
         elif event == 'song':
+            old_id = self.state.get('song', {}).get('id')
             self.state['song'] = data
+            new_id = data.get('id') if data else None
+            song_changed = old_id != new_id
         elif event == 'playback':
             self.state['status'] = data
         elif event == 'position':
@@ -286,10 +298,14 @@ class Feishin(c.BaseModule):
             if song and song.get('id') == data.get('id'):
                 song['userRating'] = data.get('rating')
         elif event in ('proxy', 'error'):
-            return
+            return False
         else:
-            return
+            return False
+
+        if song_changed:
+            self._art_path = None
         self.update_state()
+        return song_changed
 
     def get_status(self):
         """ Build state dict for the bar/popover """
@@ -302,11 +318,7 @@ class Feishin(c.BaseModule):
         artist = str(song.get('artistName', ''))
         album = song.get('album') or ''
 
-        image_url = song.get('imageUrl', '')
-        if image_url:
-            # Strip size constraints for full-resolution art
-            image_url = re.sub(r'&(size|width|height)=\d+', '', image_url)
-        art_path = self.get_art_path(image_url)
+        art_path = self._art_path
 
         length = song.get('duration', 0)
         if not isinstance(length, (int, float)):
@@ -345,33 +357,108 @@ class Feishin(c.BaseModule):
         data = self.get_status()
         c.state_manager.update(self.name, data or {})
 
-    def get_art_path(self, art_url):
-        """ Download and cache album art, return local path """
+    def _art_urls_for_song(self):
+        """ Candidate art URLs for the current song, best first.
+
+        Feishin's song-change events sometimes point imageUrl at the song
+        id, which 404s for tracks that share album art. The actual image
+        resource lives at imageId (Jellyfin), so build a fallback URL from
+        it as well.
+        """
+        song = self.state.get('song')
+        if not song:
+            return []
+        image_url = song.get('imageUrl', '')
+        if image_url:
+            image_url = re.sub(r'&(size|width|height)=\d+', '', image_url)
+        urls = [image_url] if image_url else []
+
+        song_id = song.get('id')
+        image_id = song.get('imageId')
+        if image_url and song_id and image_id and image_id != song_id:
+            alt = image_url.replace(
+                f'/Items/{song_id}/', f'/Items/{image_id}/')
+            if alt != image_url:
+                urls.append(alt)
+        return urls
+
+    def download_art(self, art_url):
+        """ Download and cache album art; return local path.
+
+        Runs off the event loop in a worker thread. Writes are atomic
+        and bounded by ART_CACHE_MAX.
+        """
         if not art_url:
             return None
 
-        if not os.path.exists(CACHE_DIR):
-            os.makedirs(CACHE_DIR, exist_ok=True)
-
-        art_filename = \
-            f"feishin_{hashlib.md5(art_url.encode()).hexdigest()}.jpg"
-        art_path = os.path.join(CACHE_DIR, art_filename)
-
-        if not os.path.exists(art_path):
-            try:
-                for f in os.listdir(CACHE_DIR):
-                    if f.startswith('feishin_') and f.endswith('.jpg'):
-                        os.remove(os.path.join(CACHE_DIR, f))
-
-                response = requests.get(art_url, timeout=5)
-                if response.status_code == 200:
-                    with open(art_path, 'wb') as f:
-                        f.write(response.content)
-                else:
+        with self._art_lock:
+            if not os.path.exists(CACHE_DIR):
+                try:
+                    os.makedirs(CACHE_DIR, exist_ok=True)
+                except Exception:
                     return None
+
+            art_filename = \
+                f"feishin_{hashlib.md5(art_url.encode()).hexdigest()}.jpg"
+            art_path = os.path.join(CACHE_DIR, art_filename)
+
+            if os.path.exists(art_path):
+                return art_path
+
+            tmp_path = art_path + '.tmp'
+            try:
+                response = requests.get(art_url, timeout=ART_TIMEOUT)
+                if response.status_code == 200:
+                    with open(tmp_path, 'wb') as f:
+                        f.write(response.content)
+                    os.replace(tmp_path, art_path)
+                    self._prune_art_cache()
+                    return art_path
             except Exception:
                 return None
-        return art_path
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+        return None
+
+    def _prune_art_cache(self):
+        """ Keep only the newest ART_CACHE_MAX art files """
+        try:
+            files = [
+                os.path.join(CACHE_DIR, f)
+                for f in os.listdir(CACHE_DIR)
+                if f.startswith('feishin_') and f.endswith('.jpg')
+            ]
+            files.sort(key=os.path.getmtime, reverse=True)
+            for f in files[ART_CACHE_MAX:]:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    async def _fetch_art(self):
+        """ Download art for the current song off the event loop """
+        art_urls = self._art_urls_for_song()
+        if not art_urls:
+            return
+        art_path = None
+        for art_url in art_urls:
+            # Stop if the song changed while downloading
+            if self._art_urls_for_song()[:1] != art_urls[:1]:
+                return
+            art_path = await asyncio.to_thread(self.download_art, art_url)
+            if art_path:
+                break
+        # Only apply if the song hasn't changed while downloading
+        if self._art_urls_for_song() != art_urls:
+            return
+        self._art_path = art_path
+        self.update_state()
 
     async def client_loop(self):
         """ Connect and read messages until disconnected """
@@ -397,7 +484,10 @@ class Feishin(c.BaseModule):
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         try:
-                            self.handle_message(json.loads(msg.data))
+                            song_changed = self.handle_message(
+                                json.loads(msg.data))
+                            if song_changed:
+                                asyncio.ensure_future(self._fetch_art())
                         except Exception as e:
                             c.print_debug(
                                 f"Feishin message error: {e}", color='red')
@@ -781,7 +871,6 @@ class Feishin(c.BaseModule):
             else:
                 new_vol = min(100, volume + step)
             self.set_volume(new_vol)
-            self.update_state()
             return True
 
         scroll.connect('scroll', on_scroll)
@@ -792,7 +881,6 @@ class Feishin(c.BaseModule):
 
         def on_right_click(_gesture, _n_press, _x, _y):
             self.toggle_play()
-            self.update_state()
 
         click.connect('released', on_right_click)
         m.add_controller(click)
