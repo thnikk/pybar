@@ -40,7 +40,8 @@ Then add the module to your bar config:
 | `password` | string    | `''`        | Password for the remote server (if set) |
 | `show_title` | boolean | `true`      | Show the song title in the bar        |
 | `art_size` | integer   | `300`       | Album art size in the popover (pixels) |
-| `visualizer` | boolean | `false`     | Show a dummy visualizer over the album art |
+| `visualizer` | boolean | `false`     | Show a visualizer over the album art    |
+| `visualizer_height` | integer | `20` | Visualizer height as a percentage of the album art height |
 
 ## Controls
 
@@ -62,3 +63,7 @@ Additional buttons in the popover:
 - The module only shows when a song is loaded in Feishin.
 - Album art is cached in `~/.cache/pybar`.
 - Position updates are pushed by Feishin roughly every 500 ms.
+- The visualizer captures feishin's audio stream via PipeWire and needs
+  `pw-record` (pipewire-utils) or `parec` (pulseaudio-utils); it falls back
+  to a dummy animation if neither is available. It only runs while the
+  popover is visible.

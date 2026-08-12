@@ -11,7 +11,11 @@ import math
 import os
 import random
 import re
+import shutil
+import struct
+import subprocess
 import threading
+import time
 import weakref
 import cairo
 import aiohttp
@@ -59,7 +63,7 @@ class Visualizer(Gtk.DrawingArea):
     ALPHA_TOP = 0.6
     ALPHA_BOT = 0.6
 
-    def __init__(self, width, height=56):
+    def __init__(self, width, height=56, audio_capture=None):
         super().__init__()
         self.set_content_width(width)
         self.set_content_height(height)
@@ -70,6 +74,7 @@ class Visualizer(Gtk.DrawingArea):
         self._targets = [
             random.uniform(0.05, 0.5) for _ in range(self.BAR_COUNT)
         ]
+        self._audio_capture = audio_capture
         self._timeout_id = None
         self.set_draw_func(self._draw)
 
@@ -88,8 +93,13 @@ class Visualizer(Gtk.DrawingArea):
 
     def _tick(self):
         """ Advance animation one frame """
+        real = None
+        if self._audio_capture and self._audio_capture.has_data():
+            real = self._audio_capture.bars()
         for i in range(self.BAR_COUNT):
-            if random.random() < self.RETARGET_CHANCE:
+            if real is not None and i < len(real):
+                self._targets[i] = real[i]
+            elif random.random() < self.RETARGET_CHANCE:
                 self._targets[i] = random.uniform(0.05, 1.0)
             self._heights[i] += (
                 (self._targets[i] - self._heights[i]) * self.SMOOTH
@@ -142,6 +152,278 @@ def format_time(seconds):
     return f"{minutes:02d}:{seconds:02d}"
 
 
+def fft_radix2(real):
+    """ In-place iterative radix-2 FFT; returns complex list.
+
+    real must be a power-of-two length list of floats.
+    """
+    n = len(real)
+    # Bit-reversal permutation
+    j = 0
+    for i in range(1, n):
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j ^= bit
+        if i < j:
+            real[i], real[j] = real[j], real[i]
+
+    data = [complex(x, 0.0) for x in real]
+    length = 2
+    while length <= n:
+        ang = -2.0 * math.pi / length
+        wlen = complex(math.cos(ang), math.sin(ang))
+        half = length // 2
+        for i in range(0, n, length):
+            w = 1.0 + 0.0j
+            for k in range(i, i + half):
+                u = data[k]
+                v = data[k + half] * w
+                data[k] = u + v
+                data[k + half] = u - v
+                w *= wlen
+        length *= 2
+    return data
+
+
+class AudioCapture:
+    """ Capture feishin's audio stream and compute spectrum bars """
+
+    SAMPLE_RATE = 48000
+    CHANNELS = 2
+    FFT_SIZE = 2048
+    BAR_COUNT = 40
+    F_MIN = 30.0
+    F_MAX = 15000.0
+    # AGC: bars stay lively regardless of playback volume
+    TARGET_LEVEL = 0.03
+    GAIN_MIN = 0.25
+    GAIN_MAX = 4.0
+    SILENCE_FLOOR = 1e-4
+
+    def __init__(self):
+        self._proc = None
+        self._thread = None
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self._bars = [0.0] * self.BAR_COUNT
+        self._has_data = False
+        self._smooth = [0.0] * self.BAR_COUNT
+        self._band_edges = self._log_bands()
+        self._agc_level = 0.0
+        self._agc_gain = 1.0
+
+    @staticmethod
+    def _log_bands():
+        """ Log-spaced band edges from F_MIN to F_MAX.
+
+        Each band is clamped to at least one FFT bin wide so no band is
+        empty (an empty band would never move).
+        """
+        bin_w = AudioCapture.SAMPLE_RATE / AudioCapture.FFT_SIZE
+        steps = AudioCapture.BAR_COUNT + 1
+        edges = []
+        for i in range(steps):
+            t = i / (steps - 1)
+            freq = (AudioCapture.F_MIN * (AudioCapture.F_MAX /
+                                          AudioCapture.F_MIN) ** t)
+            edges.append(freq)
+        # Enforce a minimum width of one bin by merging narrow bands
+        clamped = [edges[0]]
+        for edge in edges[1:]:
+            if edge - clamped[-1] < bin_w:
+                edge = clamped[-1] + bin_w
+            clamped.append(edge)
+        clamped[-1] = AudioCapture.F_MAX
+        return clamped
+
+    def bars(self):
+        """ Thread-safe snapshot of normalized bar heights (0..1) """
+        with self._lock:
+            return list(self._smooth)
+
+    def has_data(self):
+        return self._has_data
+
+    def _find_node(self):
+        """ Find feishin's PipeWire node serial via pactl """
+        try:
+            out = subprocess.run(
+                ['pactl', 'list', 'sink-inputs'],
+                capture_output=True, text=True, timeout=3
+            ).stdout
+        except Exception:
+            return None
+        node = None
+        for line in out.splitlines():
+            m = re.match(r'\s*Sink Input #(\d+)', line)
+            if m:
+                node = m.group(1)
+            if 'application.process.binary = "feishin"' in line:
+                return node
+        return None
+
+    def _spawn(self, node):
+        """ Spawn the capture subprocess for the given node """
+        if shutil.which('pw-record'):
+            cmd = [
+                'pw-record', '--target', node, '--format', 'f32',
+                '--rate', str(self.SAMPLE_RATE),
+                '--channels', str(self.CHANNELS),
+                '--container', 'raw', '-'
+            ]
+        elif shutil.which('parec'):
+            cmd = [
+                'parec', '--device', node, '--format=float32le',
+                '--rate', str(self.SAMPLE_RATE),
+                '--channels', str(self.CHANNELS)
+            ]
+        else:
+            return None
+        try:
+            return subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except Exception:
+            return None
+
+    def _run(self):
+        """ Capture loop: read PCM, FFT, update bars """
+        while not self._stop.is_set():
+            node = self._find_node()
+            if not node:
+                time.sleep(2)
+                continue
+            proc = self._spawn(node)
+            if not proc:
+                time.sleep(2)
+                continue
+            self._proc = proc
+            self._read_stream(proc)
+            self._proc = None
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+    def _read_stream(self, proc):
+        """ Read PCM from proc stdout and compute spectrum """
+        samples = []
+        chunk_size = 8192
+        while not self._stop.is_set():
+            raw = proc.stdout.read(chunk_size)
+            if not raw:
+                break
+            n = len(raw) // 4
+            if n == 0:
+                continue
+            vals = struct.unpack(f'<{n}f', raw[:n * 4])
+            samples.extend(vals)
+            while len(samples) >= self.FFT_SIZE * self.CHANNELS:
+                frame = samples[:self.FFT_SIZE * self.CHANNELS]
+                del samples[:self.FFT_SIZE]
+                self._process_frame(frame)
+        self._has_data = False
+
+    def _process_frame(self, frame):
+        """ FFT one interleaved stereo frame and update bar heights """
+        # Downmix to mono
+        mono = [
+            (frame[i] + frame[i + 1]) * 0.5
+            for i in range(0, len(frame), self.CHANNELS)
+        ]
+        spectrum = fft_radix2(mono)
+        nyquist = self.SAMPLE_RATE / 2
+        # Magnitudes for positive frequencies (skip DC)
+        n_half = self.FFT_SIZE // 2
+        mags = [abs(spectrum[i]) for i in range(1, n_half)]
+        bins = [i * self.SAMPLE_RATE / self.FFT_SIZE
+                for i in range(1, n_half)]
+
+        heights = [0.0] * self.BAR_COUNT
+        norm = 2.0 / self.FFT_SIZE
+        # Map -60dB..0dB to 0..1 for good dynamics across volume levels
+        dB_floor = -60.0
+        raw = [0.0] * self.BAR_COUNT
+        level = 0.0
+        count = 0
+        for band in range(self.BAR_COUNT):
+            lo = self._band_edges[band]
+            hi = self._band_edges[band + 1]
+            total = 0.0
+            bin_count = 0
+            for i, freq in enumerate(bins):
+                if lo <= freq < hi and freq <= nyquist:
+                    total += mags[i] * norm
+                    bin_count += 1
+            if bin_count:
+                raw[band] = total / bin_count
+                level += raw[band]
+                count += 1
+        if count:
+            level /= count
+
+        # AGC: adapt gain to overall level with fast attack / slow release
+        if level > self._agc_level:
+            self._agc_level += (level - self._agc_level) * 0.3
+        else:
+            self._agc_level += (level - self._agc_level) * 0.05
+
+        target = 1.0
+        if self._agc_level > self.SILENCE_FLOOR:
+            target = self.TARGET_LEVEL / self._agc_level
+        target = min(self.GAIN_MAX, max(self.GAIN_MIN, target))
+        if target > self._agc_gain:
+            self._agc_gain += (target - self._agc_gain) * 0.3
+        else:
+            self._agc_gain += (target - self._agc_gain) * 0.05
+
+        # Apply gain in the linear domain, then convert to dB
+        for i in range(self.BAR_COUNT):
+            avg = raw[i] * self._agc_gain
+            if avg > 0:
+                db = 20.0 * math.log10(max(avg, 1e-8))
+                heights[i] = min(1.0, max(0.0,
+                                          (db - dB_floor) / -dB_floor))
+
+        with self._lock:
+            self._has_data = True
+            # Smooth bar heights for a stable display
+            for i in range(self.BAR_COUNT):
+                self._smooth[i] += (
+                    (heights[i] - self._smooth[i]) * 0.6
+                )
+            self._bars = heights
+
+    def start(self):
+        """ Start the capture thread """
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        """ Stop the capture thread """
+        self._stop.set()
+        if self._proc:
+            try:
+                self._proc.terminate()
+            except Exception:
+                pass
+        if self._thread:
+            self._thread.join(timeout=1.0)
+            self._thread = None
+        self._proc = None
+
+    def cleanup(self):
+        """ Full stop and clear state """
+        self.stop()
+        with self._lock:
+            self._smooth = [0.0] * self.BAR_COUNT
+            self._has_data = False
+
+
 class Feishin(c.BaseModule):
     SCHEMA = {
         'host': {
@@ -188,7 +470,16 @@ class Feishin(c.BaseModule):
             'type': 'boolean',
             'default': False,
             'label': 'Visualizer',
-            'description': 'Show dummy visualizer over album art'
+            'description': 'Show visualizer over album art'
+        },
+        'visualizer_height': {
+            'type': 'integer',
+            'default': 20,
+            'label': 'Visualizer Height',
+            'description': 'Visualizer height as a percentage of '
+                           'album art height',
+            'min': 5,
+            'max': 100
         }
     }
 
@@ -201,11 +492,15 @@ class Feishin(c.BaseModule):
         self.art_size = config.get('art_size', 300)
         self.show_title = config.get('show_title', True)
         self.show_visualizer = config.get('visualizer', False)
+        self.visualizer_height = config.get('visualizer_height', 20)
+        self.visualizer_height = max(5, min(100, self.visualizer_height))
         self.state = {}
         self._loop = None
         self._ws = None
         self._art_path = None
         self._art_lock = threading.Lock()
+        self._audio_capture = AudioCapture()
+        self._popover_visible = False
 
     def ws_url(self):
         """ WebSocket URL for the remote server """
@@ -523,7 +818,7 @@ class Feishin(c.BaseModule):
                 break
 
     def cleanup(self):
-        """ Close the websocket """
+        """ Close the websocket and stop the visualizer capture """
         ws = self._ws
         self._ws = None
         if ws:
@@ -535,6 +830,7 @@ class Feishin(c.BaseModule):
                     )
             except Exception:
                 pass
+        self._audio_capture.cleanup()
 
     def fetch_data(self):
         """ Polling fallback; feishin is push-based """
@@ -546,6 +842,38 @@ class Feishin(c.BaseModule):
             c.add_style(button, active_class)
         else:
             button.get_style_context().remove_class(active_class)
+
+    def _update_visualizer(self, widget, is_playing):
+        """ Start/stop the visualizer based on popover + playback state """
+        if not self.show_visualizer:
+            return
+        active = is_playing and self._popover_visible
+        if active:
+            widget.pop_visualizer.start()
+            self._audio_capture.start()
+        else:
+            widget.pop_visualizer.stop()
+            self._audio_capture.stop()
+
+    def _track_popover_visibility(self, widget):
+        """ Watch the popover so the capture only runs while visible """
+        popover = widget.get_popover()
+        if popover is None:
+            return
+
+        def on_show(_popover):
+            self._popover_visible = True
+            if hasattr(widget, 'pop_visualizer'):
+                is_playing = self.state.get('status') == 'playing'
+                self._update_visualizer(widget, is_playing)
+
+        def on_hide(_popover):
+            self._popover_visible = False
+            if hasattr(widget, 'pop_visualizer'):
+                self._update_visualizer(widget, False)
+
+        popover.connect('show', on_show)
+        popover.connect('hide', on_hide)
 
     def update_popover_widgets(self, widget, data):
         """ Update existing popover widgets """
@@ -628,10 +956,7 @@ class Feishin(c.BaseModule):
             widget.pop_vis_revealer.set_reveal_child(is_playing)
             if hasattr(widget, 'pop_vis_bg_revealer'):
                 widget.pop_vis_bg_revealer.set_reveal_child(is_playing)
-            if is_playing:
-                widget.pop_visualizer.start()
-            else:
-                widget.pop_visualizer.stop()
+            self._update_visualizer(widget, is_playing)
 
     def _make_hover_slider(self, slider_widget):
         """Wrap slider in a box; reveal handle on box hover."""
@@ -683,7 +1008,8 @@ class Feishin(c.BaseModule):
         art_overlay.set_child(art_container)
 
         if self.show_visualizer:
-            widget.pop_vis_bg = VisualizerBG()
+            viz_height = int(art_size * (self.visualizer_height / 100))
+            widget.pop_vis_bg = VisualizerBG(height=viz_height)
             widget.pop_vis_bg_revealer = Gtk.Revealer()
             widget.pop_vis_bg_revealer.set_transition_type(
                 Gtk.RevealerTransitionType.CROSSFADE
@@ -694,7 +1020,9 @@ class Feishin(c.BaseModule):
             widget.pop_vis_bg_revealer.set_halign(Gtk.Align.FILL)
             art_overlay.add_overlay(widget.pop_vis_bg_revealer)
 
-            widget.pop_visualizer = Visualizer(art_size)
+            widget.pop_visualizer = Visualizer(
+                art_size, height=viz_height,
+                audio_capture=self._audio_capture)
             widget.pop_visualizer.set_valign(Gtk.Align.END)
             widget.pop_visualizer.set_halign(Gtk.Align.FILL)
 
@@ -918,6 +1246,7 @@ class Feishin(c.BaseModule):
         if not widget.popover_built:
             widget.set_widget(self.build_popover(widget, data))
             widget.popover_built = True
+            self._track_popover_visibility(widget)
         else:
             try:
                 self.update_popover_widgets(widget, data)
