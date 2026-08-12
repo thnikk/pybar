@@ -52,7 +52,7 @@ class Visualizer(Gtk.DrawingArea):
     # Number of bars in the visualizer
     BAR_COUNT = 40
     # How often to tick the animation in milliseconds
-    TICK_MS = 40
+    TICK_MS = 16
     # Fraction of bar area used per bar (rest is gap)
     BAR_FILL = 0.5
     # Smoothing factor for bar height interpolation
