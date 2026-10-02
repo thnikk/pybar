@@ -167,6 +167,12 @@ text {
 	min-height: 3px;
 }
 
+/* Event indicator colors (clock module). Dedicated classes so the
+ * button-style padding/border on .blue/.red never applies. */
+.indicator.event-green { background: @green; }
+.indicator.event-orange { background: @orange; }
+.indicator.event-blue { background: @blue; }
+
 /*
  * To adjust indicator sizing:
  * - min-height: Controls the indicator's thickness

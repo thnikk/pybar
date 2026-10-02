@@ -249,6 +249,15 @@ class Clock(c.BaseModule):
             "min": 1,
             "max": 60,
         },
+        "show-event-indicator": {
+            "type": "boolean",
+            "default": True,
+            "label": "Show Event Indicator",
+            "description": (
+                "Show a colored indicator on the clock when there "
+                "are calendar events today"
+            ),
+        },
     }
 
     def __init__(self, name, config):
@@ -269,7 +278,28 @@ class Clock(c.BaseModule):
         """Fetch the current time."""
         now = datetime.now()
         fmt = self.config.get("format", self.SCHEMA["format"]["default"])
-        return {"text": now.strftime(fmt), "day": now.day}
+        data = {"text": now.strftime(fmt), "day": now.day}
+
+        events_today = self._events_on(now.date())
+        if events_today:
+            data["has_events"] = True
+            data["event_style"] = self.event_lookup(events_today)
+        return data
+
+    def _events_on(self, target):
+        """Return the first event description on the given date.
+
+        Event keys may be zero-padded ("10/02") or not ("10/2");
+        match numerically like the calendar rendering does.
+        """
+        for date_str, desc in self._events.items():
+            try:
+                m, d = map(int, date_str.split("/"))
+            except (ValueError, IndexError):
+                continue
+            if m == target.month and d == target.day:
+                return desc
+        return None
 
     def _start_background_fetch(self):
         """Spawn a daemon thread to fetch all remote sources."""
@@ -603,6 +633,22 @@ class Clock(c.BaseModule):
         widget.set_visible(True)
         if new != last:
             widget.set_label(new)
+
+        # Toggle the event indicator, matching the popover color logic.
+        # Uses dedicated "event-*" classes (see style.css) so the
+        # button-style padding on .blue/.red never inflates the pill.
+        show = self.config.get("show-event-indicator", False)
+        current = getattr(widget, "_event_indicator_style", None)
+        desired = None
+        if show and data.get("has_events"):
+            desired = "event-" + data.get("event_style", "green")
+
+        if desired != current:
+            if current:
+                widget.del_indicator_style(current)
+            if desired:
+                widget.add_indicator_style(desired)
+            widget._event_indicator_style = desired
 
         # Rebuild calendar on day change and re-fetch events.
         current_day = data.get("day")
