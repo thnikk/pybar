@@ -178,6 +178,17 @@ class Power(c.BaseModule):
                     self.config.get('blank_delay', 1)
                 )  # Grace period to avoid instant wake
 
+                # Discard events already queued during the grace period
+                # (the click that triggered blanking, plus any movement
+                # while the screens were going off) so they can't wake
+                # the display the instant we start listening.
+                for dev in devices:
+                    try:
+                        for _ in dev.read():
+                            pass
+                    except BlockingIOError:
+                        pass
+
                 while True:
                     r, _, _ = select.select(devices, [], [])
                     if r:
