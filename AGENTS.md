@@ -12,6 +12,8 @@ Instructions:
 
 - Do NOT add/commit/push anything with git
 - Do not edit files outside of the current repo without explicit permission
+- After making code changes, rebuild the executable with `make build`
+  (PyInstaller via `.venv/bin/pyinstaller pybar.spec`)
 
 ## Python Guidelines
 - Code should be PEP8 compliant
