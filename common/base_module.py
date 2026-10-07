@@ -69,11 +69,13 @@ class BaseModule:
                     if cached:
                         self.last_data = cached
                         stale_init = cached.copy()
-                        cache_age = 0
+                        # A cache without a timestamp is treated as
+                        # stale so it gets refreshed on the next fetch.
+                        cache_age = float('inf')
                         if 'timestamp' in cached:
                             cache_age = time.time() - cached['timestamp']
-                            if cache_age > self.interval * 2:
-                                stale_init['stale'] = True
+                        if cache_age > self.interval * 2:
+                            stale_init['stale'] = True
                         stale_init['timestamp'] = (
                             datetime.now().timestamp())
                         state_manager.update(self.name, stale_init)
@@ -123,6 +125,8 @@ class BaseModule:
                                     os.makedirs(
                                         os.path.dirname(self.cache_path),
                                         exist_ok=True)
+                                    data['timestamp'] = (
+                                        datetime.now().timestamp())
                                     with open(self.cache_path, 'w') as f:
                                         json.dump(data, f)
                                 except Exception as e:
