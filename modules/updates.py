@@ -66,7 +66,9 @@ class Updates(c.BaseModule):
             "update_command": "paru -Syua",
             "seperator": ' ',
             "empty_error": 1,
-            "values": [0, -1]
+            # "name old -> new" for paru, plus a trailing "[age]" token
+            # for yay, so the new version is always token 3.
+            "values": [0, 3]
         },
         "Apt": {
             "command": ["apt", "list", "--upgradable"],
@@ -123,27 +125,33 @@ class Updates(c.BaseModule):
         # Detect which supported helpers are installed.
         supported = ['paru', 'yay']
         installed = [h for h in supported if shutil.which(h)]
-
-        # Use the configured value if set, otherwise auto-detect.
-        # If only one helper is installed, use it. If both are installed,
-        # fall back to paru. If none are found, fall back to paru so the
-        # command fails gracefully via FileNotFoundError in get_output.
         configured = self.config.get('aur_helper')
-        if configured in supported:
+
+        # Prefer the configured helper only if it's actually installed.
+        if configured in installed:
             aur_helper = configured
-        elif len(installed) == 1:
+        elif installed:
+            if configured:
+                c.print_debug(
+                    f"AUR helper '{configured}' not installed, using "
+                    f"'{installed[0]}'", color='yellow')
             aur_helper = installed[0]
         else:
-            aur_helper = 'paru'
+            # No supported helper available; skip the AUR check entirely.
+            aur_helper = None
 
         # Copy manager_config and substitute the configured AUR helper.
-        # The class-level dict is never modified.
+        # The class-level dict is never modified. Drop AUR when no helper
+        # is installed so no doomed command is spawned.
         manager_config = dict(self.manager_config)
-        manager_config["AUR"] = {
-            **manager_config["AUR"],
-            "command": [aur_helper, "-Qum"],
-            "update_command": f"{aur_helper} -Syua",
-        }
+        if aur_helper is None:
+            manager_config.pop("AUR", None)
+        else:
+            manager_config["AUR"] = {
+                **manager_config["AUR"],
+                "command": [aur_helper, "-Qum"],
+                "update_command": f"{aur_helper} -Syua",
+            }
 
         pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=len(manager_config))
